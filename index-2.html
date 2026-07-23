@@ -1,0 +1,1899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>On Point Pizza — Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body, #root { height: 100%; margin: 0; background: #F4EFE6; }
+  #boot-status {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; padding: 24px; font-family: sans-serif; text-align: center;
+    background: #F4EFE6; color: #3a2a1e; z-index: 9999;
+  }
+  #boot-error {
+    display: none; position: fixed; inset: 0; background: #fff5f2; color: #7a1f14;
+    padding: 20px; font-family: monospace; font-size: 13px; white-space: pre-wrap;
+    overflow: auto; z-index: 10000; border-top: 6px solid #b02a2e;
+  }
+</style>
+</head>
+<body>
+<div id="boot-status">Loading manager app…</div>
+<div id="boot-error"></div>
+<div id="root"></div>
+
+<script>
+  window.addEventListener("error", function (e) {
+    var box = document.getElementById("boot-error");
+    var statusEl = document.getElementById("boot-status");
+    if (statusEl) statusEl.style.display = "none";
+    box.style.display = "block";
+    box.textContent =
+      "Something failed to load. Screenshot this and send it back:\n\n" +
+      (e.message || "Unknown error") +
+      "\n\nFile: " + (e.filename || "n/a") + "\nLine: " + (e.lineno || "n/a") + ":" + (e.colno || "n/a") +
+      (e.error && e.error.stack ? "\n\n" + e.error.stack : "");
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    var box = document.getElementById("boot-error");
+    var statusEl = document.getElementById("boot-status");
+    if (statusEl) statusEl.style.display = "none";
+    box.style.display = "block";
+    box.textContent = "Something failed to load (promise error). Screenshot this:\n\n" + (e.reason && e.reason.message ? e.reason.message : String(e.reason));
+  });
+
+  window.storage = {
+    get: async (key, shared) => {
+      const raw = localStorage.getItem((shared ? "shared:" : "local:") + key);
+      if (raw === null) throw new Error("not found");
+      return { key, value: raw, shared: !!shared };
+    },
+    set: async (key, value, shared) => {
+      try {
+        localStorage.setItem((shared ? "shared:" : "local:") + key, value);
+        return { key, value, shared: !!shared };
+      } catch (e) {
+        return null;
+      }
+    },
+    delete: async (key, shared) => {
+      localStorage.removeItem((shared ? "shared:" : "local:") + key);
+      return { key, deleted: true, shared: !!shared };
+    },
+    list: async (prefix, shared) => {
+      const p = (shared ? "shared:" : "local:") + (prefix || "");
+      const keys = Object.keys(localStorage)
+        .filter((k) => k.startsWith(p))
+        .map((k) => k.slice((shared ? "shared:" : "local:").length));
+      return { keys, prefix, shared: !!shared };
+    },
+  };
+  window.CHAT_ENDPOINT = "/.netlify/functions/chat";
+</script>
+
+<script>
+const { useState, useEffect, useRef } = React;
+
+function makeIcon(paths, viewBox) {
+  return function Icon({ size = 16, color = "currentColor", className = "", style = {} }) {
+    return /* @__PURE__ */ React.createElement(
+      "svg",
+      {
+        width: size,
+        height: size,
+        viewBox: viewBox || "0 0 24 24",
+        fill: "none",
+        stroke: color,
+        strokeWidth: "2",
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+        className,
+        style
+      },
+      paths
+    );
+  };
+}
+const Pizza = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M12 2 2 19h20L12 2z" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "13", r: "1", fill: "currentColor" }), /* @__PURE__ */ React.createElement("circle", { cx: "9", cy: "16", r: "1", fill: "currentColor" }), /* @__PURE__ */ React.createElement("circle", { cx: "15", cy: "16", r: "1", fill: "currentColor" }))
+);
+const Send = makeIcon(/* @__PURE__ */ React.createElement("path", { d: "M22 2 11 13M22 2 15 22l-4-9-9-4 20-7z" }));
+const Plus = makeIcon(/* @__PURE__ */ React.createElement("path", { d: "M12 5v14M5 12h14" }));
+const Trash2 = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M3 6h18" }), /* @__PURE__ */ React.createElement("path", { d: "M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6M14 11v6" }))
+);
+const Check = makeIcon(/* @__PURE__ */ React.createElement("path", { d: "M20 6 9 17l-5-5" }));
+const Users = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("circle", { cx: "9", cy: "8", r: "3.2" }), /* @__PURE__ */ React.createElement("path", { d: "M2.5 20a6.5 6.5 0 0 1 13 0" }), /* @__PURE__ */ React.createElement("circle", { cx: "17", cy: "8", r: "2.6" }), /* @__PURE__ */ React.createElement("path", { d: "M17 12a5.2 5.2 0 0 1 4.5 8" }))
+);
+const Package = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M21 8 12 3 3 8v8l9 5 9-5V8z" }), /* @__PURE__ */ React.createElement("path", { d: "M3 8l9 5 9-5M12 13v8" }))
+);
+const ClipboardList = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("rect", { x: "5", y: "4", width: "14", height: "17", rx: "1.5" }), /* @__PURE__ */ React.createElement("path", { d: "M9 3h6v3H9z" }), /* @__PURE__ */ React.createElement("path", { d: "M9 11h6M9 15h6M9 19h3" }))
+);
+const MessageSquare = makeIcon(/* @__PURE__ */ React.createElement("path", { d: "M4 4h16v12H8l-4 4V4z" }));
+const AlertTriangle = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M12 3 2 20h20L12 3z" }), /* @__PURE__ */ React.createElement("path", { d: "M12 10v4" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "17", r: "0.6", fill: "currentColor" }))
+);
+const Loader2 = makeIcon(
+  /* @__PURE__ */ React.createElement("path", { d: "M21 12a9 9 0 1 1-9-9" })
+);
+const ChefHat = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M6 10a4 4 0 0 1 2-6.5A4 4 0 0 1 12 3a4 4 0 0 1 4 .5A4 4 0 0 1 18 10v7H6v-7z" }), /* @__PURE__ */ React.createElement("path", { d: "M6 21h12" }))
+);
+const BookOpen = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M3 5c3-1.5 6-1.5 9 0v14c-3-1.5-6-1.5-9 0V5z" }), /* @__PURE__ */ React.createElement("path", { d: "M21 5c-3-1.5-6-1.5-9 0v14c3-1.5 6-1.5 9 0V5z" }))
+);
+const Camera = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "14", r: "3.5" }))
+);
+const Activity = makeIcon(/* @__PURE__ */ React.createElement("path", { d: "M22 12h-4l-3 8-6-16-3 8H2" }));
+const ShoppingCart = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("circle", { cx: "9", cy: "20", r: "1", fill: "currentColor" }), /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "20", r: "1", fill: "currentColor" }), /* @__PURE__ */ React.createElement("path", { d: "M2 3h2l2.6 12.4a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 7H6" }))
+);
+const Copy = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("rect", { x: "9", y: "9", width: "12", height: "12", rx: "1.5" }), /* @__PURE__ */ React.createElement("path", { d: "M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" }))
+);
+const Mic = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("rect", { x: "9", y: "2", width: "6", height: "12", rx: "3" }), /* @__PURE__ */ React.createElement("path", { d: "M5 10a7 7 0 0 0 14 0M12 19v3" }))
+);
+const MicOff = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M2 2l20 20" }), /* @__PURE__ */ React.createElement("path", { d: "M9 4.5A3 3 0 0 1 15 6v6c0 .4-.06.77-.17 1.13M5 10a7 7 0 0 0 10.3 6.2M12 19v3" }))
+);
+const Volume2 = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M4 9v6h4l5 4V5L8 9H4z" }), /* @__PURE__ */ React.createElement("path", { d: "M17 8a5 5 0 0 1 0 8M20 5a9 9 0 0 1 0 14" }))
+);
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DEFAULT_DATA = {
+  schedule: {
+    Mon: [{ id: "s1", name: "Maria", time: "4pm\u2013close" }],
+    Tue: [],
+    Wed: [
+      { id: "s2", name: "Pop", time: "8am\u20134pm" },
+      { id: "s6", name: "Chris (owner)", time: "11am\u20137:30pm" },
+      { id: "s7", name: "Andy", time: "11am\u20137:30pm" },
+      { id: "s8", name: "Samoia (front)", time: "11am\u20132:30pm" },
+      { id: "s9", name: "Tasheka (prep)", time: "11am\u20132:30pm" },
+      { id: "s10", name: "Tyler", time: "11am\u20138pm" },
+      { id: "s11", name: "PJ", time: "3pm\u2013close" },
+      { id: "s12", name: "Dave", time: "3pm\u2013close" },
+      { id: "s13", name: "Ruzhan", time: "3pm\u2013close" },
+      { id: "s14", name: "Karina", time: "3pm\u2013close" },
+      { id: "s15", name: "Caitlin", time: "4pm\u2013close" }
+    ],
+    Thu: [
+      { id: "s16", name: "Pop", time: "8am\u20134pm" },
+      { id: "s17", name: "Tyler", time: "11am\u2013close" },
+      { id: "s18", name: "Abby", time: "10am\u20137pm" }
+    ],
+    Fri: [{ id: "s3", name: "Maria", time: "4pm\u2013close" }, { id: "s4", name: "Deshawn", time: "5pm\u2013close" }],
+    Sat: [{ id: "s5", name: "Jon", time: "11am\u20137pm" }],
+    Sun: []
+  },
+  inventory: [
+    { id: "i1", item: "Block Whole Milk Mozzarella", qty: 40, unit: "lb", low: 20, cost: 111.61, vendor: "Thomsen" },
+    { id: "i2", item: "Liuzzi Fresh Mozzarella", qty: 10, unit: "lb", low: 10, cost: null, vendor: "QFC" },
+    { id: "i3", item: "Cheddar White Block", qty: 40, unit: "lb", low: 20, cost: 81.77, vendor: "Thomsen" },
+    { id: "i4", item: "Cortona Romano Grated", qty: 20, unit: "lb", low: 5, cost: null, vendor: "QFC" },
+    { id: "i5", item: "Provolone Slicing", qty: 10, unit: "lb", low: 10, cost: null, vendor: "QFC" },
+    { id: "i6", item: "Feta Crumble", qty: 5, unit: "lb", low: 5, cost: null, vendor: "QFC" },
+    { id: "i7", item: "Jumbo Wing Cut Chicken", qty: 40, unit: "lb", low: 15, cost: 63.6, vendor: "Thomsen" },
+    { id: "i8", item: "Chicken Tenders (Clipped)", qty: 40, unit: "lb", low: 15, cost: 86.48, vendor: "Thomsen" },
+    { id: "i9", item: "Ezzo Sliced Pepperoni", qty: 50, unit: "lb", low: 15, cost: null, vendor: "QFC" },
+    { id: "i10", item: 'Bacon Topping 3/8"', qty: 1, unit: "box", low: 1, cost: 53.85, vendor: "Thomsen" },
+    { id: "i11", item: `GF Pizza Crust 12" (Udi's)`, qty: 1, unit: "box", low: 1, cost: 83, vendor: "Thomsen" },
+    { id: "i12", item: 'Pizza Boxes 16"', qty: 4, unit: "box", low: 2, cost: null, vendor: "Thomsen" },
+    { id: "i13", item: 'Pizza Boxes 12"', qty: 2, unit: "box", low: 2, cost: 16.96, vendor: "Thomsen" },
+    { id: "i14", item: 'Pizza Boxes 18"', qty: 1, unit: "box", low: 1, cost: null, vendor: "Thomsen" },
+    { id: "i15", item: "Extra Virgin Olive Oil (3L)", qty: 1, unit: "box", low: 1, cost: null, vendor: "QFC" },
+    { id: "i16", item: "Poland Spring Water 40pk", qty: 2, unit: "box", low: 1, cost: 9.2, vendor: "Thomsen" },
+    { id: "i17", item: "Romaine Hearts", qty: 1, unit: "case", low: 1, cost: null, vendor: "QFC" },
+    { id: "i18", item: "Green Bell Peppers", qty: 1, unit: "case", low: 1, cost: null, vendor: "QFC" },
+    { id: "i19", item: "Iceberg Lettuce", qty: 2, unit: "case", low: 1, cost: null, vendor: "QFC" },
+    { id: "i20", item: "Ricotta (Grande)", qty: 1, unit: "box (6 tubs)", low: 1, cost: 49.14, vendor: "Thomsen" },
+    { id: "i21", item: "Milk", qty: 1, unit: "gal", low: 2, cost: null, vendor: "QFC" },
+    { id: "i22", item: "Shredded Mozzarella (bulk bags)", qty: 4, unit: "bag", low: 2, cost: null, vendor: "QFC" },
+    { id: "i23", item: "Ground Sausage (bulk)", qty: 3, unit: "bag", low: 2, cost: 75.35, vendor: "Thomsen" },
+    { id: "i24", item: "Deli Logs (Provolone/Mozz)", qty: 5, unit: "log", low: 3, cost: null, vendor: "QFC" },
+    { id: "i25", item: "Salami / Capicola (deli)", qty: 3, unit: "ea", low: 2, cost: 34.9, vendor: "Thomsen" },
+    { id: "i26", item: "Dressing & Sauce Jugs (ranch, italian, vinaigrette, bbq)", qty: 10, unit: "jug", low: 4, cost: 69.01, vendor: "Thomsen" },
+    { id: "i27", item: "Mayo", qty: 2, unit: "jar", low: 1, cost: null, vendor: "QFC" }
+  ],
+  storageMap: [
+    { id: "sm1", area: "Back Room \u2014 Back Shelf (top)", items: "Mayonnaise, honey mustard, ranch, red wine vinegar, balsamic vinaigrette, BBQ sauce, Frank's RedHot, Frank's Extra Hot" },
+    { id: "sm2", area: "Back Room \u2014 Back Shelf (middle)", items: "Olive oil, olives, pineapple tidbits" },
+    { id: "sm3", area: "Back Room \u2014 Back Shelf (bottom)", items: "Tomato Magic 74/40, Full Red \u2014 roughly 6 Tomato Magic + 2 Full Red + 2 Tomato Magic on hand" },
+    { id: "sm4", area: "Back Room \u2014 Right Shelf (top)", items: "Kosher salt, mustard, sugar, yeast, Italian dressing mix" },
+    { id: "sm5", area: "Back Room \u2014 Right Shelf (below)", items: "Jalape\xF1os, whole pepperoncinis, sliced hot pepper rings" },
+    { id: "sm6", area: "Back Room \u2014 Far Shelf (top)", items: "Teriyaki sauce, honey hot sauce, garlic parm sauce, kosher salt" },
+    { id: "sm7", area: "Back Room \u2014 Far Shelf (spices, below sauces)", items: "Hot honey, whole basil, dried oregano, salt and pepper mix, crushed red pepper, granulated garlic, parsley flakes, black pepper" },
+    { id: "sm8", area: "Back Room Freezer \u2014 Top Left", items: "Mozzarella sticks, gluten free shells" },
+    { id: "sm9", area: "Back Room Freezer \u2014 Middle Shelf", items: "Chocolate chip cookies, chicken tenders, sometimes french fries" },
+    { id: "sm10", area: "Back Room Freezer \u2014 Bottom Shelf", items: "French fries or more chicken tenders, boneless wings, onion rings" },
+    { id: "sm11", area: "Front \u2014 Under Counter", items: "Green thank-you bags, portion cups & lids, register tape/paper/ink, slice bags, napkins, paper towels, small cooler, ketchup & mayo packets" },
+    { id: "sm12", area: "Front \u2014 Above Freezer", items: "Chips" },
+    { id: "sm13", area: "Front \u2014 Two-Door Freezer (by registers)", items: "French fries, ice cream, wraps, pesto, eggplant, more chicken fingers, cheesecake, spinach, broccoli" },
+    { id: "sm14", area: "Front \u2014 Bulk Soda Storage", items: "Pepsi products, Yacht Club sodas, drinks" },
+    { id: "sm15", area: "Prep Walk-in \u2014 Left, Top Shelf", items: "Blue cheese dressing, ranch, honey mustard, opened kalamata olives, BBQ sauce" },
+    { id: "sm16", area: "Prep Walk-in \u2014 Left, 2nd Shelf", items: "Sliced/prepped veggies: mushrooms, peppers, onions, red onions, tomatoes, salad lettuce, thawed spinach or broccoli, roma tomatoes" },
+    { id: "sm17", area: "Prep Walk-in \u2014 Left, 3rd Shelf", items: "Sliced fresh mozzarella, sliced provolone, sliced capicola, Genoa salami, turkey (sliced lunch meats), prepped ricotta, sometimes thawed spinach or broccoli" },
+    { id: "sm18", area: "Prep Walk-in \u2014 Left, Bottom Shelf", items: "Extra portion dressings \u2014 flexible/open space" },
+    { id: "sm19", area: "Prep Walk-in \u2014 Shelf Right of Left Stack", items: "All shredded cheese" },
+    { id: "sm20", area: "Prep Walk-in \u2014 Shelf Across", items: "Shredded Detroit-style cheese" },
+    { id: "sm21", area: "Prep Walk-in \u2014 Right Shelf (top)", items: "Chicken wings, roasted chicken, chopped chicken (both kinds)" },
+    { id: "sm22", area: "Prep Walk-in \u2014 Right Shelf (2nd)", items: "Cooked sausage, ground sausage, sliced meatball, bacon, grinder sauce" },
+    { id: "sm23", area: "Prep Walk-in \u2014 Right Shelf (3rd)", items: "Pizza sauce" },
+    { id: "sm24", area: "Prep Walk-in \u2014 Right Shelf (bottom)", items: "Raw items \u2014 e.g. marinated chicken" },
+    { id: "sm25", area: "Big Walk-in \u2014 Left Side", items: "Bulk cheese, then dough racks going back: 2 stacks large (1.1 lb each), 2 stacks XL (1.45 lb each), 2 stacks medium (0.55 lb each). Grab from the stack closest to the door first (FIFO)." },
+    { id: "sm26", area: "Big Walk-in \u2014 Right Side, Top Shelf", items: "Veggies" },
+    { id: "sm27", area: "Big Walk-in \u2014 Right Side, Middle Shelf", items: "Unprepped block cheeses: feta, fresh mozzarella, gorgonzola, romano" },
+    { id: "sm28", area: "Big Walk-in \u2014 Right Side, Shelf Below Middle", items: "Random sauces, Del's lemonade mix concentrate" },
+    { id: "sm29", area: "Big Walk-in \u2014 Right Side, Bottom Shelf", items: "Prepped lunch meats and cheeses like provolone" },
+    { id: "sm30", area: "Big Walk-in \u2014 Back Right, Top Shelf", items: "More veggies" },
+    { id: "sm31", area: "Big Walk-in \u2014 Back Right, 2nd Shelf", items: "Prepared Detroit-style crusts and breadsticks" },
+    { id: "sm32", area: "Big Walk-in \u2014 Back Right, 3rd Shelf", items: "Meats: pepperoni, bacon topping, meatballs" },
+    { id: "sm33", area: "Big Walk-in \u2014 Back Right, Bottom Shelf", items: "Raw meats: wings, bacon, chicken tenders" },
+    { id: "sm34", area: "Outdoor Chemical Cabinet (next to big walk-in)", items: "Bleach, dish soap, glass cleaner, sanitizer" },
+    { id: "sm35", area: "Outdoor Storage Container \u2014 Right Side, Top Shelf (front)", items: "Pop-up foil sheets, parchment paper" },
+    { id: "sm36", area: "Outdoor Storage Container \u2014 Right Side, 2nd Shelf (front)", items: "Stainless steel scrubbies, green scouring pads, some open boxes of gloves" },
+    { id: "sm37", area: "Outdoor Storage Container \u2014 Right Side, 3rd Shelf (front)", items: "Gloves \u2014 vinyl (L/M/XL), nitrile (L/M/XL)" },
+    { id: "sm38", area: "Outdoor Storage Container \u2014 Right Side, 4th Shelf (front)", items: "More gloves" },
+    { id: "sm39", area: "Outdoor Storage Container \u2014 Right Side, Bottom Shelf (front)", items: "Merchandise / slice bags \u2014 wide, flat brown paper bags" },
+    { id: "sm40", area: "Outdoor Storage Container \u2014 Back Shelf, Top", items: 'Portion cups & lids, 9x6 fiber containers, 9x9 fiber containers, 9" foil round pans & lids' },
+    { id: "sm41", area: "Outdoor Storage Container \u2014 Back Shelf, 2nd", items: 'Small 2 oz portion cups & lids, backup grinder wrap (15x20" wax paper), #10 / 10 lb bags, quart bags (brown paper), more gloves' },
+    { id: "sm42", area: "Outdoor Storage Container \u2014 Back Shelf, Bottom", items: "Paper towels, clean rags, clean aprons, clean mop heads, more paper towels, hinged containers (9x9 and 9x6)" },
+    { id: "sm43", area: "Outdoor Storage Container \u2014 Back Wall", items: "Shirts, chef coats" },
+    { id: "sm44", area: "Outdoor Storage Container \u2014 Left Side, Front (pizza boxes)", items: 'Pizza boxes \u2014 12" nearest the door, then 16", then 18" and 14"; some stand up, some lay flat' },
+    { id: "sm45", area: "Outdoor Storage Container \u2014 Left Side Shelf", items: 'Bulk 9x9 and 9x6 containers, souffl\xE9 cups & lids, deli containers & lids, clear hinged containers, 18" film, parfait cups & lids, misc. tools/junk/extra screens underneath' }
+  ],
+  standardPositions: ["Fryer", "Salad", "Sandwich", "Pizza", "Oven", "Oven 2", "Pizza 2", "Pie Spreading", "Dishwashing"],
+  staff: [
+    { id: "st1", name: "Chris (owner)", phone: "", positions: [], notes: [] },
+    { id: "st2", name: "Andy", phone: "", positions: [], notes: [] },
+    { id: "st3", name: "Pop", phone: "", positions: [], notes: [] },
+    { id: "st4", name: "Samoia", phone: "", positions: [{ id: "p1", name: "Front", skill: 3 }], notes: [] },
+    { id: "st5", name: "Tasheka", phone: "", positions: [{ id: "p2", name: "Prep", skill: 3 }], notes: [] },
+    { id: "st6", name: "Tyler", phone: "", positions: [], notes: [] },
+    { id: "st7", name: "PJ", phone: "", positions: [], notes: [] },
+    { id: "st8", name: "Dave", phone: "", positions: [], notes: [] },
+    { id: "st9", name: "Ruzhan", phone: "", positions: [], notes: [] },
+    { id: "st10", name: "Karina", phone: "", positions: [], notes: [] },
+    { id: "st11", name: "Caitlin", phone: "", positions: [], notes: [] },
+    { id: "st12", name: "Abby", phone: "", positions: [], notes: [] },
+    { id: "st13", name: "Bella", phone: "", positions: [], notes: [] },
+    { id: "st14", name: "Butch", phone: "", positions: [], notes: [] },
+    { id: "st15", name: "Cameron", phone: "", positions: [], notes: [] },
+    { id: "st16", name: "Clay", phone: "", positions: [], notes: [] },
+    { id: "st17", name: "Gavin", phone: "", positions: [], notes: [] },
+    { id: "st18", name: "Gilly", phone: "", positions: [], notes: [] },
+    { id: "st19", name: "Joe", phone: "", positions: [], notes: [] },
+    { id: "st20", name: "Ricky", phone: "", positions: [], notes: [] },
+    { id: "st21", name: "Sean", phone: "", positions: [], notes: [] },
+    { id: "st22", name: "Murph", phone: "", positions: [], notes: [] },
+    { id: "st23", name: "Tabor", phone: "", positions: [], notes: [] },
+    { id: "st24", name: "Waylon", phone: "", positions: [], notes: [] }
+  ],
+  recipes: [
+    { id: "r1", name: "Ricotta Mix", steps: "4 containers of ricotta cheese\n2 heavy pinches of crushed parsley\n1/4 souffl\xE9 of salt and pepper mix\n1 full souffl\xE9 of granulated garlic\n\nMix thoroughly." },
+    { id: "r2", name: "Roma (Tomato Prep)", steps: "4 cans of 74/40 tomato strips\nStrain in bus tub for 10\u201315 minutes to remove excess water\nGently fold tomatoes over by hand in the strainer to preserve strips \u2014 do not crush\n1/4 souffl\xE9 of salt and pepper mix\n1/2 souffl\xE9 of sugar\n\nMix gently." },
+    { id: "r3", name: "Pizza Sauce", steps: "3 cases of Tomato Magic\n16 oz garlic oil\n1 cup salt and pepper mix\n\nMix well until fully combined." },
+    { id: "r4", name: "Dough", steps: "2 8-quart containers of cold water (second one just above handles)\nSmall amount of hot water (105\u2013110\xB0F) in a 2-quart container\nDissolve 28g yeast in hot water\n\nAdd to mixer bowl:\n\u2022 Both cold waters\n\u2022 1 scoop salt\n\u2022 1 scoop sugar\n\nAdd frothy yeast mixture to bowl\nAdd 1 bag of flour\nSet dough machine to speed #1\nKeep olive oil nearby\nAs dough begins to come together, pour 1/4 container of olive oil around bowl and hook\nMix 8 minutes total, or until dough pulls off hook and appears smooth and slightly wrinkled\nOptional: Add splash of cold water if dough feels too tight\nLower bowl and cover with apron to rest" },
+    { id: "r5", name: "Garlic Butter", steps: "4 lbs butter, melted and clarified\nEqual part garlic oil (approx. 4 lbs or equal volume)\n2 heavy pinches crushed parsley\n2 heavy pinches salt and pepper mix\n\nStir to combine." },
+    { id: "r6", name: "Buffalo Sauce", steps: "Equal parts Frank's RedHot and Frank's Extra Hot\nClarify melted butter by letting solids settle and pouring off top layer\nMix clarified butter into hot sauce mixture\nAdd 1 cup Romano cheese\nStir thoroughly." }
+  ],
+  tasks: [
+    { id: "t1", text: "Confirm salami re-ship from Quality Food Co", assignee: "Manager", done: false },
+    { id: "t2", text: "Deep clean walk-in", assignee: "Closer", done: false },
+    { id: "t3", text: "Restock boxes before Friday rush", assignee: "Jon", done: false }
+  ],
+  prep: {
+    par: [
+      { id: "p1", item: "Dough", qty1: "", qty2: "" },
+      { id: "p2", item: "Block & Shred Cheese", qty1: "", qty2: "" },
+      { id: "p3", item: "Detroit Cheese (Shred)", qty1: "", qty2: "" },
+      { id: "p4", item: "Pizza Sauce", qty1: "", qty2: "" },
+      { id: "p5", item: "Marinara Sauce", qty1: "", qty2: "" },
+      { id: "p6", item: "Mushrooms", qty1: "", qty2: "" },
+      { id: "p7", item: "Green Peppers", qty1: "", qty2: "" },
+      { id: "p8", item: "Onions", qty1: "", qty2: "" },
+      { id: "p9", item: "Red Onions", qty1: "", qty2: "" },
+      { id: "p10", item: "Shredded Iceberg", qty1: "", qty2: "" },
+      { id: "p11", item: "Sliced Meatballs", qty1: "", qty2: "" },
+      { id: "p12", item: "Chopped Roasted Chicken", qty1: "", qty2: "" },
+      { id: "p13", item: "Chopped Fried Chicken", qty1: "", qty2: "" },
+      { id: "p14", item: "Sliced Tomato", qty1: "", qty2: "" },
+      { id: "p15", item: "Sliced Mozzarella", qty1: "", qty2: "" },
+      { id: "p16", item: "Provolone", qty1: "", qty2: "" },
+      { id: "p17", item: "Ham", qty1: "", qty2: "" },
+      { id: "p18", item: "Turkey", qty1: "", qty2: "" },
+      { id: "p19", item: "Genoa", qty1: "", qty2: "" },
+      { id: "p20", item: "Capicola", qty1: "", qty2: "" },
+      { id: "p21", item: "Roast Chicken", qty1: "", qty2: "" },
+      { id: "p22", item: "Cooked Wings", qty1: "", qty2: "" },
+      { id: "p23", item: "Salad Lettuce", qty1: "", qty2: "" },
+      { id: "p24", item: "Tomatoes", qty1: "", qty2: "" },
+      { id: "p25", item: "Cucumber", qty1: "", qty2: "" },
+      { id: "p26", item: "Celery", qty1: "", qty2: "" },
+      { id: "p27", item: "Roast Garlic", qty1: "", qty2: "" },
+      { id: "p28", item: "Ricotta", qty1: "", qty2: "" },
+      { id: "p29", item: "Roma Tomatoes", qty1: "", qty2: "" },
+      { id: "p30", item: "Layout Bacon", qty1: "", qty2: "" },
+      { id: "p31", item: "Cooked Sausage", qty1: "", qty2: "" },
+      { id: "p32", item: "Ground Sausage", qty1: "", qty2: "" },
+      { id: "p33", item: "Buffalo Sauce", qty1: "", qty2: "" },
+      { id: "p34", item: "Vodka Sauce", qty1: "", qty2: "" },
+      { id: "p35", item: "Rolls", qty1: "", qty2: "" },
+      { id: "p36", item: "Detroits", qty1: "", qty2: "" },
+      { id: "p37", item: "Breadsticks", qty1: "", qty2: "" },
+      { id: "p38", item: "Garlic Knots", qty1: "", qty2: "" },
+      { id: "p39", item: "Spinach Pies", qty1: "", qty2: "" },
+      { id: "p40", item: "Italian Dressing", qty1: "", qty2: "" },
+      { id: "p41", item: "Garlic Oil", qty1: "", qty2: "" },
+      { id: "p42", item: "Garlic Butter", qty1: "", qty2: "" },
+      { id: "p43", item: "Blue Cheese", qty1: "", qty2: "" },
+      { id: "p44", item: "Ranch", qty1: "", qty2: "" },
+      { id: "p45", item: "Honey Mustard", qty1: "", qty2: "" },
+      { id: "p46", item: "Caesar", qty1: "", qty2: "" },
+      { id: "p47", item: "Icing", qty1: "", qty2: "" },
+      { id: "p48", item: "Italian", qty1: "", qty2: "" },
+      { id: "p49", item: "Croutons", qty1: "", qty2: "" },
+      { id: "p50", item: "Greek", qty1: "", qty2: "" },
+      { id: "p51", item: "Cookies", qty1: "", qty2: "" },
+      { id: "p52", item: "Pulled Spinach", qty1: "", qty2: "" },
+      { id: "p53", item: "Pulled Broccoli", qty1: "", qty2: "" },
+      { id: "p54", item: "Squeezed/Seasoned Spinach", qty1: "", qty2: "" }
+    ],
+    produce: [
+      { id: "pr1", item: "Carrots", qty: "", notes: "" },
+      { id: "pr2", item: "Celery", qty: "", notes: "" },
+      { id: "pr3", item: "Cucumbers", qty: "", notes: "" },
+      { id: "pr4", item: "Iceberg Lettuce", qty: "", notes: "" },
+      { id: "pr5", item: "Romaine Hearts", qty: "", notes: "" },
+      { id: "pr6", item: "Green Peppers", qty: "", notes: "" },
+      { id: "pr7", item: "Red Onions", qty: "", notes: "" },
+      { id: "pr8", item: "Yellow Onions (Regular)", qty: "", notes: "" },
+      { id: "pr9", item: "Tomatoes (6x6)", qty: "", notes: "" },
+      { id: "pr10", item: "Cherry Grape Tomatoes", qty: "", notes: "" },
+      { id: "pr11", item: "Mushrooms", qty: "", notes: "" },
+      { id: "pr12", item: "Garlic (Peeled)", qty: "", notes: "" },
+      { id: "pr13", item: "Parsley", qty: "", notes: "" },
+      { id: "pr14", item: "Basil", qty: "", notes: "" },
+      { id: "pr15", item: "Scallions", qty: "", notes: "" },
+      { id: "pr16", item: "Eggplant", qty: "", notes: "" },
+      { id: "pr17", item: "Green Seedless Grapes", qty: "", notes: "" },
+      { id: "pr18", item: "Whole Seedless Watermelon", qty: "", notes: "" },
+      { id: "pr19", item: "Strawberries", qty: "", notes: "" },
+      { id: "pr20", item: "Blueberries", qty: "", notes: "" },
+      { id: "pr21", item: "Whole Milk Vanilla Yogurt", qty: "", notes: "" }
+    ],
+    lowStock: []
+  },
+  menu: {
+    info: {
+      phone: "(401) 789-1926",
+      address: "855 Point Judith Road, Narragansett, RI 02882",
+      hours: "Mon\u2013Wed 11am\u20139pm \xB7 Thurs\u2013Sat 11am\u201310pm \xB7 Sun 12pm\u20139pm",
+      note: "Open 7 days a week, delivery available all day. Order online at oppgansett.com. 3% discount on cash payments. Please inform your server of any food allergies before ordering."
+    },
+    pizzaSizes: ['12" Medium', '16" Large', '18" XL', "Detroit Style (10x14, limited)"],
+    pizzaBasePrices: ["16.50", "22.50", "28.75", "28.75"],
+    glutenFree: 'Gluten free crust available in 12" size only \u2014 $16.50',
+    toppingTiers: [
+      { id: "tt1", tier: "Veggie topping (each)", prices: ["2.00", "3.00", "4.00", "3.00"], items: "Mushrooms, onions, green peppers, black olives, hot peppers, broccoli, spinach, tomato, eggplant, red onion, pineapple, fresh garlic, jalape\xF1os, green onions, extra sauce, hot honey, garlic butter sauce" },
+      { id: "tt2", tier: "Meat/cheese topping (each)", prices: ["3.00", "4.00", "5.00", "4.00"], items: "Pepperoni, meatball, sausage, bacon, chicken, ham, anchovy, feta, provolone, gorgonzola, ricotta, extra cheese" }
+    ],
+    specialtySizes: ['12" Medium', '16" Large', '18" XL', '12" Gluten Free', "Detroit Style (10x14, limited)"],
+    specialtyPrices: ["22.50", "29.00", "36.00", "22.50", "36.00"],
+    specialty: [
+      { id: "sp1", name: "Big Mac", ingredients: "Thousand island dressing, meatball, chopped onions, pickles & cheese" },
+      { id: "sp2", name: "Chicago Fire", ingredients: "Sauce, fresh garlic, pepperoni, green peppers, onions, sausage, cheese, hot peppers topped with crushed red pepper" },
+      { id: "sp3", name: "Hawaiian", ingredients: "Sauce, cheese, extra ham & extra pineapple" },
+      { id: "sp4", name: "Meatlovers", ingredients: "Sauce, cheese, pepperoni, meatball, sausage & bacon" },
+      { id: "sp5", name: "Moussaka", ingredients: "Sauce, meatball, eggplant, cheese, topped with marinara sauce" },
+      { id: "sp6", name: "Pepperoni Lovers", ingredients: "Sauce, cheese, triple pepperoni & fresh garlic" },
+      { id: "sp7", name: "Supreme", ingredients: "Sauce, cheese, pepperoni, mushrooms, green peppers, onions, olives, meatball & sausage" },
+      { id: "sp8", name: "Ron Swanson", ingredients: "Cheese, sauce, triple pepperoni, fresh garlic, crushed red pepper, topped with ricotta and hot honey" },
+      { id: "sp9", name: "Rhody Ram", ingredients: "Fresh garlic, sliced tomato, onions, cheese & pepperoni (no red sauce)" },
+      { id: "sp10", name: "Meatball Parm", ingredients: "Garlic butter, pizza cheese, roma tomatoes, meatballs & ricotta" },
+      { id: "sp11", name: "Fenway Park", ingredients: "Yellow mustard, pizza cheese, sausage, green peppers and onions" },
+      { id: "sp12", name: "Buffalo Chicken", ingredients: "Crispy chicken, cheese, red onions, buffalo sauce, served with side of blue cheese" },
+      { id: "sp13", name: "BBQ Chicken", ingredients: "Crispy chicken, cheese, red onions, bbq sauce" },
+      { id: "sp14", name: "Cali Buff", ingredients: "Buffalo sauce, crispy chicken, cheese, green onion, red onions, hot peppers, gorgonzola & herbs, served with side of blue cheese" },
+      { id: "sp15", name: "Chicken Bacon Ranch", ingredients: "Ranch, chicken, green onion, cheese & bacon" },
+      { id: "sp16", name: "Chicken Parm", ingredients: "Garlic butter, pizza cheese, crispy chicken, Roma tomatoes & ricotta" },
+      { id: "sp17", name: "Chicken Pesto", ingredients: "Fresh mozzarella, pesto, chicken, cheese & tomatoes" },
+      { id: "sp18", name: "Chicken White", ingredients: "Olive oil, chicken, pizza cheese, romano, ricotta, fresh garlic & herbs \u2014 try it with tomatoes" },
+      { id: "sp19", name: "Chicken & Broccoli", ingredients: "Garlic butter, cheese, chicken, broccoli & garlic" },
+      { id: "sp20", name: "General Tso's", ingredients: "Sweet & spicy sauce, pizza cheese, crispy chicken & green peppers" },
+      { id: "sp21", name: "Athenian", ingredients: "Our greek pizza with spinach, kalamata olives & hot peppers" },
+      { id: "sp22", name: "Bob Marley", ingredients: "Olive oil, fresh garlic, cheese, sliced tomatoes, spinach, onions, green peppers & broccoli" },
+      { id: "sp23", name: "Gorgonzola Special", ingredients: "Olive oil, pizza cheese, roasted garlic, roma tomato, fresh mozzarella, gorgonzola & herbs" },
+      { id: "sp24", name: "Greek", ingredients: "Provolone, pizza cheese, tomato, feta, romano & herbs" },
+      { id: "sp25", name: "Mediterranean", ingredients: "Olive oil, cheese, spinach, black olives, red onions, roma tomato, roasted garlic, topped with feta" },
+      { id: "sp26", name: "Mom's Veggie", ingredients: "Sauce, cheese, mushrooms, green peppers, onions, black olives & eggplant" },
+      { id: "sp27", name: "Roma & Garlic", ingredients: "Olive oil, cheese, roma tomatoes & roasted garlic cloves" },
+      { id: "sp28", name: "Roma Deluxe", ingredients: "Our Roma & Garlic with spinach, broccoli & feta" },
+      { id: "sp29", name: "White", ingredients: "Olive oil, pizza cheese, romano cheese, ricotta, fresh garlic & herb" },
+      { id: "sp30", name: "Margherita", ingredients: "Pizza sauce, fresh mozzarella, fresh basil & olive oil" }
+    ],
+    calzone: {
+      note: "Any pizza (including any specialty pizza) can be made as a calzone. Served with a side of fresh made marinara sauce.",
+      cheesePrice: "15.25",
+      toppingsEach: "1.50\u20133.00",
+      specialtyPrice: "20.50"
+    },
+    appetizers: [
+      { id: "a1", name: "French Fries", price: "9.00" },
+      { id: "a2", name: "Cajun Fries", price: "9.25" },
+      { id: "a3", name: "Mozzarella Sticks w/ marinara", price: "12.75" },
+      { id: "a4", name: "Onion Rings w/ BBQ sauce", price: "11.75" },
+      { id: "a5", name: "Garlic Knots (3) w/ marinara", price: "7.25" },
+      { id: "a6", name: "Cheesy Garlic Breadsticks w/ marinara", price: "14.25" },
+      { id: "a7", name: "Buffalo Breadsticks w/ blue cheese", price: "14.25" },
+      { id: "a8", name: "Buffalo Pesto Breadsticks w/ blue cheese", price: "14.25" },
+      { id: "a9", name: "Cinnamon Sugar Doughboys (8pc) w/ icing", price: "10.75" },
+      { id: "a10", name: "Side of Meatballs (3, in marinara w/ romano)", price: "13.00" },
+      { id: "a11", name: "Chicken Parm (cutlet, cheese, marinara)", price: "13.00" },
+      { id: "a12", name: "Eggplant Parm (breaded, fried, marinara, cheese)", price: "12.00" }
+    ],
+    tendersWings: [
+      { id: "tw1", name: "3pc Chicken Tenders w/ honey mustard", price: "9.25" },
+      { id: "tw1f", name: "  ...with fries", price: "14.75" },
+      { id: "tw2", name: "6pc Chicken Tenders w/ honey mustard", price: "15.75" },
+      { id: "tw2f", name: "  ...with fries", price: "20.50" },
+      { id: "tw3", name: "10pc Chicken Wings w/ ranch", price: "17.00" },
+      { id: "tw4", name: "24pc Chicken Wings w/ ranch", price: "33.50" },
+      { id: "tw5", name: "14pc Boneless Wings w/ ranch", price: "17.00" },
+      { id: "tw6", name: "30pc Boneless Wings w/ ranch", price: "33.50" }
+    ],
+    wingFlavors: "Plain, Buffalo, Teriyaki, Buffa-Q, Honey Hot, Cajun, Garlic Parmesan, BBQ, Sweet Chili",
+    salads: [
+      { id: "s1", name: "Garden Salad", ingredients: "Romaine, tomatoes, onions, cucumbers, kalamata olives, pepperoncini, croutons, italian dressing", price: "14.25", withChicken: "18.50" },
+      { id: "s2", name: "Buffalo Chicken Salad", ingredients: "Romaine, tomato, cucumber, red onion, crispy buffalo chicken, blue cheese dressing", price: "18.50" },
+      { id: "s3", name: "Mediterranean Salad", ingredients: "Romaine, tomato, cucumber, red onion, pepperoncini, kalamata olives, feta, greek dressing", price: "16.50", withChicken: "19.50" },
+      { id: "s4", name: "Chicken Bacon Gorg Salad", ingredients: "Chicken, gorgonzola, bacon, romaine, tomatoes, cucumbers, onions, croutons, balsamic dressing", price: "19.50" },
+      { id: "s5", name: "Antipasto Salad", ingredients: "Romaine, tomato, cucumber, red onion, ham, capicola, pepperoni, genoa, provolone, italian dressing", price: "18.25" },
+      { id: "s6", name: "Caesar Salad", ingredients: "", price: "14.25", withChicken: "18.50" },
+      { id: "s7", name: "Chicken Bacon Ranch Salad", ingredients: "Lettuce, tomato, cucumber, red onion, chicken, strip bacon, ranch dressing", price: "18.50" }
+    ],
+    dressings: "Blue Cheese, Ranch, Italian, Oil & Vinegar, Caesar, Greek, Honey Mustard, Balsamic Vinaigrette, Thousand Island, BBQ, Buffalo, Teriyaki, Honey Hot, Garlic Parmesan, Sweet Chili (extra dressing/sauce $1.50, Mike's Hot Honey $2.00)",
+    sandwiches: {
+      note: "All grinders made on our own hearth baked artisan bread.",
+      items: [
+        { id: "sw1", name: "Italian Grinder", ingredients: "Ham, capicola, genoa salami, pepperoni, lettuce, tomato, hot pepper, provolone, oil & vinegar, served toasted", price: "17.50" },
+        { id: "sw2", name: "Turkey Grinder", ingredients: "Oven roasted turkey, lettuce, tomato, provolone, mayonnaise, served cold (add bacon +1.25)", price: "17.50" },
+        { id: "sw3", name: "Meatball Parm Grinder", ingredients: "In marinara, with romano and mozzarella, served toasted", price: "18.00" },
+        { id: "sw4", name: "Chicken Parm Grinder", ingredients: "In marinara, with romano and mozzarella, served toasted", price: "18.00" },
+        { id: "sw5", name: "Eggplant Parm Grinder", ingredients: "In marinara, with romano and mozzarella, served toasted", price: "16.25" },
+        { id: "sw6", name: "Veggie Grinder", ingredients: "Mushroom, onion, pepper, black olive, lettuce, tomato, hot pepper, eggplant, feta, provolone, oil & vinegar, served toasted", price: "17.50" },
+        { id: "sw7", name: "Chicken Cutlet Grinder", ingredients: "Lettuce, tomato, pickles, mayo, provolone, served cold", price: "18.00" },
+        { id: "sw8", name: "Buffalo Chicken Grinder", ingredients: "Lettuce, tomato, blue cheese dressing, served cold", price: "18.00" },
+        { id: "sw9", name: "BBQ Chicken Grinder", ingredients: "Crispy chicken, bbq sauce, bacon, provolone, served toasted", price: "18.00" },
+        { id: "sw10", name: "BLT Grinder", ingredients: "Mayo, lettuce, tomato, bacon", price: "18.00" },
+        { id: "sw11", name: "Crispy Chicken Wrap", ingredients: "Crispy chicken, romaine, romano, croutons", price: "18.00" },
+        { id: "sw12", name: "Chicken Bacon Ranch Wrap", ingredients: "Lettuce, tomato, chicken, strip bacon, ranch dressing", price: "18.00" }
+      ]
+    },
+    iceCream: [
+      { id: "ic1", name: "Ice Cream Pint (Warwick Ice Cream, made in RI)", price: "7.25" }
+    ],
+    iceCreamFlavors: "Moonstone Beach Vanilla, Autocrat Coffee Milk, Autocrat Coffee Milk with Cookies, Del's Lemon, Winter Blast of '78",
+    chipsCookies: [
+      { id: "cc1", name: "Deep River Chips (original, sea salt & vinegar, maui onion, bbq)", price: "3.25" },
+      { id: "cc2", name: "Triple Chocolate Chunk Cookie (fresh baked 4.5oz)", price: "3.75" }
+    ],
+    drinks: [
+      { id: "d1", name: "Bottled Water", price: "2.00" },
+      { id: "d2", name: "Seltzer Water (lime, cherry, blackberry)", price: "2.00" },
+      { id: "d3", name: "Pure Leaf Tea (lemon, unsweetened)", price: "3.75" },
+      { id: "d4", name: "Del's Lemonade", price: "3.75" },
+      { id: "d5", name: "20oz Soda (pepsi, diet pepsi, starry, mtn dew, dr pepper, root beer, crush orange, ginger ale)", price: "3.75" },
+      { id: "d6", name: "Gatorade (lemon-lime, cherry zero, glacier freeze)", price: "3.75" },
+      { id: "d7", name: "Celsius (peach mango green tea, grape rush, fuji apple pear, wild berry, orange)", price: "4.25" },
+      { id: "d8", name: "Juice (apple, cranberry)", price: "3.75" },
+      { id: "d9", name: "Yacht Club Soda (rhody red, cream, cola, root beer, grape, blue raspberry, lemon-lime, strawberry, sarsaparilla, ginger ale, peach seltzer)", price: "3.25" }
+    ]
+  },
+  liveOps: {
+    orderQueue: {
+      updatedAt: "",
+      sizes: [
+        { id: "q1", label: '12" Medium', count: 0 },
+        { id: "q2", label: '16" Large', count: 0 },
+        { id: "q3", label: '18" XL', count: 0 },
+        { id: "q4", label: "Detroit Style", count: 0 },
+        { id: "q5", label: '12" Gluten Free', count: 0 }
+      ]
+    },
+    stations: [
+      { id: "st1", name: "Pizza Prep Line" },
+      { id: "st2", name: "Walk-in Cooler" }
+    ],
+    stationLog: []
+  }
+};
+const FONTS = `
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
+`;
+const COLORS = {
+  crust: "#2B1B12",
+  cream: "#FFF8E7",
+  tomato: "#C33C23",
+  tomatoDark: "#9E2E1B",
+  basil: "#5B7B4F",
+  parm: "#E8B23D",
+  card: "#FAFAF5",
+  line: "#E4D9BE"
+};
+function uid() {
+  return Math.random().toString(36).slice(2, 9);
+}
+function TicketButton({ children, onClick, color = COLORS.tomato, style = {}, ...rest }) {
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick,
+      className: "px-3 py-1.5 rounded text-sm font-medium transition-transform active:scale-95 flex items-center gap-1.5",
+      style: { background: color, color: COLORS.cream, fontFamily: "Inter", ...style },
+      ...rest
+    },
+    children
+  );
+}
+function PizzaOpsManager() {
+  var _a;
+  const [data, setData] = useState(null);
+  const [tab, setTab] = useState("assistant");
+  const [loaded, setLoaded] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await window.storage.get("shop-data", true);
+        setData(res && res.value ? JSON.parse(res.value) : DEFAULT_DATA);
+      } catch (e) {
+        setData(DEFAULT_DATA);
+      } finally {
+        setLoaded(true);
+      }
+    })();
+  }, []);
+  const persist = async (next) => {
+    setData(next);
+    try {
+      const result = await window.storage.set("shop-data", JSON.stringify(next), true);
+      setSaveError(!result);
+    } catch (e) {
+      setSaveError(true);
+    }
+  };
+  if (!loaded || !data) {
+    return /* @__PURE__ */ React.createElement("div", { className: "w-full h-full flex items-center justify-center", style: { background: COLORS.crust, minHeight: 500 } }, /* @__PURE__ */ React.createElement("style", null, FONTS), /* @__PURE__ */ React.createElement(Loader2, { className: "animate-spin", color: COLORS.cream, size: 28 }));
+  }
+  const lowStockCount = data.inventory.filter((i) => i.qty <= i.low).length;
+  const openTasks = data.tasks.filter((t) => !t.done).length;
+  const boardFlags = (((_a = data.prep) == null ? void 0 : _a.lowStock) || []).filter((i) => i.status === "low" || i.status === "86").length;
+  const tabs = [
+    { id: "assistant", label: "Ask the Manager", icon: MessageSquare },
+    { id: "schedule", label: "Schedule", icon: Users },
+    { id: "staff", label: "Staff", icon: Users },
+    { id: "inventory", label: "Inventory", icon: Package, badge: lowStockCount },
+    { id: "order", label: "Order", icon: ShoppingCart, badge: lowStockCount },
+    { id: "prep", label: "Prep & Par", icon: ChefHat, badge: boardFlags },
+    { id: "recipes", label: "Recipes", icon: Pizza },
+    { id: "menu", label: "Menu", icon: BookOpen },
+    { id: "liveops", label: "Live Ops", icon: Activity },
+    { id: "tasks", label: "Tasks", icon: ClipboardList, badge: openTasks }
+  ];
+  return /* @__PURE__ */ React.createElement("div", { className: "w-full min-h-screen", style: { background: COLORS.crust } }, /* @__PURE__ */ React.createElement("style", null, FONTS), /* @__PURE__ */ React.createElement("div", { className: "px-5 pt-6 pb-4 flex items-center gap-3", style: { borderBottom: `3px dashed ${COLORS.parm}` } }, /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      className: "w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0",
+      style: { background: COLORS.tomato, transform: "rotate(-8deg)" }
+    },
+    /* @__PURE__ */ React.createElement(Pizza, { size: 22, color: COLORS.cream })
+  ), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(
+    "h1",
+    {
+      className: "text-2xl leading-none tracking-wide",
+      style: { fontFamily: "Oswald", color: COLORS.cream, fontWeight: 600, letterSpacing: "0.02em" }
+    },
+    "ON POINT PIZZA"
+  ), /* @__PURE__ */ React.createElement("p", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: COLORS.parm } }, "Shift ops, minus the sticky notes \u2014 v2"))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1 px-3 pt-3 overflow-x-auto", style: { background: COLORS.crust } }, tabs.map((t) => {
+    const Icon = t.icon;
+    const active = tab === t.id;
+    return /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: t.id,
+        onClick: () => setTab(t.id),
+        className: "flex items-center gap-1.5 px-3.5 py-2.5 rounded-t-lg text-sm whitespace-nowrap relative",
+        style: {
+          background: active ? COLORS.cream : "transparent",
+          color: active ? COLORS.crust : COLORS.parm,
+          fontFamily: "Inter",
+          fontWeight: 500
+        }
+      },
+      /* @__PURE__ */ React.createElement(Icon, { size: 15 }),
+      t.label,
+      !!t.badge && /* @__PURE__ */ React.createElement(
+        "span",
+        {
+          className: "text-[10px] rounded-full w-4 h-4 flex items-center justify-center ml-0.5",
+          style: { background: COLORS.tomato, color: COLORS.cream, fontFamily: "JetBrains Mono" }
+        },
+        t.badge
+      )
+    );
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, saveError && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-3 px-3 py-2 rounded", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, "Couldn't save the last change \u2014 data may not persist."), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "order" && /* @__PURE__ */ React.createElement(OrderTab, { data }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist })));
+}
+function AssistantAvatar({ state }) {
+  const blobs = {
+    idle: [COLORS.parm, COLORS.cream],
+    listening: [COLORS.basil, COLORS.crust],
+    thinking: [COLORS.crust, COLORS.parm],
+    speaking: [COLORS.tomato, COLORS.basil]
+  }[state] || [COLORS.parm, COLORS.cream];
+  const speed = state === "idle" ? "6s" : state === "thinking" ? "1.4s" : "2.2s";
+  return /* @__PURE__ */ React.createElement("div", { className: "flex justify-center mb-3" }, /* @__PURE__ */ React.createElement("style", null, `
+        @keyframes mistSwirlA { 0%{transform:translate(0,0) scale(1);} 33%{transform:translate(6px,-5px) scale(1.08);} 66%{transform:translate(-5px,4px) scale(0.95);} 100%{transform:translate(0,0) scale(1);} }
+        @keyframes mistSwirlB { 0%{transform:translate(0,0) scale(1);} 40%{transform:translate(-7px,5px) scale(1.05);} 75%{transform:translate(5px,-4px) scale(0.97);} 100%{transform:translate(0,0) scale(1);} }
+        @keyframes mistBreathe { 0%,100%{opacity:.55;} 50%{opacity:1;} }
+      `), /* @__PURE__ */ React.createElement("div", { className: "relative", style: { width: 56, height: 56 } }, /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: {
+        position: "absolute",
+        inset: 0,
+        borderRadius: "9999px",
+        background: blobs[0],
+        filter: "blur(9px)",
+        opacity: 0.75,
+        animation: `mistSwirlA ${speed} ease-in-out infinite`
+      }
+    }
+  ), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: {
+        position: "absolute",
+        inset: 0,
+        borderRadius: "9999px",
+        background: blobs[1],
+        filter: "blur(9px)",
+        opacity: 0.6,
+        animation: `mistSwirlB ${speed} ease-in-out infinite, mistBreathe ${state === "idle" ? "4s" : "1.2s"} ease-in-out infinite`
+      }
+    }
+  ), /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      style: {
+        position: "absolute",
+        inset: 10,
+        borderRadius: "9999px",
+        background: COLORS.cream,
+        opacity: 0.85
+      }
+    }
+  )));
+}
+function AssistantTab({ data, persist }) {
+  const [messages, setMessages] = useState([
+    {
+      role: "assistant",
+      text: "I've got today's schedule, inventory, and task list in front of me. Ask me anything \u2014 who's closing, what's low, what needs doing \u2014 or tell me to add a task, log a delivery, or update stock."
+    }
+  ]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const scrollRef = useRef(null);
+  const [voiceMode, setVoiceMode] = useState("off");
+  const [wakeWord, setWakeWord] = useState("computer");
+  const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
+  const recogRef = useRef(null);
+  const voiceModeRef = useRef("off");
+  const wakeWordRef = useRef("computer");
+  voiceModeRef.current = voiceMode;
+  wakeWordRef.current = wakeWord;
+  const speechSupported = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+  const speak = (text, onDone) => {
+    if (voiceModeRef.current === "off" || !window.speechSynthesis) {
+      onDone && onDone();
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.02;
+    u.onstart = () => setSpeaking(true);
+    u.onend = () => {
+      setSpeaking(false);
+      onDone && onDone();
+    };
+    u.onerror = () => {
+      setSpeaking(false);
+      onDone && onDone();
+    };
+    window.speechSynthesis.speak(u);
+  };
+  const startListening = () => {
+    if (!speechSupported) {
+      setVoiceError("Voice input isn't supported in this browser \u2014 try Chrome, or type instead.");
+      return;
+    }
+    if (recogRef.current) {
+      try {
+        recogRef.current.stop();
+      } catch (e) {
+      }
+    }
+    const wake = voiceModeRef.current === "wake";
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const r = new SR();
+    r.lang = "en-US";
+    r.interimResults = true;
+    r.continuous = wake;
+    r.onstart = () => {
+      setListening(true);
+      setVoiceError("");
+    };
+    r.onresult = (e) => {
+      let interim = "", final = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) final += t;
+        else interim += t;
+      }
+      if (voiceModeRef.current === "wake") {
+        const combined = (final || interim).toLowerCase();
+        const w = wakeWordRef.current;
+        const idx = combined.indexOf(w);
+        if (idx !== -1 && final) {
+          const afterRaw = final.slice(final.toLowerCase().indexOf(w) + w.length);
+          const query = afterRaw.replace(/^[\s,.:!?-]+/, "").trim();
+          if (query) {
+            try {
+              r.stop();
+            } catch (e2) {
+            }
+            sendText(query);
+          }
+        }
+        return;
+      }
+      setInput(final || interim);
+      if (final.trim()) {
+        setInput("");
+        try {
+          r.stop();
+        } catch (e2) {
+        }
+        sendText(final.trim());
+      }
+    };
+    r.onerror = (e) => {
+      setListening(false);
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        setVoiceError("Mic access was blocked \u2014 allow the microphone for this page and try again.");
+        setVoiceMode("off");
+      } else if (e.error !== "aborted" && e.error !== "no-speech") {
+        setVoiceError("Mic hiccup (" + e.error + ") \u2014 retry from the voice controls.");
+      }
+    };
+    r.onend = () => {
+      setListening(false);
+      if (voiceModeRef.current === "wake" && !speaking) {
+        setTimeout(() => {
+          if (voiceModeRef.current === "wake") startListening();
+        }, 300);
+      }
+    };
+    recogRef.current = r;
+    try {
+      r.start();
+    } catch (e) {
+    }
+  };
+  const stopListening = () => {
+    if (recogRef.current) {
+      try {
+        recogRef.current.stop();
+      } catch (e) {
+      }
+    }
+    setListening(false);
+  };
+  const setMode = (mode) => {
+    stopListening();
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    setVoiceMode(mode);
+    if (mode !== "off") {
+      setTimeout(() => startListening(), 50);
+    }
+  };
+  useEffect(() => () => {
+    if (recogRef.current) {
+      try {
+        recogRef.current.stop();
+      } catch (e) {
+      }
+    }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+  }, []);
+  useEffect(() => {
+    var _a;
+    (_a = scrollRef.current) == null ? void 0 : _a.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, busy]);
+  const send = () => sendText(input.trim());
+  const sendText = async (text) => {
+    var _a, _b, _c;
+    if (!text || busy) return;
+    setInput("");
+    const nextMessages = [...messages, { role: "user", text }];
+    setMessages(nextMessages);
+    setBusy(true);
+    const systemPrompt = `You are the shift-manager assistant for On Point Pizza in Narragansett, RI. You help staff with scheduling, inventory, and tasks.
+
+Current data (JSON):
+${JSON.stringify({ schedule: data.schedule, staff: data.staff, standardPositions: data.standardPositions, inventory: data.inventory, tasks: data.tasks, prep: data.prep, menu: data.menu, recipes: data.recipes, storageMap: data.storageMap, liveOps: data.liveOps })}
+
+The "prep" object has: "par" (the prep par sheet \u2014 item, qty1, qty2), "produce" (the produce order sheet \u2014 item, qty, notes), and "lowStock" (the 86/low-stock board \u2014 item, status of ok/low/86).
+
+The "menu" object has the full menu: pizza sizes and topping prices, specialty pizza names with their exact ingredients, calzone pricing, and other categories (appetizers, tenders & wings, salads, ice cream, drinks). Use it to answer questions like "what's on the Buffalo Chicken pizza" or "how much is a large veggie". Some prices may be blank (unverified) \u2014 if asked about a blank price, say it hasn't been confirmed yet rather than guessing.
+
+The "liveOps" object has: "orderQueue" (how many of each pizza size are currently queued to be spread/built \u2014 hand-entered by staff, not live POS data) and "stationLog" (recent camera snapshot checks of a prep station, each with a timestamp and a short plain-language read on how busy/backed-up it looked).
+
+The "staff" array has each person's phone, the positions they can fill with a 1-5 skill rating, and a dated notes log (things like availability or preferences). If asked to find coverage or a fill-in for a position, rank candidates by skill (highest first) from their "positions" list and mention their phone number so they can be called. If no one is listed for that position, say so plainly rather than guessing.
+
+Respond ONLY with a JSON object \u2014 no markdown fences, no code blocks, no preamble or text before/after it, in this exact shape:
+{
+  "reply": "a short, friendly, direct reply for the staff member (plain text, 1-4 sentences)",
+  "actions": [ ]
+}
+Keep "reply" concise \u2014 a few sentences at most \u2014 so the whole response stays well within the token limit and the JSON is never cut off mid-object.
+
+"actions" is an array of zero or more of these action objects, only include if the user is clearly asking you to change something:
+- {"type": "add_task", "text": "...", "assignee": "..."}
+- {"type": "complete_task", "text_match": "substring of an existing task's text"}
+- {"type": "update_inventory", "item_match": "substring of an existing inventory item name", "qty": number}
+- {"type": "add_shift", "day": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "name": "...", "time": "..."}
+- {"type": "set_par", "item_match": "substring of an existing par sheet item", "qty1": "...", "qty2": "..."}
+- {"type": "set_produce", "item_match": "substring of an existing produce item", "qty": "...", "notes": "..."}
+- {"type": "flag_stock", "item": "...", "status": "ok|low|86"}
+- {"type": "set_queue", "size_match": "substring of an order queue size label, e.g. 'XL' or 'Medium'", "count": number}
+
+If the user is just asking a question, return an empty actions array. Never invent inventory items, staff names, or tasks that aren't in the data when answering questions \u2014 only use actions to create new ones when explicitly asked.`;
+    try {
+      const response = await fetch(window.CHAT_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 2e3,
+          system: systemPrompt,
+          messages: [{ role: "user", content: text }]
+        })
+      });
+      const json = await response.json();
+      const raw = (json.content || []).map((c) => c.text || "").join("\n");
+      const clean = raw.replace(/```json|```/g, "").trim();
+      let parsed;
+      try {
+        parsed = JSON.parse(clean);
+      } catch (e) {
+        const match = clean.match(/\{[\s\S]*\}/);
+        if (match) {
+          try {
+            parsed = JSON.parse(match[0]);
+          } catch (e2) {
+            parsed = null;
+          }
+        }
+        if (!parsed) {
+          parsed = { reply: raw.trim() || "Sorry, I lost my train of thought \u2014 try that again?", actions: [] };
+        }
+      }
+      let next = JSON.parse(JSON.stringify(data));
+      let changed = false;
+      for (const action of parsed.actions || []) {
+        if (action.type === "add_task") {
+          next.tasks.push({ id: uid(), text: action.text || "New task", assignee: action.assignee || "Unassigned", done: false });
+          changed = true;
+        } else if (action.type === "complete_task") {
+          const t = next.tasks.find((t2) => t2.text.toLowerCase().includes((action.text_match || "").toLowerCase()));
+          if (t) {
+            t.done = true;
+            changed = true;
+          }
+        } else if (action.type === "update_inventory") {
+          const i = next.inventory.find((i2) => i2.item.toLowerCase().includes((action.item_match || "").toLowerCase()));
+          if (i && typeof action.qty === "number") {
+            i.qty = action.qty;
+            changed = true;
+          }
+        } else if (action.type === "add_shift") {
+          if (next.schedule[action.day]) {
+            next.schedule[action.day].push({ id: uid(), name: action.name || "TBD", time: action.time || "" });
+            changed = true;
+          }
+        } else if (action.type === "set_par") {
+          const r = (_a = next.prep) == null ? void 0 : _a.par.find((r2) => r2.item.toLowerCase().includes((action.item_match || "").toLowerCase()));
+          if (r) {
+            if (action.qty1 !== void 0) r.qty1 = action.qty1;
+            if (action.qty2 !== void 0) r.qty2 = action.qty2;
+            changed = true;
+          }
+        } else if (action.type === "set_produce") {
+          const r = (_b = next.prep) == null ? void 0 : _b.produce.find((r2) => r2.item.toLowerCase().includes((action.item_match || "").toLowerCase()));
+          if (r) {
+            if (action.qty !== void 0) r.qty = action.qty;
+            if (action.notes !== void 0) r.notes = action.notes;
+            changed = true;
+          }
+        } else if (action.type === "flag_stock") {
+          if (next.prep) {
+            const existing = next.prep.lowStock.find((r) => r.item.toLowerCase() === (action.item || "").toLowerCase());
+            if (existing) existing.status = action.status || "low";
+            else next.prep.lowStock.push({ id: uid(), item: action.item || "Item", status: action.status || "low", notes: "" });
+            changed = true;
+          }
+        } else if (action.type === "set_queue") {
+          const r = (_c = next.liveOps) == null ? void 0 : _c.orderQueue.sizes.find((r2) => r2.label.toLowerCase().includes((action.size_match || "").toLowerCase()));
+          if (r && typeof action.count === "number") {
+            r.count = action.count;
+            next.liveOps.orderQueue.updatedAt = (/* @__PURE__ */ new Date()).toLocaleString();
+            changed = true;
+          }
+        }
+      }
+      if (changed) await persist(next);
+      const replyText = parsed.reply || "Done.";
+      setMessages((m) => [...m, { role: "assistant", text: replyText }]);
+      speak(replyText, () => {
+        if (voiceModeRef.current !== "off") startListening();
+      });
+    } catch (e) {
+      const failText = "Couldn't reach the assistant just now \u2014 try again in a moment.";
+      setMessages((m) => [...m, { role: "assistant", text: failText }]);
+      speak(failText, () => {
+        if (voiceModeRef.current !== "off") startListening();
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col", style: { height: "62vh" } }, voiceMode !== "off" && /* @__PURE__ */ React.createElement(AssistantAvatar, { state: busy ? "thinking" : speaking ? "speaking" : listening ? "listening" : "idle" }), /* @__PURE__ */ React.createElement("div", { ref: scrollRef, className: "flex-1 overflow-y-auto px-1 py-2 space-y-3" }, messages.map(
+    (m, i) => m.role === "user" ? /* @__PURE__ */ React.createElement("div", { key: i, className: "flex justify-end" }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: "px-3.5 py-2 rounded-2xl rounded-br-sm max-w-[80%] text-sm",
+        style: { background: COLORS.crust, color: COLORS.cream, fontFamily: "Inter" }
+      },
+      m.text
+    )) : /* @__PURE__ */ React.createElement("div", { key: i, className: "flex justify-start" }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: "px-4 py-3 max-w-[85%] text-sm relative",
+        style: {
+          background: COLORS.card,
+          color: COLORS.crust,
+          fontFamily: "JetBrains Mono",
+          border: `1px solid ${COLORS.line}`,
+          borderStyle: "dashed",
+          borderRadius: "2px"
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { className: "text-[10px] mb-1 tracking-widest", style: { color: COLORS.tomato, fontFamily: "Inter", fontWeight: 600 } }, "MANAGER"),
+      m.text
+    ))
+  ), busy && /* @__PURE__ */ React.createElement("div", { className: "flex justify-start" }, /* @__PURE__ */ React.createElement("div", { className: "px-4 py-3 flex items-center gap-2 text-sm", style: { color: COLORS.crust, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(Loader2, { size: 14, className: "animate-spin" }), " thinking..."))), voiceError && /* @__PURE__ */ React.createElement("div", { className: "text-xs px-1 pb-1", style: { fontFamily: "Inter", color: COLORS.tomato } }, voiceError), voiceMode === "wake" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 px-1 pb-1 text-xs", style: { fontFamily: "Inter", color: listening ? COLORS.basil : "#888" } }, /* @__PURE__ */ React.createElement(Volume2, { size: 12 }), busy ? "Thinking..." : speaking ? "Speaking..." : `Always listening \u2014 say "${wakeWord}" followed by your question.`), voiceMode === "push" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 px-1 pb-1 text-xs", style: { fontFamily: "Inter", color: listening ? COLORS.basil : "#888" } }, /* @__PURE__ */ React.createElement(Volume2, { size: 12 }), listening ? "Listening \u2014 just talk, it sends when you pause." : busy ? "Thinking..." : "Tap-to-talk mode \u2014 replies are spoken aloud."), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 pt-2 pb-1.5 flex-wrap", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-xs mr-1", style: { fontFamily: "Inter", color: "#888" } }, "Voice:"), [
+    { id: "off", label: "Off" },
+    { id: "push", label: "Tap to talk" },
+    { id: "wake", label: `Always on ("${wakeWord}")` }
+  ].map((opt) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: opt.id,
+      onClick: () => setMode(opt.id),
+      className: "text-xs px-2.5 py-1 rounded-full",
+      style: {
+        fontFamily: "Inter",
+        border: `1px solid ${voiceMode === opt.id ? COLORS.tomato : COLORS.line}`,
+        background: voiceMode === opt.id ? COLORS.tomato : "transparent",
+        color: voiceMode === opt.id ? COLORS.cream : COLORS.crust
+      }
+    },
+    opt.label
+  )), voiceMode !== "off" && /* @__PURE__ */ React.createElement(
+    "select",
+    {
+      value: wakeWord,
+      onChange: (e) => {
+        setWakeWord(e.target.value);
+      },
+      className: "text-xs px-2 py-1 rounded-full outline-none",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", color: COLORS.crust }
+    },
+    /* @__PURE__ */ React.createElement("option", { value: "computer" }, '"computer"'),
+    /* @__PURE__ */ React.createElement("option", { value: "opps" }, '"opps"')
+  )), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 pt-1" }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      value: input,
+      onChange: (e) => setInput(e.target.value),
+      onKeyDown: (e) => e.key === "Enter" && send(),
+      placeholder: voiceMode === "wake" ? `Or type here (or say "${wakeWord}, ...")` : voiceMode === "push" ? "Or type here..." : "Ask about schedule, stock, tasks...",
+      className: "flex-1 px-3 py-2 rounded text-sm outline-none",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", background: COLORS.card, color: COLORS.crust }
+    }
+  ), /* @__PURE__ */ React.createElement(TicketButton, { onClick: send, style: { opacity: busy ? 0.6 : 1 } }, /* @__PURE__ */ React.createElement(Send, { size: 14 }), " Send")));
+}
+function ScheduleTab({ data, persist }) {
+  const [draft, setDraft] = useState({});
+  const addShift = (day) => {
+    const d = draft[day];
+    if (!d || !d.name) return;
+    const next = JSON.parse(JSON.stringify(data));
+    next.schedule[day].push({ id: uid(), name: d.name, time: d.time || "" });
+    persist(next);
+    setDraft({ ...draft, [day]: { name: "", time: "" } });
+  };
+  const removeShift = (day, id) => {
+    const next = JSON.parse(JSON.stringify(data));
+    next.schedule[day] = next.schedule[day].filter((s) => s.id !== id);
+    persist(next);
+  };
+  return /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" }, DAYS.map((day) => {
+    var _a, _b;
+    return /* @__PURE__ */ React.createElement("div", { key: day, className: "rounded p-3", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-2 tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato } }, day.toUpperCase()), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5 mb-2" }, data.schedule[day].length === 0 && /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#999" } }, "No one scheduled"), data.schedule[day].map((s) => /* @__PURE__ */ React.createElement("div", { key: s.id, className: "flex items-center justify-between text-xs px-2 py-1.5 rounded", style: { background: COLORS.cream, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("strong", null, s.name), " \xB7 ", s.time), /* @__PURE__ */ React.createElement("button", { onClick: () => removeShift(day, s.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 12, color: COLORS.tomato }))))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        placeholder: "Name",
+        value: ((_a = draft[day]) == null ? void 0 : _a.name) || "",
+        onChange: (e) => setDraft({ ...draft, [day]: { ...draft[day], name: e.target.value } }),
+        className: "text-xs px-2 py-1 rounded outline-none",
+        style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+      }
+    ), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        placeholder: "Time (e.g. 4pm\u2013close)",
+        value: ((_b = draft[day]) == null ? void 0 : _b.time) || "",
+        onChange: (e) => setDraft({ ...draft, [day]: { ...draft[day], time: e.target.value } }),
+        className: "text-xs px-2 py-1 rounded outline-none",
+        style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+      }
+    ), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => addShift(day), color: COLORS.basil, style: { justifyContent: "center", marginTop: 2 } }, /* @__PURE__ */ React.createElement(Plus, { size: 12 }), " Add")));
+  }));
+}
+function Stars({ value, onChange }) {
+  return /* @__PURE__ */ React.createElement("div", { className: "flex gap-0.5" }, [1, 2, 3, 4, 5].map((n) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: n,
+      type: "button",
+      onClick: () => onChange && onChange(n),
+      className: "text-sm leading-none",
+      style: { color: n <= value ? COLORS.tomato : "#ddd", cursor: onChange ? "pointer" : "default" }
+    },
+    "\u2605"
+  )));
+}
+function StaffTab({ data, persist }) {
+  const staff = data.staff || [];
+  const [editingId, setEditingId] = useState(null);
+  const [draft, setDraft] = useState({ name: "", phone: "" });
+  const [adding, setAdding] = useState(false);
+  const [posDraft, setPosDraft] = useState({});
+  const [noteDraft, setNoteDraft] = useState({});
+  const [expanded, setExpanded] = useState(null);
+  const [fillPosition, setFillPosition] = useState("");
+  const save = (next) => {
+    const nextData = JSON.parse(JSON.stringify(data));
+    nextData.staff = next;
+    persist(nextData);
+  };
+  const startEdit = (s) => {
+    setEditingId(s.id);
+    setDraft({ name: s.name, phone: s.phone || "" });
+  };
+  const saveEdit = () => {
+    save(staff.map((s) => s.id === editingId ? { ...s, name: draft.name, phone: draft.phone } : s));
+    setEditingId(null);
+    setDraft({ name: "", phone: "" });
+  };
+  const addStaff = () => {
+    if (!draft.name.trim()) return;
+    save([...staff, { id: uid(), name: draft.name.trim(), phone: draft.phone, positions: [], notes: [] }]);
+    setAdding(false);
+    setDraft({ name: "", phone: "" });
+  };
+  const remove = (id) => save(staff.filter((s) => s.id !== id));
+  const addPosition = (staffId) => {
+    const d = posDraft[staffId];
+    if (!d || !d.name || !d.name.trim()) return;
+    save(
+      staff.map(
+        (s) => s.id === staffId ? { ...s, positions: [...s.positions || [], { id: uid(), name: d.name.trim(), skill: d.skill || 3 }] } : s
+      )
+    );
+    setPosDraft({ ...posDraft, [staffId]: { name: "", skill: 3 } });
+  };
+  const removePosition = (staffId, posId) => {
+    save(staff.map((s) => s.id === staffId ? { ...s, positions: s.positions.filter((p) => p.id !== posId) } : s));
+  };
+  const setPositionSkill = (staffId, posId, skill) => {
+    save(
+      staff.map(
+        (s) => s.id === staffId ? { ...s, positions: s.positions.map((p) => p.id === posId ? { ...p, skill } : p) } : s
+      )
+    );
+  };
+  const addNote = (staffId) => {
+    const text = (noteDraft[staffId] || "").trim();
+    if (!text) return;
+    const entry = { id: uid(), date: (/* @__PURE__ */ new Date()).toLocaleDateString(), text };
+    save(staff.map((s) => s.id === staffId ? { ...s, notes: [entry, ...s.notes || []] } : s));
+    setNoteDraft({ ...noteDraft, [staffId]: "" });
+  };
+  const removeNote = (staffId, noteId) => {
+    save(staff.map((s) => s.id === staffId ? { ...s, notes: s.notes.filter((n) => n.id !== noteId) } : s));
+  };
+  const allPositions = Array.from(
+    /* @__PURE__ */ new Set([...data.standardPositions || [], ...staff.flatMap((s) => (s.positions || []).map((p) => p.name))])
+  );
+  const fillCandidates = fillPosition ? staff.map((s) => ({ s, p: (s.positions || []).find((p) => p.name.toLowerCase() === fillPosition.toLowerCase()) })).filter((x) => x.p).sort((a, b) => b.p.skill - a.p.skill) : [];
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "Phone numbers, positions + skill, and notes that stick around \u2014 separate from the weekly Schedule."), !adding && /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => {
+    setAdding(true);
+    setEditingId(null);
+    setDraft({ name: "", phone: "" });
+  }, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 13 }), " Add staff")), allPositions.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "mb-3 px-3 py-2.5 rounded", style: { background: "#FBF0DA", border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-1.5", style: { fontFamily: "Inter", color: "#8A6116" } }, "Find a fill-in"), /* @__PURE__ */ React.createElement(
+    "select",
+    {
+      value: fillPosition,
+      onChange: (e) => setFillPosition(e.target.value),
+      className: "w-full text-sm px-2 py-1.5 rounded outline-none mb-2",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+    },
+    /* @__PURE__ */ React.createElement("option", { value: "" }, "Select a position..."),
+    allPositions.map((p) => /* @__PURE__ */ React.createElement("option", { key: p, value: p }, p))
+  ), fillPosition && (fillCandidates.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#999" } }, "No one's listed for ", fillPosition, " yet.") : /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, fillCandidates.map(({ s, p }) => /* @__PURE__ */ React.createElement("div", { key: s.id, className: "flex items-center justify-between text-sm", style: { fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(Stars, { value: p.skill }), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { color: "#888" } }, s.phone || "no number"))))))), adding && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-3 rounded space-y-1.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("input", { placeholder: "Name", value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full text-sm px-2.5 py-2 rounded outline-none", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full text-sm px-2.5 py-2 rounded outline-none", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: addStaff, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => {
+    setAdding(false);
+    setDraft({ name: "", phone: "" });
+  }, color: "#888" }, "Cancel"))), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, staff.map((s) => {
+    const editing = editingId === s.id;
+    const open = expanded === s.id;
+    const pd = posDraft[s.id] || { name: "", skill: 3 };
+    return /* @__PURE__ */ React.createElement("div", { key: s.id, className: "rounded px-3 py-2.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, editing ? /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, /* @__PURE__ */ React.createElement("input", { value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full text-sm px-2.5 py-2 rounded outline-none", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full text-sm px-2.5 py-2 rounded outline-none", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: saveEdit, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => setEditingId(null), color: "#888" }, "Cancel"))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "flex items-start justify-between gap-2 cursor-pointer", onClick: () => setExpanded(open ? null : s.id) }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#888" } }, s.phone || "no number on file", (s.positions || []).length > 0 && " \xB7 " + s.positions.map((p) => p.name).join(", "))), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 shrink-0" }, /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+      e.stopPropagation();
+      startEdit(s);
+    }, className: "text-xs px-2 py-0.5 rounded", style: { fontFamily: "Inter", border: `1px solid ${COLORS.line}`, color: COLORS.crust } }, "Edit"), /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+      e.stopPropagation();
+      remove(s.id);
+    } }, /* @__PURE__ */ React.createElement(Trash2, { size: 13, color: "#999" })), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "JetBrains Mono", color: "#999" } }, open ? "\u2212" : "+"))), open && /* @__PURE__ */ React.createElement("div", { className: "mt-2.5 pt-2.5", style: { borderTop: `1px dashed ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-1", style: { fontFamily: "Inter", color: COLORS.crust } }, "Positions & skill"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1 mb-2" }, (s.positions || []).map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, className: "flex items-center justify-between" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.crust } }, p.name), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(Stars, { value: p.skill, onChange: (n) => setPositionSkill(s.id, p.id, n) }), /* @__PURE__ */ React.createElement("button", { onClick: () => removePosition(s.id, p.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 12, color: "#999" }))))), (s.positions || []).length === 0 && /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#999" } }, "No positions listed yet.")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 mb-3" }, /* @__PURE__ */ React.createElement(
+      "select",
+      {
+        value: pd.name,
+        onChange: (e) => setPosDraft({ ...posDraft, [s.id]: { ...pd, name: e.target.value } }),
+        className: "flex-1 text-xs px-2 py-1.5 rounded outline-none",
+        style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", color: pd.name ? COLORS.crust : "#999" }
+      },
+      /* @__PURE__ */ React.createElement("option", { value: "" }, "Select a position..."),
+      (data.standardPositions || []).map((p) => /* @__PURE__ */ React.createElement("option", { key: p, value: p }, p))
+    ), /* @__PURE__ */ React.createElement(Stars, { value: pd.skill, onChange: (n) => setPosDraft({ ...posDraft, [s.id]: { ...pd, skill: n } }) }), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => addPosition(s.id), color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 12 }))), /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-1", style: { fontFamily: "Inter", color: COLORS.crust } }, "Notes log"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1 mb-2" }, (s.notes || []).map((n) => /* @__PURE__ */ React.createElement("div", { key: n.id, className: "flex items-start justify-between gap-2 text-xs", style: { fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#666" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa" } }, n.date, " \u2014 "), n.text), /* @__PURE__ */ React.createElement("button", { onClick: () => removeNote(s.id, n.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 11, color: "#bbb" })))), (s.notes || []).length === 0 && /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#999" } }, "No notes yet.")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        placeholder: "Add a note (e.g. out next Tuesday)",
+        value: noteDraft[s.id] || "",
+        onChange: (e) => setNoteDraft({ ...noteDraft, [s.id]: e.target.value }),
+        onKeyDown: (e) => e.key === "Enter" && addNote(s.id),
+        className: "flex-1 text-xs px-2 py-1.5 rounded outline-none",
+        style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+      }
+    ), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => addNote(s.id), color: COLORS.crust }, /* @__PURE__ */ React.createElement(Plus, { size: 12 }))))));
+  })));
+}
+function InventoryTab({ data, persist }) {
+  const [draft, setDraft] = useState({ item: "", qty: "", unit: "", low: "", cost: "", vendor: "" });
+  const [showCost, setShowCost] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+  const [mapEditingId, setMapEditingId] = useState(null);
+  const [mapDraft, setMapDraft] = useState({ area: "", items: "" });
+  const [mapAdding, setMapAdding] = useState(false);
+  const storageMap = data.storageMap || [];
+  const saveMap = (next) => {
+    const nextData = JSON.parse(JSON.stringify(data));
+    nextData.storageMap = next;
+    persist(nextData);
+  };
+  const startMapEdit = (m) => {
+    setMapEditingId(m.id);
+    setMapDraft({ area: m.area, items: m.items });
+  };
+  const saveMapEdit = () => {
+    saveMap(storageMap.map((m) => m.id === mapEditingId ? { ...m, area: mapDraft.area, items: mapDraft.items } : m));
+    setMapEditingId(null);
+    setMapDraft({ area: "", items: "" });
+  };
+  const addMapArea = () => {
+    if (!mapDraft.area.trim()) return;
+    saveMap([...storageMap, { id: uid(), area: mapDraft.area.trim(), items: mapDraft.items }]);
+    setMapAdding(false);
+    setMapDraft({ area: "", items: "" });
+  };
+  const removeMapArea = (id) => saveMap(storageMap.filter((m) => m.id !== id));
+  const updateField = (id, field, value) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const i = next.inventory.find((i2) => i2.id === id);
+    i[field] = value;
+    persist(next);
+  };
+  const remove = (id) => {
+    const next = JSON.parse(JSON.stringify(data));
+    next.inventory = next.inventory.filter((i) => i.id !== id);
+    persist(next);
+  };
+  const add = () => {
+    if (!draft.item) return;
+    const next = JSON.parse(JSON.stringify(data));
+    next.inventory.push({
+      id: uid(),
+      item: draft.item,
+      qty: Number(draft.qty) || 0,
+      unit: draft.unit || "ea",
+      low: Number(draft.low) || 0,
+      cost: draft.cost === "" ? null : Number(draft.cost),
+      vendor: draft.vendor || ""
+    });
+    persist(next);
+    setDraft({ item: "", qty: "", unit: "", low: "", cost: "", vendor: "" });
+  };
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "Set unit cost + vendor here so the Order tab can suggest restocks."), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => setShowCost((s) => !s),
+      className: "text-xs px-2 py-1 rounded",
+      style: { fontFamily: "Inter", border: `1px solid ${COLORS.line}`, color: COLORS.crust }
+    },
+    showCost ? "Hide cost/vendor" : "Show cost/vendor"
+  )), /* @__PURE__ */ React.createElement("div", { className: "space-y-2 mb-3" }, data.inventory.map((i) => {
+    var _a, _b;
+    const isLow = i.qty <= i.low;
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: i.id,
+        className: "px-3 py-2.5 rounded",
+        style: { background: COLORS.card, border: `1px solid ${isLow ? COLORS.tomato : COLORS.line}` }
+      },
+      /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, isLow && /* @__PURE__ */ React.createElement(AlertTriangle, { size: 14, color: COLORS.tomato }), /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 500, color: COLORS.crust } }, i.item), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "low at ", i.low, " ", i.unit)), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "number",
+          value: i.qty,
+          onChange: (e) => updateField(i.id, "qty", Number(e.target.value)),
+          className: "w-16 text-sm px-2 py-1 rounded text-right",
+          style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono", color: isLow ? COLORS.tomatoDark : COLORS.crust }
+        }
+      ), /* @__PURE__ */ React.createElement("span", { className: "text-xs w-14", style: { fontFamily: "Inter", color: "#888" } }, i.unit), /* @__PURE__ */ React.createElement("button", { onClick: () => remove(i.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 13, color: "#999" })))),
+      showCost && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 mt-2 pt-2", style: { borderTop: `1px dashed ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "Cost/unit $"), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "number",
+          step: "0.01",
+          placeholder: "\u2014",
+          value: (_a = i.cost) != null ? _a : "",
+          onChange: (e) => updateField(i.id, "cost", e.target.value === "" ? null : Number(e.target.value)),
+          className: "w-20 text-xs px-2 py-1 rounded",
+          style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" }
+        }
+      ), /* @__PURE__ */ React.createElement("span", { className: "text-xs ml-2", style: { fontFamily: "Inter", color: "#888" } }, "Vendor"), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          placeholder: "Thomsen / QFC",
+          value: (_b = i.vendor) != null ? _b : "",
+          onChange: (e) => updateField(i.id, "vendor", e.target.value),
+          className: "w-28 text-xs px-2 py-1 rounded",
+          style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+        }
+      ))
+    );
+  })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5 items-center pt-2", style: { borderTop: `1px dashed ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("input", { placeholder: "Item", value: draft.item, onChange: (e) => setDraft({ ...draft, item: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none flex-1 min-w-[100px]", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Qty", type: "number", value: draft.qty, onChange: (e) => setDraft({ ...draft, qty: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Unit", value: draft.unit, onChange: (e) => setDraft({ ...draft, unit: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Low at", type: "number", value: draft.low, onChange: (e) => setDraft({ ...draft, low: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Cost $", type: "number", step: "0.01", value: draft.cost, onChange: (e) => setDraft({ ...draft, cost: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Vendor", value: draft.vendor, onChange: (e) => setDraft({ ...draft, vendor: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-20", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement(TicketButton, { onClick: add, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 13 }), " Add")), /* @__PURE__ */ React.createElement("div", { className: "mt-4 pt-3", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, "Storage Map"), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => setShowMap((s) => !s),
+      className: "text-xs px-2 py-1 rounded",
+      style: { fontFamily: "Inter", border: `1px solid ${COLORS.line}`, color: COLORS.crust }
+    },
+    showMap ? "Hide" : "Where's it stored?"
+  )), showMap && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: "#888" } }, 'Reference list for "where is X stored" \u2014 Ask the Manager reads this too.'), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5 mb-2" }, storageMap.map((m) => {
+    const editing = mapEditingId === m.id;
+    return /* @__PURE__ */ React.createElement("div", { key: m.id, className: "px-3 py-2 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, editing ? /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        value: mapDraft.area,
+        onChange: (e) => setMapDraft({ ...mapDraft, area: e.target.value }),
+        className: "w-full text-sm px-2 py-1.5 rounded outline-none",
+        style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", fontWeight: 600 }
+      }
+    ), /* @__PURE__ */ React.createElement(
+      "textarea",
+      {
+        value: mapDraft.items,
+        onChange: (e) => setMapDraft({ ...mapDraft, items: e.target.value }),
+        rows: 2,
+        className: "w-full text-sm px-2 py-1.5 rounded outline-none",
+        style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+      }
+    ), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: saveMapEdit, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => setMapEditingId(null), color: "#888" }, "Cancel"))) : /* @__PURE__ */ React.createElement("div", { className: "flex items-start justify-between gap-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, m.area), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#666" } }, m.items)), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 shrink-0" }, /* @__PURE__ */ React.createElement("button", { onClick: () => startMapEdit(m), className: "text-xs px-2 py-0.5 rounded", style: { fontFamily: "Inter", border: `1px solid ${COLORS.line}`, color: COLORS.crust } }, "Edit"), /* @__PURE__ */ React.createElement("button", { onClick: () => removeMapArea(m.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 13, color: "#999" })))));
+  })), mapAdding ? /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 rounded space-y-1.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      placeholder: "Area name (e.g. Walk-in cooler)",
+      value: mapDraft.area,
+      onChange: (e) => setMapDraft({ ...mapDraft, area: e.target.value }),
+      className: "w-full text-sm px-2.5 py-2 rounded outline-none",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+    }
+  ), /* @__PURE__ */ React.createElement(
+    "textarea",
+    {
+      placeholder: "What's stored there",
+      value: mapDraft.items,
+      onChange: (e) => setMapDraft({ ...mapDraft, items: e.target.value }),
+      rows: 2,
+      className: "w-full text-sm px-2.5 py-2 rounded outline-none",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+    }
+  ), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: addMapArea, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 13 }), " Add area"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => {
+    setMapAdding(false);
+    setMapDraft({ area: "", items: "" });
+  }, color: "#888" }, "Cancel"))) : /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => {
+    setMapAdding(true);
+    setMapEditingId(null);
+    setMapDraft({ area: "", items: "" });
+  }, color: COLORS.crust }, /* @__PURE__ */ React.createElement(Plus, { size: 13 }), " Add storage area"))));
+}
+function OrderTab({ data }) {
+  const [overrides, setOverrides] = useState({});
+  const [checked, setChecked] = useState({});
+  const [copied, setCopied] = useState(false);
+  const suggested = data.inventory.filter((i) => i.qty <= i.low).map((i) => {
+    const target = i.low * 2;
+    const defaultQty = Math.max(Math.ceil(target - i.qty), 1);
+    const qty = overrides[i.id] !== void 0 ? overrides[i.id] : defaultQty;
+    return { ...i, suggestedQty: qty };
+  });
+  const setQty = (id, val) => setOverrides((o) => ({ ...o, [id]: Number(val) }));
+  const toggle = (id) => setChecked((c) => ({ ...c, [id]: !c[id] }));
+  const active = suggested.filter((i) => !checked[i.id]);
+  const byVendor = active.reduce((acc, i) => {
+    const v = i.vendor || "Unassigned vendor";
+    (acc[v] = acc[v] || []).push(i);
+    return acc;
+  }, {});
+  const total = active.reduce((sum, i) => sum + (i.cost ? i.cost * i.suggestedQty : 0), 0);
+  const missingCost = active.filter((i) => !i.cost).length;
+  const buildText = () => {
+    let out = `ON POINT PIZZA \u2014 SUGGESTED ORDER (${(/* @__PURE__ */ new Date()).toLocaleDateString()})
+
+`;
+    Object.entries(byVendor).forEach(([vendor, items]) => {
+      out += `${vendor.toUpperCase()}
+`;
+      items.forEach((i) => {
+        const line = i.cost ? ` ($${(i.cost * i.suggestedQty).toFixed(2)})` : "";
+        out += `  - ${i.suggestedQty} ${i.unit} ${i.item}${line}
+`;
+      });
+      out += "\n";
+    });
+    if (total > 0) out += `Estimated total (priced items only): $${total.toFixed(2)}
+`;
+    return out;
+  };
+  const copyOrder = async () => {
+    try {
+      await navigator.clipboard.writeText(buildText());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2e3);
+    } catch (e) {
+      setCopied(false);
+    }
+  };
+  if (suggested.length === 0) {
+    return /* @__PURE__ */ React.createElement("div", { className: "text-sm italic", style: { fontFamily: "Inter", color: "#999" } }, "Nothing at or below par right now \u2014 no order needed.");
+  }
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, 'Built from Inventory items at or below their "low" line. Suggested qty restocks to 2\xD7 low \u2014 adjust as needed.'), /* @__PURE__ */ React.createElement(TicketButton, { onClick: copyOrder, color: COLORS.crust }, /* @__PURE__ */ React.createElement(Copy, { size: 13 }), " ", copied ? "Copied!" : "Copy order")), missingCost > 0 && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-3 px-3 py-2 rounded", style: { background: "#FBF0DA", color: "#8A6116", fontFamily: "Inter" } }, missingCost, " item", missingCost > 1 ? "s" : "", " on this list ", missingCost > 1 ? "don't" : "doesn't", " have a unit cost yet \u2014 add one in Inventory (Show cost/vendor) for a full total."), Object.entries(byVendor).map(([vendor, items]) => /* @__PURE__ */ React.createElement("div", { key: vendor, className: "mb-4" }, /* @__PURE__ */ React.createElement(SectionHeader, null, vendor), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, items.map((i) => /* @__PURE__ */ React.createElement("div", { key: i.id, className: "flex items-center justify-between px-3 py-2 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => toggle(i.id), className: "w-4 h-4 rounded border flex items-center justify-center", style: { borderColor: COLORS.tomato } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 500, color: COLORS.crust } }, i.item), /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "on hand ", i.qty, " ", i.unit, " \xB7 low at ", i.low))), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "number",
+      min: "0",
+      value: i.suggestedQty,
+      onChange: (e) => setQty(i.id, e.target.value),
+      className: "w-14 text-sm px-2 py-1 rounded text-right",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono", color: COLORS.crust }
+    }
+  ), /* @__PURE__ */ React.createElement("span", { className: "text-xs w-10", style: { fontFamily: "Inter", color: "#888" } }, i.unit), /* @__PURE__ */ React.createElement("span", { className: "text-xs w-16 text-right", style: { fontFamily: "JetBrains Mono", color: i.cost ? COLORS.crust : "#bbb" } }, i.cost ? `$${(i.cost * i.suggestedQty).toFixed(2)}` : "no cost"))))))), total > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between px-3 py-2.5 mt-2 rounded", style: { background: COLORS.crust } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.cream } }, "Estimated total (priced items only)"), /* @__PURE__ */ React.createElement("span", { className: "text-sm font-semibold", style: { fontFamily: "JetBrains Mono", color: COLORS.cream } }, "$", total.toFixed(2))), Object.keys(checked).some((k) => checked[k]) && /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-3 italic", style: { fontFamily: "Inter", color: "#999" } }, "Checked-off items are hidden from the copy list above \u2014 uncheck to bring them back."));
+}
+function RecipesTab({ data, persist }) {
+  const recipes = data.recipes || DEFAULT_DATA.recipes;
+  const [openId, setOpenId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [draft, setDraft] = useState({ name: "", steps: "" });
+  const [adding, setAdding] = useState(false);
+  const save = (nextRecipes) => {
+    const next = JSON.parse(JSON.stringify(data));
+    next.recipes = nextRecipes;
+    persist(next);
+  };
+  const startEdit = (r) => {
+    setEditingId(r.id);
+    setDraft({ name: r.name, steps: r.steps });
+  };
+  const saveEdit = () => {
+    save(recipes.map((r) => r.id === editingId ? { ...r, name: draft.name, steps: draft.steps } : r));
+    setEditingId(null);
+    setDraft({ name: "", steps: "" });
+  };
+  const addRecipe = () => {
+    if (!draft.name.trim()) return;
+    save([...recipes, { id: uid(), name: draft.name.trim(), steps: draft.steps }]);
+    setAdding(false);
+    setDraft({ name: "", steps: "" });
+  };
+  const remove = (id) => {
+    save(recipes.filter((r) => r.id !== id));
+    if (openId === id) setOpenId(null);
+  };
+  const editorBox = (onSave, onCancel) => /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5 mt-2" }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      placeholder: "Recipe name",
+      value: draft.name,
+      onChange: (e) => setDraft({ ...draft, name: e.target.value }),
+      className: "w-full text-sm px-2.5 py-2 rounded outline-none",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+    }
+  ), /* @__PURE__ */ React.createElement(
+    "textarea",
+    {
+      placeholder: "Ingredients & steps \u2014 one per line",
+      value: draft.steps,
+      onChange: (e) => setDraft({ ...draft, steps: e.target.value }),
+      rows: 8,
+      className: "w-full text-sm px-2.5 py-2 rounded outline-none",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+    }
+  ), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: onSave, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: onCancel, color: "#888" }, "Cancel")));
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "Tap a recipe to open it. House units: souffl\xE9 cups, scoops, pinches \u2014 same as on the line."), !adding && /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => {
+    setAdding(true);
+    setEditingId(null);
+    setDraft({ name: "", steps: "" });
+  }, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 13 }), " Add recipe")), adding && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-3 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, editorBox(addRecipe, () => {
+    setAdding(false);
+    setDraft({ name: "", steps: "" });
+  })), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, recipes.map((r) => {
+    const open = openId === r.id;
+    const editing = editingId === r.id;
+    return /* @__PURE__ */ React.createElement("div", { key: r.id, className: "rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: "flex items-center justify-between px-3 py-2.5 cursor-pointer",
+        onClick: () => !editing && setOpenId(open ? null : r.id)
+      },
+      /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, r.name),
+      /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, open && !editing && /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+        e.stopPropagation();
+        startEdit(r);
+      }, className: "text-xs px-2 py-0.5 rounded", style: { fontFamily: "Inter", border: `1px solid ${COLORS.line}`, color: COLORS.crust } }, "Edit"), open && !editing && /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+        e.stopPropagation();
+        remove(r.id);
+      } }, /* @__PURE__ */ React.createElement(Trash2, { size: 13, color: "#999" })), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "JetBrains Mono", color: "#999" } }, open ? "\u2212" : "+"))
+    ), open && !editing && /* @__PURE__ */ React.createElement("div", { className: "px-3 pb-3 text-sm whitespace-pre-wrap", style: { fontFamily: "Inter", color: COLORS.crust, borderTop: `1px dashed ${COLORS.line}`, paddingTop: 10 } }, r.steps), editing && /* @__PURE__ */ React.createElement("div", { className: "px-3 pb-3" }, editorBox(saveEdit, () => {
+      setEditingId(null);
+      setDraft({ name: "", steps: "" });
+    })));
+  })));
+}
+function SectionHeader({ children }) {
+  return /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-2 mt-5 tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato } }, children);
+}
+function PrepParTab({ data, persist }) {
+  const prep = data.prep || { par: [], produce: [], lowStock: [] };
+  const [newFlag, setNewFlag] = useState("");
+  const updatePar = (id, field, value) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const row = next.prep.par.find((r) => r.id === id);
+    row[field] = value;
+    persist(next);
+  };
+  const updateProduce = (id, field, value) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const row = next.prep.produce.find((r) => r.id === id);
+    row[field] = value;
+    persist(next);
+  };
+  const addFlag = () => {
+    if (!newFlag.trim()) return;
+    const next = JSON.parse(JSON.stringify(data));
+    next.prep.lowStock.push({ id: uid(), item: newFlag.trim(), status: "low", notes: "" });
+    persist(next);
+    setNewFlag("");
+  };
+  const setFlagStatus = (id, status) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const row = next.prep.lowStock.find((r) => r.id === id);
+    row.status = status;
+    persist(next);
+  };
+  const removeFlag = (id) => {
+    const next = JSON.parse(JSON.stringify(data));
+    next.prep.lowStock = next.prep.lowStock.filter((r) => r.id !== id);
+    persist(next);
+  };
+  const statusColor = { ok: COLORS.basil, low: COLORS.parm, "86": COLORS.tomato };
+  const statusLabel = { ok: "OK", low: "LOW", "86": "86" };
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(SectionHeader, null, "86 / Low Stock Board"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5 mb-2" }, prep.lowStock.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#999" } }, "Nothing flagged right now."), prep.lowStock.map((f) => /* @__PURE__ */ React.createElement("div", { key: f.id, className: "flex items-center justify-between px-3 py-2 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, f.item), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1" }, ["ok", "low", "86"].map((s) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: s,
+      onClick: () => setFlagStatus(f.id, s),
+      className: "text-[10px] px-2 py-1 rounded-full",
+      style: {
+        fontFamily: "Inter",
+        fontWeight: 600,
+        background: f.status === s ? statusColor[s] : "transparent",
+        color: f.status === s ? COLORS.cream : "#999",
+        border: `1px solid ${f.status === s ? statusColor[s] : COLORS.line}`
+      }
+    },
+    statusLabel[s]
+  )), /* @__PURE__ */ React.createElement("button", { onClick: () => removeFlag(f.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 12, color: "#999", className: "ml-1" })))))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 mb-2" }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      placeholder: "Flag an item (e.g. Roma tomatoes)",
+      value: newFlag,
+      onChange: (e) => setNewFlag(e.target.value),
+      onKeyDown: (e) => e.key === "Enter" && addFlag(),
+      className: "flex-1 text-xs px-2.5 py-1.5 rounded outline-none",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+    }
+  ), /* @__PURE__ */ React.createElement(TicketButton, { onClick: addFlag, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 12 }))), /* @__PURE__ */ React.createElement(SectionHeader, null, "Prep Par Sheet"), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_60px_60px] px-3 py-1.5 text-[10px] tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#999", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "ITEM"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "QTY 1"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "QTY 2")), /* @__PURE__ */ React.createElement("div", { className: "max-h-72 overflow-y-auto" }, prep.par.map((row, idx) => /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      key: row.id,
+      className: "grid grid-cols-[1fr_60px_60px] items-center px-3 py-1.5 text-sm",
+      style: { fontFamily: "Inter", background: idx % 2 ? COLORS.cream : COLORS.card, color: COLORS.crust }
+    },
+    /* @__PURE__ */ React.createElement("span", null, row.item),
+    /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        value: row.qty1,
+        onChange: (e) => updatePar(row.id, "qty1", e.target.value),
+        className: "w-14 text-right text-xs px-1 py-0.5 rounded justify-self-end",
+        style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" }
+      }
+    ),
+    /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        value: row.qty2,
+        onChange: (e) => updatePar(row.id, "qty2", e.target.value),
+        className: "w-14 text-right text-xs px-1 py-0.5 rounded justify-self-end",
+        style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" }
+      }
+    )
+  )))), /* @__PURE__ */ React.createElement(SectionHeader, null, "Produce Order Sheet"), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_50px_1fr] px-3 py-1.5 text-[10px] tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#999", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "ITEM"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "QTY"), /* @__PURE__ */ React.createElement("span", { className: "pl-2" }, "NOTES")), /* @__PURE__ */ React.createElement("div", { className: "max-h-72 overflow-y-auto" }, prep.produce.map((row, idx) => /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      key: row.id,
+      className: "grid grid-cols-[1fr_50px_1fr] items-center px-3 py-1.5 text-sm gap-1",
+      style: { fontFamily: "Inter", background: idx % 2 ? COLORS.cream : COLORS.card, color: COLORS.crust }
+    },
+    /* @__PURE__ */ React.createElement("span", null, row.item),
+    /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        value: row.qty,
+        onChange: (e) => updateProduce(row.id, "qty", e.target.value),
+        className: "w-12 text-right text-xs px-1 py-0.5 rounded justify-self-end",
+        style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" }
+      }
+    ),
+    /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        value: row.notes,
+        onChange: (e) => updateProduce(row.id, "notes", e.target.value),
+        className: "text-xs px-1.5 py-0.5 rounded",
+        style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+      }
+    )
+  )))));
+}
+function PriceInput({ value, onChange }) {
+  const empty = value === "";
+  return /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      value,
+      onChange: (e) => onChange(e.target.value),
+      placeholder: "?",
+      className: "w-14 text-right text-xs px-1.5 py-1 rounded",
+      style: {
+        border: `1px solid ${empty ? COLORS.tomato : COLORS.line}`,
+        background: empty ? "#FDECE8" : "white",
+        fontFamily: "JetBrains Mono",
+        color: COLORS.crust
+      }
+    }
+  );
+}
+function SimpleList({ title, rows, onChange }) {
+  return /* @__PURE__ */ React.createElement("div", { className: "mb-4" }, /* @__PURE__ */ React.createElement(SectionHeader, null, title), /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, rows.map((r) => /* @__PURE__ */ React.createElement("div", { key: r.id, className: "flex items-center justify-between px-3 py-1.5 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, r.name), /* @__PURE__ */ React.createElement(PriceInput, { value: r.price, onChange: (v) => onChange(r.id, v) })))));
+}
+function MenuTab({ data, persist }) {
+  const menu = data.menu;
+  if (!menu) return null;
+  const set = (path, value) => {
+    const next = JSON.parse(JSON.stringify(data));
+    path(next.menu);
+    persist(next);
+  };
+  const updateSimple = (key, id, price) => set((m) => {
+    const row = m[key].find((r) => r.id === id);
+    row.price = price;
+  });
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-xs px-3 py-2 rounded mb-3", style: { background: "#E9F0E5", color: COLORS.basil, fontFamily: "Inter" } }, "Pulled from the actual printed menu proof \u2014 this replaces the earlier photo-based guesses. Prices are still editable if anything changes."), /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 rounded mb-4", style: { background: COLORS.crust } }, /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.parm } }, menu.info.phone, " \xB7 ", menu.info.address), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: COLORS.cream } }, menu.info.hours), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: COLORS.parm } }, menu.info.note)), /* @__PURE__ */ React.createElement(SectionHeader, null, "Pizza \u2014 sizes & toppings"), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: "#888" } }, menu.glutenFree), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden mb-2", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_repeat(4,56px)] px-3 py-1.5 text-[10px] tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#999", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "SIZE"), menu.pizzaSizes.map((s) => /* @__PURE__ */ React.createElement("span", { key: s, className: "text-right" }, s.split(" ")[0]))), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_repeat(4,56px)] items-center px-3 py-2 text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, /* @__PURE__ */ React.createElement("span", null, "Base price"), menu.pizzaBasePrices.map((p, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "justify-self-end" }, /* @__PURE__ */ React.createElement(PriceInput, { value: p, onChange: (v) => set((m) => {
+    m.pizzaBasePrices[i] = v;
+  }) }))))), menu.toppingTiers.map((t) => /* @__PURE__ */ React.createElement("div", { key: t.id, className: "rounded px-3 py-2 mb-2", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-1" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm font-medium", style: { fontFamily: "Inter", color: COLORS.crust } }, t.tier), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1" }, t.prices.map((p, i) => /* @__PURE__ */ React.createElement(PriceInput, { key: i, value: p, onChange: (v) => set((m) => {
+    m.toppingTiers.find((x) => x.id === t.id).prices[i] = v;
+  }) })))), /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, t.items))), /* @__PURE__ */ React.createElement(SectionHeader, null, "Specialty Pizzas (", menu.specialty.length, ")"), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden mb-2", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_repeat(5,44px)] px-3 py-1.5 text-[10px] tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#999", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "SIZE"), menu.specialtySizes.map((s) => /* @__PURE__ */ React.createElement("span", { key: s, className: "text-right" }, s.split(" ")[0]))), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_repeat(5,44px)] items-center px-3 py-2 text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, /* @__PURE__ */ React.createElement("span", null, "All specialty pizzas"), menu.specialtyPrices.map((p, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "justify-self-end" }, /* @__PURE__ */ React.createElement(PriceInput, { value: p, onChange: (v) => set((m) => {
+    m.specialtyPrices[i] = v;
+  }) }))))), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: "#888" } }, "Same price grid applies to every specialty pizza below."), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5 mb-4" }, menu.specialty.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, className: "rounded px-3 py-2", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "text-sm font-semibold mb-0.5", style: { fontFamily: "Inter", color: COLORS.tomato } }, p.name), /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, p.ingredients)))), /* @__PURE__ */ React.createElement(SectionHeader, null, "Calzones"), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-1.5", style: { fontFamily: "Inter", color: "#888" } }, menu.calzone.note), /* @__PURE__ */ React.createElement("div", { className: "space-y-1 mb-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between px-3 py-1.5 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, "Cheese Calzone"), /* @__PURE__ */ React.createElement(PriceInput, { value: menu.calzone.cheesePrice, onChange: (v) => set((m) => {
+    m.calzone.cheesePrice = v;
+  }) })), /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between px-3 py-1.5 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, "Toppings, each"), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      value: menu.calzone.toppingsEach,
+      onChange: (e) => set((m) => {
+        m.calzone.toppingsEach = e.target.value;
+      }),
+      className: "w-20 text-right text-xs px-1.5 py-1 rounded",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono", color: COLORS.crust }
+    }
+  )), /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between px-3 py-1.5 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, "Specialty Calzone (any specialty pizza)"), /* @__PURE__ */ React.createElement(PriceInput, { value: menu.calzone.specialtyPrice, onChange: (v) => set((m) => {
+    m.calzone.specialtyPrice = v;
+  }) }))), /* @__PURE__ */ React.createElement(SimpleList, { title: "Appetizers", rows: menu.appetizers, onChange: (id, v) => updateSimple("appetizers", id, v) }), /* @__PURE__ */ React.createElement(SectionHeader, null, "Tenders & Wings"), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-1.5", style: { fontFamily: "Inter", color: "#888" } }, "Available in: ", menu.wingFlavors), /* @__PURE__ */ React.createElement("div", { className: "space-y-1 mb-4" }, menu.tendersWings.map((r) => /* @__PURE__ */ React.createElement("div", { key: r.id, className: "flex items-center justify-between px-3 py-1.5 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: r.name.startsWith("  ") ? "#888" : COLORS.crust } }, r.name), /* @__PURE__ */ React.createElement(PriceInput, { value: r.price, onChange: (v) => updateSimple("tendersWings", r.id, v) })))), /* @__PURE__ */ React.createElement(SectionHeader, null, "Salads"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5 mb-2" }, menu.salads.map((s) => /* @__PURE__ */ React.createElement("div", { key: s.id, className: "rounded px-3 py-2", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-0.5" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm font-medium", style: { fontFamily: "Inter", color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(PriceInput, { value: s.price, onChange: (v) => set((m) => {
+    m.salads.find((x) => x.id === s.id).price = v;
+  }) }), s.withChicken !== void 0 && /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "+chicken:", /* @__PURE__ */ React.createElement("span", { className: "inline-block ml-1" }, /* @__PURE__ */ React.createElement(PriceInput, { value: s.withChicken, onChange: (v) => set((m) => {
+    m.salads.find((x) => x.id === s.id).withChicken = v;
+  }) }))))), s.ingredients && /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, s.ingredients)))), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-4", style: { fontFamily: "Inter", color: "#888" } }, "Dressings: ", menu.dressings), /* @__PURE__ */ React.createElement(SectionHeader, null, "Sandwiches"), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-1.5", style: { fontFamily: "Inter", color: "#888" } }, menu.sandwiches.note), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5 mb-4" }, menu.sandwiches.items.map((s) => /* @__PURE__ */ React.createElement("div", { key: s.id, className: "rounded px-3 py-2", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-0.5" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm font-medium", style: { fontFamily: "Inter", color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement(PriceInput, { value: s.price, onChange: (v) => set((m) => {
+    m.sandwiches.items.find((x) => x.id === s.id).price = v;
+  }) })), /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, s.ingredients)))), /* @__PURE__ */ React.createElement(SimpleList, { title: "Ice Cream Pints", rows: menu.iceCream, onChange: (id, v) => updateSimple("iceCream", id, v) }), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-4 -mt-3", style: { fontFamily: "Inter", color: "#888" } }, "Flavors: ", menu.iceCreamFlavors), /* @__PURE__ */ React.createElement(SimpleList, { title: "Chips / Cookies", rows: menu.chipsCookies, onChange: (id, v) => updateSimple("chipsCookies", id, v) }), /* @__PURE__ */ React.createElement(SimpleList, { title: "Drinks", rows: menu.drinks, onChange: (id, v) => updateSimple("drinks", id, v) }));
+}
+function LiveOpsTab({ data, persist }) {
+  var _a;
+  const liveOps = data.liveOps || { orderQueue: { sizes: [], updatedAt: "" }, stations: [], stationLog: [] };
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const intervalRef = useRef(null);
+  const [camOn, setCamOn] = useState(false);
+  const [camError, setCamError] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [lastResult, setLastResult] = useState("");
+  const [stationId, setStationId] = useState(((_a = liveOps.stations[0]) == null ? void 0 : _a.id) || "");
+  const [newStation, setNewStation] = useState("");
+  const [autoMinutes, setAutoMinutes] = useState(0);
+  const updateQueueCount = (id, count) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const row = next.liveOps.orderQueue.sizes.find((r) => r.id === id);
+    row.count = count;
+    next.liveOps.orderQueue.updatedAt = (/* @__PURE__ */ new Date()).toLocaleString();
+    persist(next);
+  };
+  const addStation = () => {
+    if (!newStation.trim()) return;
+    const next = JSON.parse(JSON.stringify(data));
+    const id = uid();
+    next.liveOps.stations.push({ id, name: newStation.trim() });
+    persist(next);
+    setStationId(id);
+    setNewStation("");
+  };
+  const startCamera = async () => {
+    setCamError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setCamOn(true);
+    } catch (e) {
+      setCamError("Couldn't access the camera \u2014 check that this device has granted camera permission to the page.");
+    }
+  };
+  const stopCamera = () => {
+    var _a2;
+    (_a2 = streamRef.current) == null ? void 0 : _a2.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setCamOn(false);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setAutoMinutes(0);
+  };
+  useEffect(() => () => {
+    stopCamera();
+    if (intervalRef.current) clearInterval(intervalRef.current);
+  }, []);
+  const captureAndAnalyze = async () => {
+    var _a2;
+    if (!videoRef.current) return;
+    setAnalyzing(true);
+    setLastResult("");
+    const stationName = ((_a2 = liveOps.stations.find((s) => s.id === stationId)) == null ? void 0 : _a2.name) || "Unnamed station";
+    try {
+      const video = videoRef.current;
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      const base64 = dataUrl.split(",")[1];
+      const response = await fetch(window.CHAT_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 400,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
+                { type: "text", text: `This is a photo of a pizza shop station called "${stationName}". In 2-3 short sentences, plain language, describe: how busy/backed-up it looks (if it's a prep line) or how well-stocked it looks (if it's storage/cooler), anything that looks low, and any obvious issue. If it's hard to tell anything useful from the photo, just say so plainly.` }
+              ]
+            }
+          ]
+        })
+      });
+      const json = await response.json();
+      const text = (json.content || []).map((c) => c.text || "").join("\n").trim() || "Couldn't get a read from that photo \u2014 try again.";
+      setLastResult(text);
+      const next = JSON.parse(JSON.stringify(data));
+      next.liveOps.stationLog.unshift({ id: uid(), time: (/* @__PURE__ */ new Date()).toLocaleString(), station: stationName, note: text });
+      next.liveOps.stationLog = next.liveOps.stationLog.slice(0, 30);
+      persist(next);
+    } catch (e) {
+      setLastResult("Something went wrong analyzing that photo \u2014 try again.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+  const setAuto = (minutes) => {
+    setAutoMinutes(minutes);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (minutes > 0) {
+      intervalRef.current = setInterval(captureAndAnalyze, minutes * 60 * 1e3);
+    }
+  };
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(SectionHeader, null, "Order Queue \u2014 what's left to spread"), liveOps.orderQueue.updatedAt && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-1.5", style: { fontFamily: "Inter", color: "#999" } }, "Last updated ", liveOps.orderQueue.updatedAt), /* @__PURE__ */ React.createElement("div", { className: "space-y-1 mb-2" }, liveOps.orderQueue.sizes.map((r) => /* @__PURE__ */ React.createElement("div", { key: r.id, className: "flex items-center justify-between px-3 py-1.5 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, r.label), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "number",
+      value: r.count,
+      onChange: (e) => updateQueueCount(r.id, Number(e.target.value)),
+      className: "w-16 text-right text-sm px-2 py-1 rounded",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono", color: COLORS.crust }
+    }
+  )))), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-5", style: { fontFamily: "Inter", color: "#888" } }, `Update these by hand for now \u2014 Clover order data isn't wired in yet. The assistant reads this to answer "what's queued up."`), /* @__PURE__ */ React.createElement(SectionHeader, null, "Station Check (camera)"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap items-center gap-1.5 mb-2" }, liveOps.stations.map((s) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: s.id,
+      onClick: () => setStationId(s.id),
+      className: "text-xs px-2.5 py-1 rounded-full",
+      style: {
+        fontFamily: "Inter",
+        fontWeight: 500,
+        background: stationId === s.id ? COLORS.tomato : "transparent",
+        color: stationId === s.id ? COLORS.cream : "#888",
+        border: `1px solid ${stationId === s.id ? COLORS.tomato : COLORS.line}`
+      }
+    },
+    s.name
+  ))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 mb-3" }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      placeholder: "Add a station (e.g. Dough Station)",
+      value: newStation,
+      onChange: (e) => setNewStation(e.target.value),
+      onKeyDown: (e) => e.key === "Enter" && addStation(),
+      className: "flex-1 text-xs px-2.5 py-1.5 rounded outline-none",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+    }
+  ), /* @__PURE__ */ React.createElement(TicketButton, { onClick: addStation, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 12 }))), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden mb-2", style: { border: `1px solid ${COLORS.line}`, background: "#111" } }, /* @__PURE__ */ React.createElement("video", { ref: videoRef, autoPlay: true, playsInline: true, muted: true, className: "w-full", style: { maxHeight: 260, display: camOn ? "block" : "none", objectFit: "cover" } }), !camOn && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-center", style: { height: 160 } }, /* @__PURE__ */ React.createElement(Camera, { size: 28, color: "#666" }))), camError && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: COLORS.tomato } }, camError), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2 mb-2" }, !camOn ? /* @__PURE__ */ React.createElement(TicketButton, { onClick: startCamera, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Camera, { size: 13 }), " Turn on camera") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(TicketButton, { onClick: captureAndAnalyze, style: { opacity: analyzing ? 0.6 : 1 } }, analyzing ? /* @__PURE__ */ React.createElement(Loader2, { size: 13, className: "animate-spin" }) : /* @__PURE__ */ React.createElement(Camera, { size: 13 }), " ", analyzing ? "Analyzing..." : "Snapshot & check"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: stopCamera, color: "#888" }, "Turn off"))), camOn && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 mb-4" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "Unattended auto-check:"), [0, 5, 15, 30].map((m) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: m,
+      onClick: () => setAuto(m),
+      className: "text-xs px-2 py-1 rounded",
+      style: {
+        fontFamily: "Inter",
+        background: autoMinutes === m ? COLORS.crust : "transparent",
+        color: autoMinutes === m ? COLORS.cream : "#888",
+        border: `1px solid ${COLORS.line}`
+      }
+    },
+    m === 0 ? "Off" : `${m}m`
+  ))), lastResult && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-4 rounded", style: { background: COLORS.card, border: `1px dashed ${COLORS.line}`, fontFamily: "JetBrains Mono", fontSize: 13, color: COLORS.crust } }, lastResult), liveOps.stationLog.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(SectionHeader, null, "Recent Checks"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, liveOps.stationLog.map((l) => /* @__PURE__ */ React.createElement("div", { key: l.id, className: "px-3 py-2 rounded text-xs", style: { background: COLORS.card, border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("div", { className: "mb-0.5 flex items-center gap-1.5" }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.tomato, fontWeight: 600 } }, l.station), /* @__PURE__ */ React.createElement("span", { style: { color: "#999" } }, "\xB7 ", l.time)), /* @__PURE__ */ React.createElement("div", { style: { color: COLORS.crust } }, l.note))))));
+}
+function TasksTab({ data, persist }) {
+  const [text, setText] = useState("");
+  const [assignee, setAssignee] = useState("");
+  const toggle = (id) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const t = next.tasks.find((t2) => t2.id === id);
+    t.done = !t.done;
+    persist(next);
+  };
+  const remove = (id) => {
+    const next = JSON.parse(JSON.stringify(data));
+    next.tasks = next.tasks.filter((t) => t.id !== id);
+    persist(next);
+  };
+  const add = () => {
+    if (!text.trim()) return;
+    const next = JSON.parse(JSON.stringify(data));
+    next.tasks.push({ id: uid(), text: text.trim(), assignee: assignee.trim() || "Unassigned", done: false });
+    persist(next);
+    setText("");
+    setAssignee("");
+  };
+  const open = data.tasks.filter((t) => !t.done);
+  const done = data.tasks.filter((t) => t.done);
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 mb-3" }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      placeholder: "New task...",
+      value: text,
+      onChange: (e) => setText(e.target.value),
+      onKeyDown: (e) => e.key === "Enter" && add(),
+      className: "flex-1 text-sm px-2.5 py-2 rounded outline-none",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+    }
+  ), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      placeholder: "Assignee",
+      value: assignee,
+      onChange: (e) => setAssignee(e.target.value),
+      className: "w-28 text-sm px-2.5 py-2 rounded outline-none",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+    }
+  ), /* @__PURE__ */ React.createElement(TicketButton, { onClick: add, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 14 }))), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5 mb-4" }, open.map((t) => /* @__PURE__ */ React.createElement("div", { key: t.id, className: "flex items-center justify-between px-3 py-2 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => toggle(t.id), className: "w-4 h-4 rounded border flex items-center justify-center", style: { borderColor: COLORS.tomato } }), /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, t.text)), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs px-2 py-0.5 rounded-full", style: { background: COLORS.crust, color: COLORS.parm, fontFamily: "Inter" } }, t.assignee), /* @__PURE__ */ React.createElement("button", { onClick: () => remove(t.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 13, color: "#999" }))))), open.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#999" } }, "All caught up.")), done.length > 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-1.5 tracking-widest", style: { fontFamily: "Oswald", color: "#999" } }, "DONE"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, done.map((t) => /* @__PURE__ */ React.createElement("div", { key: t.id, className: "flex items-center justify-between px-3 py-2 rounded opacity-60", style: { background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => toggle(t.id), className: "w-4 h-4 rounded flex items-center justify-center", style: { background: COLORS.basil } }, /* @__PURE__ */ React.createElement(Check, { size: 11, color: "white" })), /* @__PURE__ */ React.createElement("span", { className: "text-sm line-through", style: { fontFamily: "Inter", color: COLORS.crust } }, t.text)), /* @__PURE__ */ React.createElement("button", { onClick: () => remove(t.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 13, color: "#999" })))))));
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(PizzaOpsManager));
+const bootStatus = document.getElementById("boot-status");
+if (bootStatus) bootStatus.style.display = "none";
+</script>
+</body>
+</html>
