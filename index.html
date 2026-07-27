@@ -874,17 +874,40 @@ Keep "reply" concise \u2014 a few sentences at most \u2014 so the whole response
 
 If the user is just asking a question, return an empty actions array. Never invent inventory items, staff names, or tasks that aren't in the data when answering questions \u2014 only use actions to create new ones when explicitly asked.`;
     try {
-      const response = await fetch(window.CHAT_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 2e3,
-          system: systemPrompt,
-          messages: [{ role: "user", content: text }]
-        })
-      });
-      const json = await response.json();
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), 3e4);
+      let response;
+      try {
+        response = await fetch(window.CHAT_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: ctrl.signal,
+          body: JSON.stringify({
+            model: "claude-sonnet-4-6",
+            max_tokens: 2e3,
+            system: systemPrompt,
+            messages: [{ role: "user", content: text }]
+          })
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      const bodyText = await response.text();
+      if (!response.ok) {
+        throw new Error(`Server said ${response.status}. ${bodyText.slice(0, 400)}`);
+      }
+      let json;
+      try {
+        json = JSON.parse(bodyText);
+      } catch (e) {
+        throw new Error(`Got a non-JSON reply from the server: ${bodyText.slice(0, 400)}`);
+      }
+      if (json.error) {
+        throw new Error(`API error: ${json.error.message || JSON.stringify(json.error).slice(0, 400)}`);
+      }
+      if (!json.content) {
+        throw new Error(`Reply had no content field. Raw: ${bodyText.slice(0, 400)}`);
+      }
       const raw = (json.content || []).map((c) => c.text || "").join("\n");
       const clean = raw.replace(/```json|```/g, "").trim();
       let parsed;
@@ -963,9 +986,11 @@ If the user is just asking a question, return an empty actions array. Never inve
         if (voiceModeRef.current !== "off") startListening();
       });
     } catch (e) {
-      const failText = "Couldn't reach the assistant just now \u2014 try again in a moment.";
+      const detail = e && e.name === "AbortError" ? "The request timed out after 30 seconds \u2014 the server never answered." : e && e.message ? e.message : String(e);
+      console.error("Ask the Manager failed:", e);
+      const failText = "Couldn't reach the assistant.\n\nDETAILS (screenshot this):\n" + detail;
       setMessages((m) => [...m, { role: "assistant", text: failText }]);
-      speak(failText, () => {
+      speak("Couldn't reach the assistant. Check the screen for details.", () => {
         if (voiceModeRef.current !== "off") startListening();
       });
     } finally {
@@ -1770,7 +1795,10 @@ function LiveOpsTab({ data, persist }) {
           ]
         })
       });
-      const json = await response.json();
+      const camBody = await response.text();
+      if (!response.ok) throw new Error(`Server said ${response.status}. ${camBody.slice(0, 300)}`);
+      const json = JSON.parse(camBody);
+      if (json.error) throw new Error(`API error: ${json.error.message || "unknown"}`);
       const text = (json.content || []).map((c) => c.text || "").join("\n").trim() || "Couldn't get a read from that photo \u2014 try again.";
       setLastResult(text);
       const next = JSON.parse(JSON.stringify(data));
