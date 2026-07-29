@@ -153,38 +153,8 @@ const Volume2 = makeIcon(
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DEFAULT_DATA = {
   schedule: {
-    Mon: [
-      { id: "sch1", name: "Pop (cooking)", time: "8am\u20134pm" },
-      { id: "sch2", name: "Shawn (cooking)", time: "9am\u20134pm" },
-      { id: "sch3", name: "Alan (prep)", time: "8am\u20133pm" },
-      { id: "sch4", name: "Bella (front)", time: "11am\u20137pm" },
-      { id: "sch5", name: "Samoia (front)", time: "11am\u20132:30pm" },
-      { id: "sch6", name: "Tasheka (prep)", time: "11am\u20132:30pm" },
-      { id: "sch7", name: "Tyler (oven)", time: "4pm\u2013close" },
-      { id: "sch8", name: "Andy (cooking)", time: "4pm\u2013close" },
-      { id: "sch9", name: "Ricky (fryer)", time: "4pm\u2013close" },
-      { id: "sch10", name: "Gilly (cooking)", time: "~4pm\u2013close" },
-      { id: "sch11", name: "Taber (cooking)", time: "5:30pm\u2013close" },
-      { id: "sch12", name: "Aruzan (front)", time: "4:30pm\u2013close" },
-      { id: "sch13", name: "Karina (front)", time: "4:30pm\u2013close" },
-      { id: "sch14", name: "Murph (dish)", time: "hours TBD" }
-    ],
-    Tue: [
-      { id: "sch15", name: "Pop (cooking)", time: "8am\u20134pm" },
-      { id: "sch16", name: "Shawn (cooking)", time: "9am\u20134:30pm" },
-      { id: "sch17", name: "Bella (front)", time: "10:30am\u20134:30pm" },
-      { id: "sch18", name: "Samoia (front)", time: "11am\u20132:30pm" },
-      { id: "sch19", name: "Tasheka (prep)", time: "11am\u20132:30pm" },
-      { id: "sch20", name: "Tyler (oven)", time: "11am\u2013close" },
-      { id: "sch21", name: "PJ (cooking)", time: "12pm\u20137pm" },
-      { id: "sch22", name: "Ricky (fryer)", time: "4pm\u2013close" },
-      { id: "sch23", name: "Caitlin (pies)", time: "4pm\u2013close" },
-      { id: "sch24", name: "Aruzan (front)", time: "4:30pm\u2013close" },
-      { id: "sch25", name: "Karina (front)", time: "4:30pm\u2013close" },
-      { id: "sch26", name: "Taber (cooking)", time: "5:30pm\u2013close" },
-      { id: "sch27", name: "Andy (cooking)", time: "start TBD\u2013close" },
-      { id: "sch28", name: "Luke John (pies)", time: "open-ended / maybe" }
-    ],
+    Mon: [{ id: "s1", name: "Maria", time: "4pm\u2013close" }],
+    Tue: [],
     Wed: [
       { id: "s2", name: "Pop", time: "8am\u20134pm" },
       { id: "s6", name: "Chris (owner)", time: "11am\u20137:30pm" },
@@ -196,57 +166,17 @@ const DEFAULT_DATA = {
       { id: "s12", name: "Dave", time: "3pm\u2013close" },
       { id: "s13", name: "Ruzhan", time: "3pm\u2013close" },
       { id: "s14", name: "Karina", time: "3pm\u2013close" },
-      { id: "s15", name: "Caitlin", time: "4pm\u2013close" },
-      { id: "schCARA_W", name: "Cara (cooking)", time: "4pm\u2013close" }
+      { id: "s15", name: "Caitlin", time: "4pm\u2013close" }
     ],
     Thu: [
-      { id: "sch29", name: "Chris (owner)", time: "day" },
-      { id: "sch30", name: "Pop (cooking)", time: "8am\u20134pm" },
-      { id: "sch31", name: "Shawn (cooking)", time: "9am\u20134:30pm" },
-      { id: "sch32", name: "Abby (cooking)", time: "10am\u20137pm" },
-      { id: "sch33", name: "Alan (prep)", time: "8am\u20133pm" },
-      { id: "sch34", name: "** OPEN (front)", time: "NEEDS FILLING" },
-      { id: "sch35", name: "Tyler (oven)", time: "11am\u2013close" },
-      { id: "sch36", name: "Dave (oven)", time: "3pm\u2013close" },
-      { id: "sch37", name: "Ricky (fryer)", time: "4pm\u2013close" },
-      { id: "sch38", name: "Caitlin (front \u2014 covering)", time: "4pm\u2013close" },
-      { id: "sch39", name: "Cara (cooking)", time: "4pm\u2013close" },
-      { id: "sch40", name: "Taber (cooking)", time: "5:30pm\u2013close" },
-      { id: "sch41", name: "Andy (cooking)", time: "start TBD\u2013close" },
-      { id: "sch42", name: "Murph (dish)", time: "hours TBD" },
-      { id: "sch43", name: "Luke John (pies)", time: "floats in 3\u20135pm, unreliable" },
-      { id: "sch44", name: "? Bella (front)", time: "11am\u20137pm \u2014 CONFIRM" },
-      { id: "sch45", name: "\u2014 Aruzan + Karina OFF today \u2014", time: "front is thin" }
+      { id: "s16", name: "Pop", time: "8am\u20134pm" },
+      { id: "s17", name: "Tyler", time: "11am\u2013close" },
+      { id: "s18", name: "Abby", time: "10am\u20137pm" }
     ],
-    Fri: [
-      { id: "sch46", name: "Chris (owner)", time: "day" },
-      { id: "sch47", name: "Pop (cooking)", time: "8am\u20134pm" },
-      { id: "sch48", name: "Alan (prep)", time: "8am\u20133pm" },
-      { id: "sch49", name: "Abby (cooking)", time: "10am\u20137pm" },
-      { id: "sch50", name: "Cara (cooking)", time: "11am\u20137pm" },
-      { id: "sch51", name: "Tyler (oven)", time: "11am\u2013close" },
-      { id: "sch52", name: "Samoia (front)", time: "11am\u20132:30pm" },
-      { id: "sch53", name: "Tasheka (prep)", time: "11am\u20132:30pm" },
-      { id: "sch54", name: "PJ (cooking)", time: "~3pm\u2013end TBD" },
-      { id: "sch55", name: "Dave (oven)", time: "3pm\u2013close" },
-      { id: "sch56", name: "Ricky (fryer)", time: "4pm\u2013close" },
-      { id: "sch57", name: "Caitlin (front \u2014 covering)", time: "4pm\u2013close" },
-      { id: "sch58", name: "Gilly (cooking)", time: "~4pm\u2013close" },
-      { id: "sch59", name: "Andy (cooking)", time: "start TBD\u2013close" },
-      { id: "sch60", name: "Murph (dish)", time: "hours TBD" },
-      { id: "sch61", name: "Luke John (pies)", time: "open-ended / maybe" },
-      { id: "sch62", name: "? Bella (front)", time: "11am\u20134pm \u2014 CONFIRM" },
-      { id: "sch63", name: "\u2014 Aruzan + Karina OFF today \u2014", time: "front is thin" }
-    ],
-    Sat: [{ id: "s5", name: "Jon", time: "11am\u20137pm" },
-      { id: "schCHRIS_S", name: "Chris (owner)", time: "open or close" },
-      { id: "schCARA_S", name: "Cara (cooking)", time: "4pm\u2013close" }
-    ],
-    Sun: [
-      { id: "schCHRIS_U", name: "Chris (owner)", time: "open or close" }
-    ]
+    Fri: [{ id: "s3", name: "Maria", time: "4pm\u2013close" }, { id: "s4", name: "Deshawn", time: "5pm\u2013close" }],
+    Sat: [{ id: "s5", name: "Jon", time: "11am\u20137pm" }],
+    Sun: []
   },
-  scheduleVersion: "2026-07-28",
   inventory: [
     { id: "i1", item: "Block Whole Milk Mozzarella", qty: 40, unit: "lb", low: 20, cost: 111.61, vendor: "Thomsen" },
     { id: "i2", item: "Liuzzi Fresh Mozzarella", qty: 10, unit: "lb", low: 10, cost: null, vendor: "QFC" },
@@ -638,25 +568,7 @@ function PizzaOpsManager() {
     (async () => {
       try {
         const res = await window.storage.get("shop-data", true);
-        let loadedData = res && res.value ? JSON.parse(res.value) : DEFAULT_DATA;
-        if (loadedData !== DEFAULT_DATA && loadedData.scheduleVersion !== DEFAULT_DATA.scheduleVersion) {
-          loadedData.schedule = loadedData.schedule || {};
-          ["Mon", "Tue", "Thu", "Fri"].forEach((dy) => {
-            loadedData.schedule[dy] = JSON.parse(JSON.stringify(DEFAULT_DATA.schedule[dy]));
-          });
-          ["Wed", "Sat", "Sun"].forEach((dy) => {
-            const keep = loadedData.schedule[dy] || [];
-            const have = new Set(keep.map((s) => String(s.name).toLowerCase().split(" (")[0].trim()));
-            DEFAULT_DATA.schedule[dy].forEach((s) => {
-              const who = String(s.name).toLowerCase().split(" (")[0].trim();
-              if (!have.has(who)) keep.push(JSON.parse(JSON.stringify(s)));
-            });
-            loadedData.schedule[dy] = keep;
-          });
-          loadedData.scheduleVersion = DEFAULT_DATA.scheduleVersion;
-          try { await window.storage.set("shop-data", JSON.stringify(loadedData), true); } catch (e) {}
-        }
-        setData(loadedData);
+        setData(res && res.value ? JSON.parse(res.value) : DEFAULT_DATA);
       } catch (e) {
         setData(DEFAULT_DATA);
       } finally {
@@ -2093,14 +2005,14 @@ function LiveOpsTab({ data, persist }) {
       setAnalyzing(false);
     }
   };
-  const setAuto = (minutes) => {
-    setAutoMinutes(minutes);
+  const setAuto = (seconds) => {
+    setAutoMinutes(seconds);
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    if (minutes > 0) {
-      intervalRef.current = setInterval(captureAndAnalyze, minutes * 60 * 1e3);
+    if (seconds > 0) {
+      intervalRef.current = setInterval(captureAndAnalyze, seconds * 1e3);
     }
   };
   return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(SectionHeader, null, "Order Queue \u2014 what's left to spread"), liveOps.orderQueue.updatedAt && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-1.5", style: { fontFamily: "Inter", color: "#999" } }, "Last updated ", liveOps.orderQueue.updatedAt), /* @__PURE__ */ React.createElement("div", { className: "space-y-1 mb-2" }, liveOps.orderQueue.sizes.map((r) => /* @__PURE__ */ React.createElement("div", { key: r.id, className: "flex items-center justify-between px-3 py-1.5 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, r.label), /* @__PURE__ */ React.createElement(
@@ -2137,7 +2049,7 @@ function LiveOpsTab({ data, persist }) {
       className: "flex-1 text-xs px-2.5 py-1.5 rounded outline-none",
       style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
     }
-  ), /* @__PURE__ */ React.createElement(TicketButton, { onClick: addStation, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 12 }))), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden mb-2", style: { border: `1px solid ${COLORS.line}`, background: "#111" } }, /* @__PURE__ */ React.createElement("video", { ref: videoRef, autoPlay: true, playsInline: true, muted: true, className: "w-full", style: { maxHeight: 260, display: camOn ? "block" : "none", objectFit: "cover" } }), !camOn && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-center", style: { height: 160 } }, /* @__PURE__ */ React.createElement(Camera, { size: 28, color: "#666" }))), camError && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: COLORS.tomato } }, camError), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2 mb-2" }, !camOn ? /* @__PURE__ */ React.createElement(TicketButton, { onClick: startCamera, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Camera, { size: 13 }), " Turn on camera") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(TicketButton, { onClick: captureAndAnalyze, style: { opacity: analyzing ? 0.6 : 1 } }, analyzing ? /* @__PURE__ */ React.createElement(Loader2, { size: 13, className: "animate-spin" }) : /* @__PURE__ */ React.createElement(Camera, { size: 13 }), " ", analyzing ? "Analyzing..." : "Snapshot & check"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: stopCamera, color: "#888" }, "Turn off"))), camOn && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 mb-4" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "Unattended auto-check:"), [0, 5, 15, 30].map((m) => /* @__PURE__ */ React.createElement(
+  ), /* @__PURE__ */ React.createElement(TicketButton, { onClick: addStation, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 12 }))), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden mb-2", style: { border: `1px solid ${COLORS.line}`, background: "#111" } }, /* @__PURE__ */ React.createElement("video", { ref: videoRef, autoPlay: true, playsInline: true, muted: true, className: "w-full", style: { maxHeight: 260, display: camOn ? "block" : "none", objectFit: "cover" } }), !camOn && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-center", style: { height: 160 } }, /* @__PURE__ */ React.createElement(Camera, { size: 28, color: "#666" }))), camError && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: COLORS.tomato } }, camError), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2 mb-2" }, !camOn ? /* @__PURE__ */ React.createElement(TicketButton, { onClick: startCamera, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Camera, { size: 13 }), " Turn on camera") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(TicketButton, { onClick: captureAndAnalyze, style: { opacity: analyzing ? 0.6 : 1 } }, analyzing ? /* @__PURE__ */ React.createElement(Loader2, { size: 13, className: "animate-spin" }) : /* @__PURE__ */ React.createElement(Camera, { size: 13 }), " ", analyzing ? "Analyzing..." : "Snapshot & check"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: stopCamera, color: "#888" }, "Turn off"))), camOn && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 mb-4" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "Unattended auto-check:"), [0, 10, 30, 60, 300, 900].map((m) => /* @__PURE__ */ React.createElement(
     "button",
     {
       key: m,
@@ -2150,7 +2062,7 @@ function LiveOpsTab({ data, persist }) {
         border: `1px solid ${COLORS.line}`
       }
     },
-    m === 0 ? "Off" : `${m}m`
+    m === 0 ? "Off" : m < 60 ? `${m}s` : `${m / 60}m`
   ))), lastResult && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-4 rounded", style: { background: COLORS.card, border: `1px dashed ${COLORS.line}`, fontFamily: "JetBrains Mono", fontSize: 13, color: COLORS.crust } }, lastResult), liveOps.stationLog.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(SectionHeader, null, "Recent Checks"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, liveOps.stationLog.map((l) => /* @__PURE__ */ React.createElement("div", { key: l.id, className: "px-3 py-2 rounded text-xs", style: { background: COLORS.card, border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("div", { className: "mb-0.5 flex items-center gap-1.5" }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.tomato, fontWeight: 600 } }, l.station), /* @__PURE__ */ React.createElement("span", { style: { color: "#999" } }, "\xB7 ", l.time)), /* @__PURE__ */ React.createElement("div", { style: { color: COLORS.crust } }, l.note))))));
 }
 function GuidesTab() {
