@@ -178,41 +178,41 @@ const DEFAULT_DATA = {
     Sun: []
   },
   inventory: [
-    { id: "i1", item: "Block Whole Milk Mozzarella", qty: 40, unit: "lb", low: 20, vendor: "QFC", prices: { qfc: { amt: 2.19, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 111.61, unit: "case", date: null } } },
+    { id: "i1", item: "Block Whole Milk Mozzarella", qty: 40, unit: "lb", low: 20, vendor: "QFC", thomsenSku: "80736", thomsenUom: "Case", prices: { qfc: { amt: 2.19, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 111.61, unit: "case", date: null } } },
     { id: "i2", item: "Liuzzi Fresh Mozzarella", qty: 10, unit: "lb", low: 10, vendor: "QFC", prices: { qfc: { amt: 4.89, unit: "lb", date: "2026-07-23" }, thomsen: null } },
-    { id: "i3", item: "Cheddar White Block", qty: 40, unit: "lb", low: 20, vendor: "QFC", prices: { qfc: { amt: 2.24, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 81.77, unit: "case", date: null } } },
-    { id: "i4", item: "Romano Grated (Cortona/Capu)", qty: 20, unit: "lb", low: 5, vendor: "QFC", prices: { qfc: { amt: 3.99, unit: "lb", date: "2026-07-23" }, thomsen: null } },
-    { id: "i5", item: "Provolone Slicing", qty: 10, unit: "lb", low: 10, vendor: "QFC", prices: { qfc: null, thomsen: null } },
-    { id: "i6", item: "Feta Crumble", qty: 5, unit: "lb", low: 5, vendor: "QFC", prices: { qfc: null, thomsen: null } },
-    { id: "i7", item: "Jumbo Wing Cut Chicken", qty: 40, unit: "lb", low: 15, vendor: "QFC", prices: { qfc: { amt: 1.89, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 63.6, unit: "case", date: null } } },
-    { id: "i8", item: "Chicken Tenders (Clipped)", qty: 40, unit: "lb", low: 15, vendor: "QFC", prices: { qfc: { amt: 1.89, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 86.48, unit: "case", date: null } } },
+    { id: "i3", item: "Cheddar White Block", qty: 40, unit: "lb", low: 20, vendor: "QFC", thomsenSku: "80419", thomsenUom: "Case", prices: { qfc: { amt: 2.24, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 81.77, unit: "case", date: null } } },
+    { id: "i4", item: "Romano Grated (Cortona/Capu)", qty: 20, unit: "lb", low: 5, vendor: "QFC", thomsenSku: "123466", thomsenUom: "Case", prices: { qfc: { amt: 3.99, unit: "lb", date: "2026-07-23" }, thomsen: null } },
+    { id: "i5", item: "Provolone Slicing", qty: 10, unit: "lb", low: 10, vendor: "QFC", thomsenSku: "80740", thomsenUom: "Case", prices: { qfc: null, thomsen: null } },
+    { id: "i6", item: "Feta Crumble", qty: 5, unit: "lb", low: 5, vendor: "QFC", thomsenSku: "643457", thomsenUom: "Case", prices: { qfc: null, thomsen: null } },
+    { id: "i7", item: "Jumbo Wing Cut Chicken", qty: 40, unit: "lb", low: 15, vendor: "QFC", thomsenSku: "80811", thomsenUom: "Case", prices: { qfc: { amt: 1.89, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 63.6, unit: "case", date: null } } },
+    { id: "i8", item: "Chicken Tenders (Clipped)", qty: 40, unit: "lb", low: 15, vendor: "QFC", thomsenSku: "80808", thomsenUom: "Case", prices: { qfc: { amt: 1.89, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 86.48, unit: "case", date: null } } },
     { id: "i9", item: "Ezzo Sliced Pepperoni (Cup & Char)", qty: 50, unit: "lb", low: 15, vendor: "QFC", prices: { qfc: { amt: 6.99, unit: "lb", date: "2026-07-23" }, thomsen: null } },
     { id: "i10", item: 'Bacon Topping 3/8"', qty: 1, unit: "box", low: 1, vendor: "Thomsen", prices: { qfc: null, thomsen: { amt: 53.85, unit: "box", date: null } } },
-    { id: "i11", item: `GF Pizza Crust 12" (Udi's)`, qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 82.54, unit: "box", date: "2026-07-23" }, thomsen: { amt: 83, unit: "box", date: null } } },
-    { id: "i12", item: 'Pizza Boxes 16"', qty: 4, unit: "box", low: 2, vendor: "Thomsen", prices: { qfc: null, thomsen: null } },
-    { id: "i13", item: 'Pizza Boxes 12"', qty: 2, unit: "box", low: 2, vendor: "Thomsen", prices: { qfc: null, thomsen: { amt: 16.96, unit: "box", date: null } } },
+    { id: "i11", item: `GF Pizza Crust 12" (Udi's)`, qty: 1, unit: "box", low: 1, vendor: "QFC", thomsenSku: "565419", thomsenUom: "Case", prices: { qfc: { amt: 82.54, unit: "box", date: "2026-07-23" }, thomsen: { amt: 83, unit: "box", date: null } } },
+    { id: "i12", item: 'Pizza Boxes 16"', qty: 4, unit: "box", low: 2, vendor: "Thomsen", thomsenSku: "81812", thomsenUom: "Bundle", prices: { qfc: null, thomsen: null } },
+    { id: "i13", item: 'Pizza Boxes 12"', qty: 2, unit: "box", low: 2, vendor: "Thomsen", thomsenSku: "81856", thomsenUom: "Bundle", prices: { qfc: null, thomsen: { amt: 16.96, unit: "box", date: null } } },
     { id: "i14", item: 'Pizza Boxes 18"', qty: 1, unit: "box", low: 1, vendor: "Thomsen", prices: { qfc: null, thomsen: null } },
-    { id: "i15", item: "Extra Virgin Olive Oil (3L)", qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: null, thomsen: null } },
-    { id: "i16", item: "Poland Spring Water 40pk", qty: 2, unit: "box", low: 1, vendor: "Thomsen", prices: { qfc: null, thomsen: { amt: 9.2, unit: "box", date: null } } },
+    { id: "i15", item: "Extra Virgin Olive Oil (3L)", qty: 1, unit: "box", low: 1, vendor: "QFC", thomsenSku: "70629", thomsenUom: "Case", prices: { qfc: null, thomsen: null } },
+    { id: "i16", item: "Poland Spring Water 40pk", qty: 2, unit: "box", low: 1, vendor: "Thomsen", thomsenSku: "81718", thomsenUom: "Case", prices: { qfc: null, thomsen: { amt: 9.2, unit: "box", date: null } } },
     { id: "i17", item: "Romaine Hearts", qty: 1, unit: "case", low: 1, vendor: "QFC", prices: { qfc: null, thomsen: null } },
     { id: "i18", item: "Green Bell Peppers", qty: 1, unit: "case", low: 1, vendor: "QFC", prices: { qfc: null, thomsen: null } },
     { id: "i19", item: "Iceberg Lettuce", qty: 2, unit: "case", low: 1, vendor: "QFC", prices: { qfc: null, thomsen: null } },
-    { id: "i20", item: "Ricotta", qty: 1, unit: "case", low: 1, vendor: "QFC", prices: { qfc: { amt: 38.64, unit: "box", date: "2026-07-23" }, thomsen: { amt: 49.14, unit: "case (6 tubs)", date: null } } },
+    { id: "i20", item: "Ricotta", qty: 1, unit: "case", low: 1, vendor: "QFC", thomsenSku: "81122", thomsenUom: "Case", prices: { qfc: { amt: 38.64, unit: "box", date: "2026-07-23" }, thomsen: { amt: 49.14, unit: "case (6 tubs)", date: null } } },
     { id: "i21", item: "Milk", qty: 1, unit: "gal", low: 2, vendor: "QFC", prices: { qfc: null, thomsen: null } },
     { id: "i22", item: "Shredded Mozzarella (bulk bags)", qty: 4, unit: "bag", low: 2, vendor: "QFC", prices: { qfc: null, thomsen: null } },
-    { id: "i23", item: "Sweet Italian Ground Sausage", qty: 3, unit: "bag", low: 2, vendor: "QFC", prices: { qfc: { amt: 4.29, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 75.35, unit: "bag", date: null } } },
+    { id: "i23", item: "Sweet Italian Ground Sausage", qty: 3, unit: "bag", low: 2, vendor: "QFC", thomsenSku: "75490", thomsenUom: "Case", prices: { qfc: { amt: 4.29, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 75.35, unit: "bag", date: null } } },
     { id: "i24", item: "Deli Logs (Provolone/Mozz)", qty: 5, unit: "log", low: 3, vendor: "QFC", prices: { qfc: null, thomsen: null } },
     { id: "i25", item: "Salami / Capicola (deli)", qty: 3, unit: "ea", low: 2, vendor: "Thomsen", prices: { qfc: null, thomsen: { amt: 34.9, unit: "ea", date: null } } },
     { id: "i26", item: "Dressing & Sauce Jugs (ranch, italian, vinaigrette, bbq)", qty: 10, unit: "jug", low: 4, vendor: "Thomsen", prices: { qfc: null, thomsen: { amt: 69.01, unit: "jug", date: null } } },
     { id: "i27", item: "Mayo", qty: 2, unit: "jar", low: 1, vendor: "QFC", prices: { qfc: null, thomsen: null } },
-    { id: "i29", item: "Tomato Magic Ground Tomatoes (Stanislaus)", qty: 5, unit: "box", low: 2, vendor: "QFC", prices: { qfc: { amt: 39.11, unit: "box", date: "2026-07-23" }, thomsen: null } },
-    { id: "i30", item: "Stanislaus 74/40 Tomato Fillets", qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 39.54, unit: "box", date: "2026-07-23" }, thomsen: null } },
-    { id: "i31", item: "GM All Trumps Flour (Unbleached/Bromated)", qty: 9, unit: "box", low: 4, vendor: "QFC", prices: { qfc: { amt: 24, unit: "box", date: "2026-07-23" }, thomsen: null } },
+    { id: "i29", item: "Tomato Magic Ground Tomatoes (Stanislaus)", qty: 5, unit: "box", low: 2, vendor: "QFC", thomsenSku: "81855", thomsenUom: "Case", prices: { qfc: { amt: 39.11, unit: "box", date: "2026-07-23" }, thomsen: null } },
+    { id: "i30", item: "Stanislaus 74/40 Tomato Fillets", qty: 1, unit: "box", low: 1, vendor: "QFC", thomsenSku: "34100", thomsenUom: "Case", prices: { qfc: { amt: 39.54, unit: "box", date: "2026-07-23" }, thomsen: null } },
+    { id: "i31", item: "GM All Trumps Flour (Unbleached/Bromated)", qty: 9, unit: "box", low: 4, vendor: "QFC", thomsenSku: "50121", thomsenUom: "Bag", prices: { qfc: { amt: 24, unit: "box", date: "2026-07-23" }, thomsen: null } },
     { id: "i32", item: "Ken's Sweet Baby Ray's BBQ (Original)", qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 60.91, unit: "box", date: "2026-07-23" }, thomsen: null } },
     { id: "i33", item: "Nitrile Gloves Black M (Powder Free)", qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 43, unit: "box", date: "2026-07-23" }, thomsen: null } },
     { id: "i34", item: "Savaday Molded Fiber Trays 5.5x7.5", qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 175.41, unit: "box", date: "2026-07-23" }, thomsen: null } },
-    { id: "i35", item: "Tyson Brandywine Breaded Tenders 70ct", qty: 5, unit: "box", low: 2, vendor: "QFC", prices: { qfc: { amt: 42.3, unit: "box", date: "2026-07-23" }, thomsen: null } },
-    { id: "i36", item: "Pierce Boneless Wing Dings", qty: 2, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 48.81, unit: "box", date: "2026-07-23" }, thomsen: null } },
+    { id: "i35", item: "Tyson Brandywine Breaded Tenders 70ct", qty: 5, unit: "box", low: 2, vendor: "QFC", thomsenSku: "72175", thomsenUom: "Case", prices: { qfc: { amt: 42.3, unit: "box", date: "2026-07-23" }, thomsen: null } },
+    { id: "i36", item: "Pierce Boneless Wing Dings", qty: 2, unit: "box", low: 1, vendor: "QFC", thomsenSku: "81067", thomsenUom: "Case", prices: { qfc: { amt: 48.81, unit: "box", date: "2026-07-23" }, thomsen: null } },
     { id: "i38", item: 'Simplot Conquest Fries 3/8" (Clear Coat)', qty: 2, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 42, unit: "box", date: "2026-07-23" }, thomsen: null } }
   ],
   storageMap: [
@@ -725,8 +725,13 @@ function AssistantTab({ data, persist }) {
   const recogRef = useRef(null);
   const voiceModeRef = useRef("off");
   const wakeWordRef = useRef("computer");
-  const pushBufferRef = useRef("");
+  const committedRef = useRef("");
+  const liveRef = useRef("");
+  const genRef = useRef(0);
+  const restartTimerRef = useRef(null);
+  const speakingRef = useRef(false);
   voiceModeRef.current = voiceMode;
+  speakingRef.current = speaking;
   wakeWordRef.current = wakeWord;
   const speechSupported = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
   const speak = (text, onDone) => {
@@ -748,96 +753,111 @@ function AssistantTab({ data, persist }) {
     };
     window.speechSynthesis.speak(u);
   };
-  const startListening = () => {
+  const startListening = (resume) => {
+    if (!resume) {
+      committedRef.current = "";
+      liveRef.current = "";
+    }
     if (!speechSupported) {
       setVoiceError("Voice input isn't supported in this browser \u2014 try Chrome, or type instead.");
       return;
     }
+    // Retire any existing recognizer WITHOUT letting it schedule a restart.
     if (recogRef.current) {
-      try {
-        recogRef.current.stop();
-      } catch (e) {
-      }
+      const old = recogRef.current;
+      recogRef.current = null;
+      old.onresult = null; old.onend = null; old.onerror = null; old.onstart = null;
+      try { old.stop(); } catch (e) {}
+      try { old.abort(); } catch (e) {}
     }
-    const wake = voiceModeRef.current === "wake";
+    const myGen = ++genRef.current;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     const r = new SR();
     r.lang = "en-US";
     r.interimResults = true;
     r.continuous = true;
+    liveRef.current = "";
     r.onstart = () => {
+      if (myGen !== genRef.current) return;
       setListening(true);
       setVoiceError("");
     };
     r.onresult = (e) => {
-      let interim = "", final = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (myGen !== genRef.current) return;
+      // e.results is cumulative for this recognizer, so rebuild from scratch
+      // every time. Appending would double-count results we already read.
+      let finalText = "", interim = "";
+      for (let i = 0; i < e.results.length; i++) {
         const t = e.results[i][0].transcript;
-        if (e.results[i].isFinal) final += t;
+        if (e.results[i].isFinal) finalText += t + " ";
         else interim += t;
       }
       if (voiceModeRef.current === "wake") {
-        const combined = (final || interim).toLowerCase();
+        const combined = (finalText || interim).toLowerCase();
         const w = wakeWordRef.current;
-        const idx = combined.indexOf(w);
-        if (idx !== -1 && final) {
-          const afterRaw = final.slice(final.toLowerCase().indexOf(w) + w.length);
+        if (finalText && combined.indexOf(w) !== -1) {
+          const afterRaw = finalText.slice(finalText.toLowerCase().indexOf(w) + w.length);
           const query = afterRaw.replace(/^[\s,.:!?-]+/, "").trim();
           if (query) {
-            try {
-              r.stop();
-            } catch (e2) {
-            }
+            genRef.current++;
+            try { r.stop(); } catch (e2) {}
             sendText(query);
           }
         }
         return;
       }
-      if (final.trim()) {
-        pushBufferRef.current = (pushBufferRef.current + " " + final).trim();
-      }
-      setInput((pushBufferRef.current + " " + interim).trim());
+      liveRef.current = finalText.trim();
+      setInput(joinParts(committedRef.current, liveRef.current, interim.trim()));
     };
     r.onerror = (e) => {
+      if (myGen !== genRef.current) return;
       setListening(false);
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
         setVoiceError("Mic access was blocked \u2014 allow the microphone for this page and try again.");
         setVoiceMode("off");
+        genRef.current++;
       } else if (e.error !== "aborted" && e.error !== "no-speech") {
         setVoiceError("Mic hiccup (" + e.error + ") \u2014 retry from the voice controls.");
       }
     };
     r.onend = () => {
+      if (myGen !== genRef.current) return;
       setListening(false);
-      if (voiceModeRef.current === "wake" && !speaking) {
-        setTimeout(() => {
-          if (voiceModeRef.current === "wake") startListening();
-        }, 300);
-      } else if (voiceModeRef.current === "push" && !speaking) {
-        setTimeout(() => {
-          if (voiceModeRef.current === "push") startListening();
+      // Carry this instance's text forward so a browser timeout doesn't lose it.
+      committedRef.current = joinParts(committedRef.current, liveRef.current);
+      liveRef.current = "";
+      const mode = voiceModeRef.current;
+      if ((mode === "wake" || mode === "push") && !speakingRef.current && !restartTimerRef.current) {
+        restartTimerRef.current = setTimeout(() => {
+          restartTimerRef.current = null;
+          if (voiceModeRef.current === mode) startListening(true);
         }, 300);
       }
     };
     recogRef.current = r;
-    try {
-      r.start();
-    } catch (e) {
-    }
+    try { r.start(); } catch (e) {}
   };
   const stopListening = () => {
+    genRef.current++;
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
     if (recogRef.current) {
-      try {
-        recogRef.current.stop();
-      } catch (e) {
-      }
+      const old = recogRef.current;
+      recogRef.current = null;
+      old.onresult = null; old.onend = null; old.onerror = null; old.onstart = null;
+      try { old.stop(); } catch (e) {}
+      try { old.abort(); } catch (e) {}
     }
     setListening(false);
   };
   const setMode = (mode) => {
     stopListening();
     if (window.speechSynthesis) window.speechSynthesis.cancel();
-    pushBufferRef.current = "";
+    committedRef.current = "";
+    liveRef.current = "";
+    setInput("");
     setVoiceMode(mode);
     if (mode !== "off") {
       setTimeout(() => startListening(), 50);
@@ -845,8 +865,12 @@ function AssistantTab({ data, persist }) {
   };
   const pushTap = () => {
     if (voiceModeRef.current === "push" && listening) {
-      const q = (pushBufferRef.current + " " + input).trim();
-      pushBufferRef.current = "";
+      // The input box already shows the full transcript (committed + live +
+      // interim), so send exactly that \u2014 combining it with the refs again
+      // is what was duplicating the text.
+      const q = joinParts(input);
+      committedRef.current = "";
+      liveRef.current = "";
       stopListening();
       setInput("");
       if (q) sendText(q);
@@ -855,11 +879,14 @@ function AssistantTab({ data, persist }) {
     }
   };
   useEffect(() => () => {
+    genRef.current++;
+    if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
     if (recogRef.current) {
-      try {
-        recogRef.current.stop();
-      } catch (e) {
-      }
+      const old = recogRef.current;
+      recogRef.current = null;
+      old.onresult = null; old.onend = null; old.onerror = null; old.onstart = null;
+      try { old.stop(); } catch (e) {}
+      try { old.abort(); } catch (e) {}
     }
     if (window.speechSynthesis) window.speechSynthesis.cancel();
   }, []);
@@ -905,7 +932,7 @@ Keep "reply" concise \u2014 a few sentences at most \u2014 so the whole response
 - {"type": "flag_stock", "item": "...", "status": "ok|low|86"}
 - {"type": "set_queue", "size_match": "substring of an order queue size label, e.g. 'XL' or 'Medium'", "count": number}
 
-Inventory items carry two vendor prices under "prices": qfc (Quality Food) and thomsen. When quoting or costing, use the one with the more recent "date"; if only one is dated, use that one; if neither is dated, use qfc, and fall back to thomsen only when qfc is null. Each price has its own "unit" \u2014 if the two vendors' units differ, say so rather than comparing them directly. "vendor" is who we actually order the item from, which is separate from price comparison.
+Some inventory items carry "thomsenSku" (the Thomsen order-guide item number) and "thomsenUom" (Thomsen's unit of measure) \u2014 use these when asked for an item number or how Thomsen sells it. Inventory items carry two vendor prices under "prices": qfc (Quality Food) and thomsen. When quoting or costing, use the one with the more recent "date"; if only one is dated, use that one; if neither is dated, use qfc, and fall back to thomsen only when qfc is null. Each price has its own "unit" \u2014 if the two vendors' units differ, say so rather than comparing them directly. "vendor" is who we actually order the item from, which is separate from price comparison.
 
 If the user is just asking a question, return an empty actions array. Never invent inventory items, staff names, or tasks that aren't in the data when answering questions \u2014 only use actions to create new ones when explicitly asked.`;
     try {
@@ -1388,6 +1415,7 @@ function InventoryTab({ data, persist }) {
         }),
         /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 pt-1" },
           /* @__PURE__ */ React.createElement("span", { className: "text-xs w-16 flex-shrink-0", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "Order from"),
+          i.thomsenSku ? /* @__PURE__ */ React.createElement("span", { className: "text-xs ml-auto", style: { fontFamily: "JetBrains Mono", color: "#a89886" } }, "Thomsen #" + i.thomsenSku + (i.thomsenUom ? " \u00b7 " + i.thomsenUom : "")) : null,
           /* @__PURE__ */ React.createElement("select", {
             value: (_b = i.vendor) != null ? _b : "",
             onChange: (e) => updateField(i.id, "vendor", e.target.value),
@@ -1489,6 +1517,14 @@ function costAmt(i) {
 function priceLabel(p) {
   if (!p) return null;
   return "$" + p.amt.toFixed(2) + "/" + (p.unit || "ea");
+}
+
+function joinParts() {
+  return Array.prototype.slice.call(arguments)
+    .filter(function (s) { return s && s.trim(); })
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 const CATEGORY_ORDER = ["Cheese", "Meat", "Produce", "Sauces, Oils & Dressings", "Dry Goods", "Beverages", "Paper & Packaging", "Other"];
