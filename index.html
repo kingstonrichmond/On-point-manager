@@ -178,33 +178,42 @@ const DEFAULT_DATA = {
     Sun: []
   },
   inventory: [
-    { id: "i1", item: "Block Whole Milk Mozzarella", qty: 40, unit: "lb", low: 20, cost: 111.61, vendor: "Thomsen" },
-    { id: "i2", item: "Liuzzi Fresh Mozzarella", qty: 10, unit: "lb", low: 10, cost: null, vendor: "QFC" },
-    { id: "i3", item: "Cheddar White Block", qty: 40, unit: "lb", low: 20, cost: 81.77, vendor: "Thomsen" },
-    { id: "i4", item: "Cortona Romano Grated", qty: 20, unit: "lb", low: 5, cost: null, vendor: "QFC" },
-    { id: "i5", item: "Provolone Slicing", qty: 10, unit: "lb", low: 10, cost: null, vendor: "QFC" },
-    { id: "i6", item: "Feta Crumble", qty: 5, unit: "lb", low: 5, cost: null, vendor: "QFC" },
-    { id: "i7", item: "Jumbo Wing Cut Chicken", qty: 40, unit: "lb", low: 15, cost: 63.6, vendor: "Thomsen" },
-    { id: "i8", item: "Chicken Tenders (Clipped)", qty: 40, unit: "lb", low: 15, cost: 86.48, vendor: "Thomsen" },
-    { id: "i9", item: "Ezzo Sliced Pepperoni", qty: 50, unit: "lb", low: 15, cost: null, vendor: "QFC" },
-    { id: "i10", item: 'Bacon Topping 3/8"', qty: 1, unit: "box", low: 1, cost: 53.85, vendor: "Thomsen" },
-    { id: "i11", item: `GF Pizza Crust 12" (Udi's)`, qty: 1, unit: "box", low: 1, cost: 83, vendor: "Thomsen" },
-    { id: "i12", item: 'Pizza Boxes 16"', qty: 4, unit: "box", low: 2, cost: null, vendor: "Thomsen" },
-    { id: "i13", item: 'Pizza Boxes 12"', qty: 2, unit: "box", low: 2, cost: 16.96, vendor: "Thomsen" },
-    { id: "i14", item: 'Pizza Boxes 18"', qty: 1, unit: "box", low: 1, cost: null, vendor: "Thomsen" },
-    { id: "i15", item: "Extra Virgin Olive Oil (3L)", qty: 1, unit: "box", low: 1, cost: null, vendor: "QFC" },
-    { id: "i16", item: "Poland Spring Water 40pk", qty: 2, unit: "box", low: 1, cost: 9.2, vendor: "Thomsen" },
-    { id: "i17", item: "Romaine Hearts", qty: 1, unit: "case", low: 1, cost: null, vendor: "QFC" },
-    { id: "i18", item: "Green Bell Peppers", qty: 1, unit: "case", low: 1, cost: null, vendor: "QFC" },
-    { id: "i19", item: "Iceberg Lettuce", qty: 2, unit: "case", low: 1, cost: null, vendor: "QFC" },
-    { id: "i20", item: "Ricotta (Grande)", qty: 1, unit: "box (6 tubs)", low: 1, cost: 49.14, vendor: "Thomsen" },
-    { id: "i21", item: "Milk", qty: 1, unit: "gal", low: 2, cost: null, vendor: "QFC" },
-    { id: "i22", item: "Shredded Mozzarella (bulk bags)", qty: 4, unit: "bag", low: 2, cost: null, vendor: "QFC" },
-    { id: "i23", item: "Ground Sausage (bulk)", qty: 3, unit: "bag", low: 2, cost: 75.35, vendor: "Thomsen" },
-    { id: "i24", item: "Deli Logs (Provolone/Mozz)", qty: 5, unit: "log", low: 3, cost: null, vendor: "QFC" },
-    { id: "i25", item: "Salami / Capicola (deli)", qty: 3, unit: "ea", low: 2, cost: 34.9, vendor: "Thomsen" },
-    { id: "i26", item: "Dressing & Sauce Jugs (ranch, italian, vinaigrette, bbq)", qty: 10, unit: "jug", low: 4, cost: 69.01, vendor: "Thomsen" },
-    { id: "i27", item: "Mayo", qty: 2, unit: "jar", low: 1, cost: null, vendor: "QFC" }
+    { id: "i1", item: "Block Whole Milk Mozzarella", qty: 40, unit: "lb", low: 20, vendor: "QFC", prices: { qfc: { amt: 2.19, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 111.61, unit: "case", date: null } } },
+    { id: "i2", item: "Liuzzi Fresh Mozzarella", qty: 10, unit: "lb", low: 10, vendor: "QFC", prices: { qfc: { amt: 4.89, unit: "lb", date: "2026-07-23" }, thomsen: null } },
+    { id: "i3", item: "Cheddar White Block", qty: 40, unit: "lb", low: 20, vendor: "QFC", prices: { qfc: { amt: 2.24, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 81.77, unit: "case", date: null } } },
+    { id: "i4", item: "Romano Grated (Cortona/Capu)", qty: 20, unit: "lb", low: 5, vendor: "QFC", prices: { qfc: { amt: 3.99, unit: "lb", date: "2026-07-23" }, thomsen: null } },
+    { id: "i5", item: "Provolone Slicing", qty: 10, unit: "lb", low: 10, vendor: "QFC", prices: { qfc: null, thomsen: null } },
+    { id: "i6", item: "Feta Crumble", qty: 5, unit: "lb", low: 5, vendor: "QFC", prices: { qfc: null, thomsen: null } },
+    { id: "i7", item: "Jumbo Wing Cut Chicken", qty: 40, unit: "lb", low: 15, vendor: "QFC", prices: { qfc: { amt: 1.89, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 63.6, unit: "case", date: null } } },
+    { id: "i8", item: "Chicken Tenders (Clipped)", qty: 40, unit: "lb", low: 15, vendor: "QFC", prices: { qfc: { amt: 1.89, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 86.48, unit: "case", date: null } } },
+    { id: "i9", item: "Ezzo Sliced Pepperoni (Cup & Char)", qty: 50, unit: "lb", low: 15, vendor: "QFC", prices: { qfc: { amt: 6.99, unit: "lb", date: "2026-07-23" }, thomsen: null } },
+    { id: "i10", item: 'Bacon Topping 3/8"', qty: 1, unit: "box", low: 1, vendor: "Thomsen", prices: { qfc: null, thomsen: { amt: 53.85, unit: "box", date: null } } },
+    { id: "i11", item: `GF Pizza Crust 12" (Udi's)`, qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 82.54, unit: "box", date: "2026-07-23" }, thomsen: { amt: 83, unit: "box", date: null } } },
+    { id: "i12", item: 'Pizza Boxes 16"', qty: 4, unit: "box", low: 2, vendor: "Thomsen", prices: { qfc: null, thomsen: null } },
+    { id: "i13", item: 'Pizza Boxes 12"', qty: 2, unit: "box", low: 2, vendor: "Thomsen", prices: { qfc: null, thomsen: { amt: 16.96, unit: "box", date: null } } },
+    { id: "i14", item: 'Pizza Boxes 18"', qty: 1, unit: "box", low: 1, vendor: "Thomsen", prices: { qfc: null, thomsen: null } },
+    { id: "i15", item: "Extra Virgin Olive Oil (3L)", qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: null, thomsen: null } },
+    { id: "i16", item: "Poland Spring Water 40pk", qty: 2, unit: "box", low: 1, vendor: "Thomsen", prices: { qfc: null, thomsen: { amt: 9.2, unit: "box", date: null } } },
+    { id: "i17", item: "Romaine Hearts", qty: 1, unit: "case", low: 1, vendor: "QFC", prices: { qfc: null, thomsen: null } },
+    { id: "i18", item: "Green Bell Peppers", qty: 1, unit: "case", low: 1, vendor: "QFC", prices: { qfc: null, thomsen: null } },
+    { id: "i19", item: "Iceberg Lettuce", qty: 2, unit: "case", low: 1, vendor: "QFC", prices: { qfc: null, thomsen: null } },
+    { id: "i20", item: "Ricotta", qty: 1, unit: "case", low: 1, vendor: "QFC", prices: { qfc: { amt: 38.64, unit: "box", date: "2026-07-23" }, thomsen: { amt: 49.14, unit: "case (6 tubs)", date: null } } },
+    { id: "i21", item: "Milk", qty: 1, unit: "gal", low: 2, vendor: "QFC", prices: { qfc: null, thomsen: null } },
+    { id: "i22", item: "Shredded Mozzarella (bulk bags)", qty: 4, unit: "bag", low: 2, vendor: "QFC", prices: { qfc: null, thomsen: null } },
+    { id: "i23", item: "Sweet Italian Ground Sausage", qty: 3, unit: "bag", low: 2, vendor: "QFC", prices: { qfc: { amt: 4.29, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 75.35, unit: "bag", date: null } } },
+    { id: "i24", item: "Deli Logs (Provolone/Mozz)", qty: 5, unit: "log", low: 3, vendor: "QFC", prices: { qfc: null, thomsen: null } },
+    { id: "i25", item: "Salami / Capicola (deli)", qty: 3, unit: "ea", low: 2, vendor: "Thomsen", prices: { qfc: null, thomsen: { amt: 34.9, unit: "ea", date: null } } },
+    { id: "i26", item: "Dressing & Sauce Jugs (ranch, italian, vinaigrette, bbq)", qty: 10, unit: "jug", low: 4, vendor: "Thomsen", prices: { qfc: null, thomsen: { amt: 69.01, unit: "jug", date: null } } },
+    { id: "i27", item: "Mayo", qty: 2, unit: "jar", low: 1, vendor: "QFC", prices: { qfc: null, thomsen: null } },
+    { id: "i29", item: "Tomato Magic Ground Tomatoes (Stanislaus)", qty: 5, unit: "box", low: 2, vendor: "QFC", prices: { qfc: { amt: 39.11, unit: "box", date: "2026-07-23" }, thomsen: null } },
+    { id: "i30", item: "Stanislaus 74/40 Tomato Fillets", qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 39.54, unit: "box", date: "2026-07-23" }, thomsen: null } },
+    { id: "i31", item: "GM All Trumps Flour (Unbleached/Bromated)", qty: 9, unit: "box", low: 4, vendor: "QFC", prices: { qfc: { amt: 24, unit: "box", date: "2026-07-23" }, thomsen: null } },
+    { id: "i32", item: "Ken's Sweet Baby Ray's BBQ (Original)", qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 60.91, unit: "box", date: "2026-07-23" }, thomsen: null } },
+    { id: "i33", item: "Nitrile Gloves Black M (Powder Free)", qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 43, unit: "box", date: "2026-07-23" }, thomsen: null } },
+    { id: "i34", item: "Savaday Molded Fiber Trays 5.5x7.5", qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 175.41, unit: "box", date: "2026-07-23" }, thomsen: null } },
+    { id: "i35", item: "Tyson Brandywine Breaded Tenders 70ct", qty: 5, unit: "box", low: 2, vendor: "QFC", prices: { qfc: { amt: 42.3, unit: "box", date: "2026-07-23" }, thomsen: null } },
+    { id: "i36", item: "Pierce Boneless Wing Dings", qty: 2, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 48.81, unit: "box", date: "2026-07-23" }, thomsen: null } },
+    { id: "i38", item: 'Simplot Conquest Fries 3/8" (Clear Coat)', qty: 2, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 42, unit: "box", date: "2026-07-23" }, thomsen: null } }
   ],
   storageMap: [
     { id: "sm1", area: "Back Room \u2014 Back Shelf (top)", items: "Mayonnaise, honey mustard, ranch, red wine vinegar, balsamic vinaigrette, BBQ sauce, Frank's RedHot, Frank's Extra Hot" },
@@ -626,7 +635,7 @@ function PizzaOpsManager() {
       {
         key: t.id,
         onClick: () => setTab(t.id),
-        className: "flex items-center gap-1.5 px-3.5 py-2.5 rounded-t-lg text-sm whitespace-nowrap relative",
+        className: "flex items-center gap-1.5 px-4 py-3 rounded-t-lg text-sm whitespace-nowrap relative",
         style: {
           background: active ? COLORS.cream : "transparent",
           color: active ? COLORS.crust : COLORS.parm,
@@ -639,7 +648,7 @@ function PizzaOpsManager() {
       !!t.badge && /* @__PURE__ */ React.createElement(
         "span",
         {
-          className: "text-[10px] rounded-full w-4 h-4 flex items-center justify-center ml-0.5",
+          className: "text-xs rounded-full w-5 h-5 flex items-center justify-center ml-1 font-bold",
           style: { background: COLORS.tomato, color: COLORS.cream, fontFamily: "JetBrains Mono" }
         },
         t.badge
@@ -716,6 +725,7 @@ function AssistantTab({ data, persist }) {
   const recogRef = useRef(null);
   const voiceModeRef = useRef("off");
   const wakeWordRef = useRef("computer");
+  const pushBufferRef = useRef("");
   voiceModeRef.current = voiceMode;
   wakeWordRef.current = wakeWord;
   const speechSupported = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -754,7 +764,7 @@ function AssistantTab({ data, persist }) {
     const r = new SR();
     r.lang = "en-US";
     r.interimResults = true;
-    r.continuous = wake;
+    r.continuous = true;
     r.onstart = () => {
       setListening(true);
       setVoiceError("");
@@ -783,15 +793,10 @@ function AssistantTab({ data, persist }) {
         }
         return;
       }
-      setInput(final || interim);
       if (final.trim()) {
-        setInput("");
-        try {
-          r.stop();
-        } catch (e2) {
-        }
-        sendText(final.trim());
+        pushBufferRef.current = (pushBufferRef.current + " " + final).trim();
       }
+      setInput((pushBufferRef.current + " " + interim).trim());
     };
     r.onerror = (e) => {
       setListening(false);
@@ -807,6 +812,10 @@ function AssistantTab({ data, persist }) {
       if (voiceModeRef.current === "wake" && !speaking) {
         setTimeout(() => {
           if (voiceModeRef.current === "wake") startListening();
+        }, 300);
+      } else if (voiceModeRef.current === "push" && !speaking) {
+        setTimeout(() => {
+          if (voiceModeRef.current === "push") startListening();
         }, 300);
       }
     };
@@ -828,9 +837,21 @@ function AssistantTab({ data, persist }) {
   const setMode = (mode) => {
     stopListening();
     if (window.speechSynthesis) window.speechSynthesis.cancel();
+    pushBufferRef.current = "";
     setVoiceMode(mode);
     if (mode !== "off") {
       setTimeout(() => startListening(), 50);
+    }
+  };
+  const pushTap = () => {
+    if (voiceModeRef.current === "push" && listening) {
+      const q = (pushBufferRef.current + " " + input).trim();
+      pushBufferRef.current = "";
+      stopListening();
+      setInput("");
+      if (q) sendText(q);
+    } else {
+      setMode("push");
     }
   };
   useEffect(() => () => {
@@ -883,6 +904,8 @@ Keep "reply" concise \u2014 a few sentences at most \u2014 so the whole response
 - {"type": "set_produce", "item_match": "substring of an existing produce item", "qty": "...", "notes": "..."}
 - {"type": "flag_stock", "item": "...", "status": "ok|low|86"}
 - {"type": "set_queue", "size_match": "substring of an order queue size label, e.g. 'XL' or 'Medium'", "count": number}
+
+Inventory items carry two vendor prices under "prices": qfc (Quality Food) and thomsen. When quoting or costing, use the one with the more recent "date"; if only one is dated, use that one; if neither is dated, use qfc, and fall back to thomsen only when qfc is null. Each price has its own "unit" \u2014 if the two vendors' units differ, say so rather than comparing them directly. "vendor" is who we actually order the item from, which is separate from price comparison.
 
 If the user is just asking a question, return an empty actions array. Never invent inventory items, staff names, or tasks that aren't in the data when answering questions \u2014 only use actions to create new ones when explicitly asked.`;
     try {
@@ -1030,10 +1053,10 @@ If the user is just asking a question, return an empty actions array. Never inve
           borderRadius: "2px"
         }
       },
-      /* @__PURE__ */ React.createElement("div", { className: "text-[10px] mb-1 tracking-widest", style: { color: COLORS.tomato, fontFamily: "Inter", fontWeight: 600 } }, "MANAGER"),
+      /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-1 tracking-widest", style: { color: COLORS.tomato, fontFamily: "Inter", fontWeight: 600 } }, "MANAGER"),
       m.text
     ))
-  ), busy && /* @__PURE__ */ React.createElement("div", { className: "flex justify-start" }, /* @__PURE__ */ React.createElement("div", { className: "px-4 py-3 flex items-center gap-2 text-sm", style: { color: COLORS.crust, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(Loader2, { size: 14, className: "animate-spin" }), " thinking..."))), voiceError && /* @__PURE__ */ React.createElement("div", { className: "text-xs px-1 pb-1", style: { fontFamily: "Inter", color: COLORS.tomato } }, voiceError), voiceMode === "wake" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 px-1 pb-1 text-xs", style: { fontFamily: "Inter", color: listening ? COLORS.basil : "#888" } }, /* @__PURE__ */ React.createElement(Volume2, { size: 12 }), busy ? "Thinking..." : speaking ? "Speaking..." : `Always listening \u2014 say "${wakeWord}" followed by your question.`), voiceMode === "push" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 px-1 pb-1 text-xs", style: { fontFamily: "Inter", color: listening ? COLORS.basil : "#888" } }, /* @__PURE__ */ React.createElement(Volume2, { size: 12 }), listening ? "Listening \u2014 just talk, it sends when you pause." : busy ? "Thinking..." : "Tap-to-talk mode \u2014 replies are spoken aloud."), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 pt-2 pb-1.5 flex-wrap", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-xs mr-1", style: { fontFamily: "Inter", color: "#888" } }, "Voice:"), [
+  ), busy && /* @__PURE__ */ React.createElement("div", { className: "flex justify-start" }, /* @__PURE__ */ React.createElement("div", { className: "px-4 py-3 flex items-center gap-2 text-sm", style: { color: COLORS.crust, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(Loader2, { size: 14, className: "animate-spin" }), " thinking..."))), voiceError && /* @__PURE__ */ React.createElement("div", { className: "text-xs px-1 pb-1", style: { fontFamily: "Inter", color: COLORS.tomato } }, voiceError), voiceMode === "wake" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 px-1 pb-1 text-xs", style: { fontFamily: "Inter", color: listening ? COLORS.basil : "#888" } }, /* @__PURE__ */ React.createElement(Volume2, { size: 12 }), busy ? "Thinking..." : speaking ? "Speaking..." : `Always listening \u2014 say "${wakeWord}" followed by your question.`), voiceMode === "push" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 px-1 pb-1 text-xs", style: { fontFamily: "Inter", color: listening ? COLORS.basil : "#888" } }, /* @__PURE__ */ React.createElement(Volume2, { size: 12 }), listening ? "Listening \u2014 take your time, tap \u201CTap when done\u201D to send." : busy ? "Thinking..." : "Tap-to-talk mode \u2014 replies are spoken aloud."), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 pt-2 pb-1.5 flex-wrap", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-xs mr-1", style: { fontFamily: "Inter", color: "#888" } }, "Voice:"), [
     { id: "off", label: "Off" },
     { id: "push", label: "Tap to talk" },
     { id: "wake", label: `Always on ("${wakeWord}")` }
@@ -1041,8 +1064,8 @@ If the user is just asking a question, return an empty actions array. Never inve
     "button",
     {
       key: opt.id,
-      onClick: () => setMode(opt.id),
-      className: "text-xs px-2.5 py-1 rounded-full",
+      onClick: () => opt.id === "push" ? pushTap() : setMode(opt.id),
+      className: "text-sm px-3.5 py-2 rounded-full",
       style: {
         fontFamily: "Inter",
         border: `1px solid ${voiceMode === opt.id ? COLORS.tomato : COLORS.line}`,
@@ -1050,7 +1073,7 @@ If the user is just asking a question, return an empty actions array. Never inve
         color: voiceMode === opt.id ? COLORS.cream : COLORS.crust
       }
     },
-    opt.label
+    opt.id === "push" && voiceMode === "push" && listening ? "Tap when done \u2713" : opt.label
   )), voiceMode !== "off" && /* @__PURE__ */ React.createElement(
     "select",
     {
@@ -1275,6 +1298,15 @@ function InventoryTab({ data, persist }) {
     i[field] = value;
     persist(next);
   };
+  const updatePrice = (id, vendorKey, field, value) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const i = next.inventory.find((i2) => i2.id === id);
+    if (!i.prices) i.prices = { qfc: null, thomsen: null };
+    if (field === "amt" && (value === "" || value == null)) { i.prices[vendorKey] = null; persist(next); return; }
+    if (!i.prices[vendorKey]) i.prices[vendorKey] = { amt: 0, unit: i.unit || "ea", date: null };
+    i.prices[vendorKey][field] = field === "amt" ? Number(value) : value;
+    persist(next);
+  };
   const remove = (id) => {
     const next = JSON.parse(JSON.stringify(data));
     next.inventory = next.inventory.filter((i) => i.id !== id);
@@ -1289,8 +1321,12 @@ function InventoryTab({ data, persist }) {
       qty: Number(draft.qty) || 0,
       unit: draft.unit || "ea",
       low: Number(draft.low) || 0,
-      cost: draft.cost === "" ? null : Number(draft.cost),
-      vendor: draft.vendor || ""
+      vendor: draft.vendor || "QFC",
+      prices: draft.cost === "" ? { qfc: null, thomsen: null } : (
+        (draft.vendor || "QFC") === "Thomsen"
+          ? { qfc: null, thomsen: { amt: Number(draft.cost), unit: draft.unit || "ea", date: null } }
+          : { qfc: { amt: Number(draft.cost), unit: draft.unit || "ea", date: null }, thomsen: null }
+      )
     });
     persist(next);
     setDraft({ item: "", qty: "", unit: "", low: "", cost: "", vendor: "" });
@@ -1299,7 +1335,7 @@ function InventoryTab({ data, persist }) {
     "button",
     {
       onClick: () => setShowCost((s) => !s),
-      className: "text-xs px-2 py-1 rounded",
+      className: "text-sm px-3 py-2 rounded",
       style: { fontFamily: "Inter", border: `1px solid ${COLORS.line}`, color: COLORS.crust }
     },
     showCost ? "Hide cost/vendor" : "Show cost/vendor"
@@ -1310,8 +1346,8 @@ function InventoryTab({ data, persist }) {
       "div",
       {
         key: i.id,
-        className: "px-3 py-2.5 rounded",
-        style: { background: COLORS.card, border: `1px solid ${isLow ? COLORS.tomato : COLORS.line}` }
+        className: "px-3 py-3 rounded",
+        style: { background: isLow ? "#FDF0EC" : COLORS.card, border: `1px solid ${isLow ? COLORS.tomato : COLORS.line}`, borderLeft: `5px solid ${isLow ? COLORS.tomato : COLORS.line}` }
       },
       /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, isLow && /* @__PURE__ */ React.createElement(AlertTriangle, { size: 14, color: COLORS.tomato }), /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 500, color: COLORS.crust } }, i.item), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "low at ", i.low, " ", i.unit)), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(
         "input",
@@ -1319,37 +1355,57 @@ function InventoryTab({ data, persist }) {
           type: "number",
           value: i.qty,
           onChange: (e) => updateField(i.id, "qty", Number(e.target.value)),
-          className: "w-16 text-sm px-2 py-1 rounded text-right",
+          className: "w-20 text-lg px-2 py-2 rounded text-right",
           style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono", color: isLow ? COLORS.tomatoDark : COLORS.crust }
         }
       ), /* @__PURE__ */ React.createElement("span", { className: "text-xs w-14", style: { fontFamily: "Inter", color: "#888" } }, i.unit), /* @__PURE__ */ React.createElement("button", { onClick: () => remove(i.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 13, color: "#999" })))),
-      showCost && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 mt-2 pt-2", style: { borderTop: `1px dashed ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "Cost/unit $"), /* @__PURE__ */ React.createElement(
-        "input",
-        {
-          type: "number",
-          step: "0.01",
-          placeholder: "\u2014",
-          value: (_a = i.cost) != null ? _a : "",
-          onChange: (e) => updateField(i.id, "cost", e.target.value === "" ? null : Number(e.target.value)),
-          className: "w-20 text-xs px-2 py-1 rounded",
-          style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" }
-        }
-      ), /* @__PURE__ */ React.createElement("span", { className: "text-xs ml-2", style: { fontFamily: "Inter", color: "#888" } }, "Vendor"), /* @__PURE__ */ React.createElement(
-        "input",
-        {
-          placeholder: "Thomsen / QFC",
-          value: (_b = i.vendor) != null ? _b : "",
-          onChange: (e) => updateField(i.id, "vendor", e.target.value),
-          className: "w-28 text-xs px-2 py-1 rounded",
-          style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
-        }
-      ))
+      showCost && /* @__PURE__ */ React.createElement("div", { className: "mt-2.5 pt-2.5 space-y-1.5", style: { borderTop: `1px dashed ${COLORS.line}` } },
+        ["qfc", "thomsen"].map((vk) => {
+          const p = (i.prices || {})[vk];
+          const best = costOf(i);
+          const isBest = !!(p && best && p === best);
+          const label = vk === "qfc" ? "Quality" : "Thomsen";
+          return /* @__PURE__ */ React.createElement("div", { key: vk, className: "flex items-center gap-2" },
+            /* @__PURE__ */ React.createElement("span", { className: "text-xs w-16 flex-shrink-0", style: { fontFamily: "Inter", fontWeight: isBest ? 700 : 400, color: isBest ? COLORS.tomato : "#8a7a6c" } }, label),
+            /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "$"),
+            /* @__PURE__ */ React.createElement("input", {
+              type: "number", step: "0.01", placeholder: "\u2014",
+              value: p ? p.amt : "",
+              onChange: (e) => updatePrice(i.id, vk, "amt", e.target.value),
+              className: "w-20 text-sm px-2 py-1.5 rounded",
+              style: { border: `1px solid ${isBest ? COLORS.tomato : COLORS.line}`, fontFamily: "JetBrains Mono" }
+            }),
+            /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "per"),
+            /* @__PURE__ */ React.createElement("input", {
+              placeholder: i.unit || "ea",
+              value: p && p.unit ? p.unit : "",
+              onChange: (e) => updatePrice(i.id, vk, "unit", e.target.value),
+              className: "w-16 text-sm px-2 py-1.5 rounded",
+              style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+            }),
+            /* @__PURE__ */ React.createElement("span", { className: "text-xs ml-auto", style: { fontFamily: "Inter", color: "#a89886" } }, p && p.date ? p.date.slice(5) : "no date")
+          );
+        }),
+        /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 pt-1" },
+          /* @__PURE__ */ React.createElement("span", { className: "text-xs w-16 flex-shrink-0", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "Order from"),
+          /* @__PURE__ */ React.createElement("select", {
+            value: (_b = i.vendor) != null ? _b : "",
+            onChange: (e) => updateField(i.id, "vendor", e.target.value),
+            className: "text-sm px-2 py-1.5 rounded",
+            style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", color: COLORS.crust, background: "white" }
+          },
+            /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014"),
+            /* @__PURE__ */ React.createElement("option", { value: "QFC" }, "Quality Food"),
+            /* @__PURE__ */ React.createElement("option", { value: "Thomsen" }, "Thomsen")
+          )
+        )
+      )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5 items-center pt-2", style: { borderTop: `1px dashed ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("input", { placeholder: "Item", value: draft.item, onChange: (e) => setDraft({ ...draft, item: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none flex-1 min-w-[100px]", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Qty", type: "number", value: draft.qty, onChange: (e) => setDraft({ ...draft, qty: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Unit", value: draft.unit, onChange: (e) => setDraft({ ...draft, unit: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Low at", type: "number", value: draft.low, onChange: (e) => setDraft({ ...draft, low: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Cost $", type: "number", step: "0.01", value: draft.cost, onChange: (e) => setDraft({ ...draft, cost: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Vendor", value: draft.vendor, onChange: (e) => setDraft({ ...draft, vendor: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-20", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement(TicketButton, { onClick: add, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 13 }), " Add")), /* @__PURE__ */ React.createElement("div", { className: "mt-4 pt-3", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, "Storage Map"), /* @__PURE__ */ React.createElement(
+  })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5 items-center pt-2", style: { borderTop: `1px dashed ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("input", { placeholder: "Item", value: draft.item, onChange: (e) => setDraft({ ...draft, item: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none flex-1 min-w-[100px]", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Qty", type: "number", value: draft.qty, onChange: (e) => setDraft({ ...draft, qty: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Unit", value: draft.unit, onChange: (e) => setDraft({ ...draft, unit: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Low at", type: "number", value: draft.low, onChange: (e) => setDraft({ ...draft, low: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Cost $", type: "number", step: "0.01", value: draft.cost, onChange: (e) => setDraft({ ...draft, cost: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("select", { value: draft.vendor, onChange: (e) => setDraft({ ...draft, vendor: e.target.value }), className: "text-sm px-2 py-2 rounded outline-none w-24", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", background: "white" } }, React.createElement("option", { value: "" }, "Vendor"), React.createElement("option", { value: "QFC" }, "Quality"), React.createElement("option", { value: "Thomsen" }, "Thomsen")), /* @__PURE__ */ React.createElement(TicketButton, { onClick: add, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 13 }), " Add")), /* @__PURE__ */ React.createElement("div", { className: "mt-4 pt-3", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, "Storage Map"), /* @__PURE__ */ React.createElement(
     "button",
     {
       onClick: () => setShowMap((s) => !s),
-      className: "text-xs px-2 py-1 rounded",
+      className: "text-sm px-3 py-2 rounded",
       style: { fontFamily: "Inter", border: `1px solid ${COLORS.line}`, color: COLORS.crust }
     },
     showMap ? "Hide" : "Where's it stored?"
@@ -1413,6 +1469,28 @@ function itemCategory(name) {
   if (has(["flour", "yeast", "crust", "salt", "sugar", "spice", "can", "dough"])) return "Dry Goods";
   return "Other";
 }
+// Effective unit cost: most recently dated price wins; otherwise QFC is the
+// default; Thomsen only if QFC has no price. Returns null if neither has one.
+function costOf(i) {
+  const p = i.prices || {};
+  const q = p.qfc, t = p.thomsen;
+  if (q && t) {
+    if (q.date && t.date) return (q.date >= t.date ? q : t);
+    if (q.date && !t.date) return q;
+    if (!q.date && t.date) return t;
+    return q;
+  }
+  return q || t || null;
+}
+function costAmt(i) {
+  const c = costOf(i);
+  return c && typeof c.amt === "number" ? c.amt : null;
+}
+function priceLabel(p) {
+  if (!p) return null;
+  return "$" + p.amt.toFixed(2) + "/" + (p.unit || "ea");
+}
+
 const CATEGORY_ORDER = ["Cheese", "Meat", "Produce", "Sauces, Oils & Dressings", "Dry Goods", "Beverages", "Paper & Packaging", "Other"];
 
 function OrderTab({ data }) {
@@ -1480,8 +1558,8 @@ function OrderTab({ data }) {
   });
 
   const cart = inv.filter((i) => checked[i.id]);
-  const total = cart.reduce((s, i) => s + (i.cost ? i.cost * getQty(i) : 0), 0);
-  const noCost = cart.filter((i) => !i.cost).length;
+  const total = cart.reduce((s, i) => { const c = costAmt(i); return s + (c ? c * getQty(i) : 0); }, 0);
+  const noCost = cart.filter((i) => costAmt(i) == null).length;
 
   const buildText = () => {
     const byVendor = {};
@@ -1542,10 +1620,10 @@ function OrderTab({ data }) {
         ),
         React.createElement(
           "div",
-          { className: "text-[11px] mt-0.5 flex items-center gap-1.5", style: { fontFamily: "Inter", color: "#8a7a6c" } },
+          { className: "text-xs mt-0.5 flex items-center gap-1.5", style: { fontFamily: "Inter", color: "#8a7a6c" } },
           i.vendor || "No vendor",
           low && React.createElement("span", { style: { color: COLORS.tomato, fontWeight: 700 } }, "\u2022 LOW"),
-          i.cost ? React.createElement("span", null, "\u00b7 $" + i.cost.toFixed(2) + "/" + (i.unit || "ea")) : null
+          costOf(i) ? React.createElement("span", null, "\u00b7 " + priceLabel(costOf(i))) : null
         )
       ),
       React.createElement(
@@ -1568,7 +1646,7 @@ function OrderTab({ data }) {
           { onClick: () => bump(i, 1), className: "w-8 h-8 rounded text-lg leading-none", style: { background: COLORS.basil, color: "white", fontWeight: 700 } },
           "+"
         ),
-        React.createElement("span", { className: "text-[10px] w-7", style: { fontFamily: "Inter", color: "#999" } }, i.unit || "")
+        React.createElement("span", { className: "text-xs w-7", style: { fontFamily: "Inter", color: "#999" } }, i.unit || "")
       )
     );
   };
@@ -1632,7 +1710,7 @@ function OrderTab({ data }) {
         React.createElement("div", { className: "text-sm", style: { fontFamily: "Oswald", color: COLORS.cream, fontWeight: 600 } }, cart.length + (cart.length === 1 ? " item" : " items")),
         React.createElement(
           "div",
-          { className: "text-[11px]", style: { fontFamily: "Inter", color: COLORS.parm } },
+          { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.parm } },
           total > 0 ? "\u2248 $" + total.toFixed(2) + (noCost ? " (" + noCost + " without a price)" : "") : "No prices on file"
         )
       ),
@@ -1768,7 +1846,7 @@ function PrepParTab({ data, persist }) {
     {
       key: s,
       onClick: () => setFlagStatus(f.id, s),
-      className: "text-[10px] px-2 py-1 rounded-full",
+      className: "text-xs px-2 py-1 rounded-full",
       style: {
         fontFamily: "Inter",
         fontWeight: 600,
@@ -1788,7 +1866,7 @@ function PrepParTab({ data, persist }) {
       className: "flex-1 text-xs px-2.5 py-1.5 rounded outline-none",
       style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
     }
-  ), /* @__PURE__ */ React.createElement(TicketButton, { onClick: addFlag, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 12 }))), /* @__PURE__ */ React.createElement(SectionHeader, null, "Prep Par Sheet"), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_60px_60px] px-3 py-1.5 text-[10px] tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#999", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "ITEM"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "QTY 1"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "QTY 2")), /* @__PURE__ */ React.createElement("div", { className: "max-h-72 overflow-y-auto" }, prep.par.map((row, idx) => /* @__PURE__ */ React.createElement(
+  ), /* @__PURE__ */ React.createElement(TicketButton, { onClick: addFlag, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 12 }))), /* @__PURE__ */ React.createElement(SectionHeader, null, "Prep Par Sheet"), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_60px_60px] px-3 py-1.5 text-xs tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#999", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "ITEM"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "QTY 1"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "QTY 2")), /* @__PURE__ */ React.createElement("div", { className: "max-h-72 overflow-y-auto" }, prep.par.map((row, idx) => /* @__PURE__ */ React.createElement(
     "div",
     {
       key: row.id,
@@ -1814,7 +1892,7 @@ function PrepParTab({ data, persist }) {
         style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" }
       }
     )
-  )))), /* @__PURE__ */ React.createElement(SectionHeader, null, "Produce Order Sheet"), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_50px_1fr] px-3 py-1.5 text-[10px] tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#999", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "ITEM"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "QTY"), /* @__PURE__ */ React.createElement("span", { className: "pl-2" }, "NOTES")), /* @__PURE__ */ React.createElement("div", { className: "max-h-72 overflow-y-auto" }, prep.produce.map((row, idx) => /* @__PURE__ */ React.createElement(
+  )))), /* @__PURE__ */ React.createElement(SectionHeader, null, "Produce Order Sheet"), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_50px_1fr] px-3 py-1.5 text-xs tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#999", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "ITEM"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "QTY"), /* @__PURE__ */ React.createElement("span", { className: "pl-2" }, "NOTES")), /* @__PURE__ */ React.createElement("div", { className: "max-h-72 overflow-y-auto" }, prep.produce.map((row, idx) => /* @__PURE__ */ React.createElement(
     "div",
     {
       key: row.id,
@@ -1875,11 +1953,11 @@ function MenuTab({ data, persist }) {
     const row = m[key].find((r) => r.id === id);
     row.price = price;
   });
-  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-xs px-3 py-2 rounded mb-3", style: { background: "#E9F0E5", color: COLORS.basil, fontFamily: "Inter" } }, "Pulled from the actual printed menu proof \u2014 this replaces the earlier photo-based guesses. Prices are still editable if anything changes."), /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 rounded mb-4", style: { background: COLORS.crust } }, /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.parm } }, menu.info.phone, " \xB7 ", menu.info.address), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: COLORS.cream } }, menu.info.hours), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: COLORS.parm } }, menu.info.note)), /* @__PURE__ */ React.createElement(SectionHeader, null, "Pizza \u2014 sizes & toppings"), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: "#888" } }, menu.glutenFree), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden mb-2", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_repeat(4,56px)] px-3 py-1.5 text-[10px] tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#999", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "SIZE"), menu.pizzaSizes.map((s) => /* @__PURE__ */ React.createElement("span", { key: s, className: "text-right" }, s.split(" ")[0]))), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_repeat(4,56px)] items-center px-3 py-2 text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, /* @__PURE__ */ React.createElement("span", null, "Base price"), menu.pizzaBasePrices.map((p, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "justify-self-end" }, /* @__PURE__ */ React.createElement(PriceInput, { value: p, onChange: (v) => set((m) => {
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-xs px-3 py-2 rounded mb-3", style: { background: "#E9F0E5", color: COLORS.basil, fontFamily: "Inter" } }, "Pulled from the actual printed menu proof \u2014 this replaces the earlier photo-based guesses. Prices are still editable if anything changes."), /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 rounded mb-4", style: { background: COLORS.crust } }, /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.parm } }, menu.info.phone, " \xB7 ", menu.info.address), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: COLORS.cream } }, menu.info.hours), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: COLORS.parm } }, menu.info.note)), /* @__PURE__ */ React.createElement(SectionHeader, null, "Pizza \u2014 sizes & toppings"), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: "#888" } }, menu.glutenFree), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden mb-2", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_repeat(4,56px)] px-3 py-1.5 text-xs tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#999", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "SIZE"), menu.pizzaSizes.map((s) => /* @__PURE__ */ React.createElement("span", { key: s, className: "text-right" }, s.split(" ")[0]))), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_repeat(4,56px)] items-center px-3 py-2 text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, /* @__PURE__ */ React.createElement("span", null, "Base price"), menu.pizzaBasePrices.map((p, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "justify-self-end" }, /* @__PURE__ */ React.createElement(PriceInput, { value: p, onChange: (v) => set((m) => {
     m.pizzaBasePrices[i] = v;
   }) }))))), menu.toppingTiers.map((t) => /* @__PURE__ */ React.createElement("div", { key: t.id, className: "rounded px-3 py-2 mb-2", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-1" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm font-medium", style: { fontFamily: "Inter", color: COLORS.crust } }, t.tier), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1" }, t.prices.map((p, i) => /* @__PURE__ */ React.createElement(PriceInput, { key: i, value: p, onChange: (v) => set((m) => {
     m.toppingTiers.find((x) => x.id === t.id).prices[i] = v;
-  }) })))), /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, t.items))), /* @__PURE__ */ React.createElement(SectionHeader, null, "Specialty Pizzas (", menu.specialty.length, ")"), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden mb-2", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_repeat(5,44px)] px-3 py-1.5 text-[10px] tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#999", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "SIZE"), menu.specialtySizes.map((s) => /* @__PURE__ */ React.createElement("span", { key: s, className: "text-right" }, s.split(" ")[0]))), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_repeat(5,44px)] items-center px-3 py-2 text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, /* @__PURE__ */ React.createElement("span", null, "All specialty pizzas"), menu.specialtyPrices.map((p, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "justify-self-end" }, /* @__PURE__ */ React.createElement(PriceInput, { value: p, onChange: (v) => set((m) => {
+  }) })))), /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, t.items))), /* @__PURE__ */ React.createElement(SectionHeader, null, "Specialty Pizzas (", menu.specialty.length, ")"), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden mb-2", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_repeat(5,44px)] px-3 py-1.5 text-xs tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#999", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "SIZE"), menu.specialtySizes.map((s) => /* @__PURE__ */ React.createElement("span", { key: s, className: "text-right" }, s.split(" ")[0]))), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_repeat(5,44px)] items-center px-3 py-2 text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, /* @__PURE__ */ React.createElement("span", null, "All specialty pizzas"), menu.specialtyPrices.map((p, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "justify-self-end" }, /* @__PURE__ */ React.createElement(PriceInput, { value: p, onChange: (v) => set((m) => {
     m.specialtyPrices[i] = v;
   }) }))))), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: "#888" } }, "Same price grid applies to every specialty pizza below."), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5 mb-4" }, menu.specialty.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, className: "rounded px-3 py-2", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "text-sm font-semibold mb-0.5", style: { fontFamily: "Inter", color: COLORS.tomato } }, p.name), /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, p.ingredients)))), /* @__PURE__ */ React.createElement(SectionHeader, null, "Calzones"), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-1.5", style: { fontFamily: "Inter", color: "#888" } }, menu.calzone.note), /* @__PURE__ */ React.createElement("div", { className: "space-y-1 mb-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between px-3 py-1.5 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, "Cheese Calzone"), /* @__PURE__ */ React.createElement(PriceInput, { value: menu.calzone.cheesePrice, onChange: (v) => set((m) => {
     m.calzone.cheesePrice = v;
@@ -2029,7 +2107,7 @@ function LiveOpsTab({ data, persist }) {
     {
       key: s.id,
       onClick: () => setStationId(s.id),
-      className: "text-xs px-2.5 py-1 rounded-full",
+      className: "text-sm px-3.5 py-2 rounded-full",
       style: {
         fontFamily: "Inter",
         fontWeight: 500,
@@ -2054,7 +2132,7 @@ function LiveOpsTab({ data, persist }) {
     {
       key: m,
       onClick: () => setAuto(m),
-      className: "text-xs px-2 py-1 rounded",
+      className: "text-sm px-3 py-2 rounded",
       style: {
         fontFamily: "Inter",
         background: autoMinutes === m ? COLORS.crust : "transparent",
@@ -2114,7 +2192,7 @@ function GuidesTab() {
             "div",
             { className: "px-2.5 py-2" },
             /* @__PURE__ */ React.createElement("div", { className: "text-sm leading-tight", style: { fontFamily: "Oswald", color: COLORS.crust, fontWeight: 600 } }, g.title),
-            /* @__PURE__ */ React.createElement("div", { className: "text-[11px] mt-0.5 leading-snug", style: { fontFamily: "Inter", color: "#8a7a6c" } }, g.sub)
+            /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5 leading-snug", style: { fontFamily: "Inter", color: "#8a7a6c" } }, g.sub)
           )
         ))
       )
@@ -2151,7 +2229,7 @@ function GuidesTab() {
       ),
       /* @__PURE__ */ React.createElement(
         "div",
-        { className: "text-center text-[11px] pb-3 flex-shrink-0", style: { fontFamily: "Inter", color: "#b8a99a" } },
+        { className: "text-center text-xs pb-3 flex-shrink-0", style: { fontFamily: "Inter", color: "#b8a99a" } },
         zoomed ? "Tap picture to zoom out" : "Tap picture to zoom in"
       )
     )
@@ -2221,7 +2299,7 @@ function TasksTab({ data, persist }) {
     count > 0 && React.createElement(
       "span",
       {
-        className: "text-[10px] px-1.5 rounded-full",
+        className: "text-xs px-1.5 rounded-full",
         style: { background: COLORS.tomato, color: COLORS.cream, fontWeight: 700 }
       },
       count
@@ -2258,7 +2336,7 @@ function TasksTab({ data, persist }) {
         {
           value: stationOf(t),
           onChange: (e) => move(t.id, e.target.value),
-          className: "text-[11px] px-1 py-1 rounded outline-none",
+          className: "text-xs px-1 py-1 rounded outline-none",
           style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", background: "white", maxWidth: "90px" }
         },
         allStations.map((s) => React.createElement("option", { key: s, value: s }, s))
@@ -2337,7 +2415,7 @@ function TasksTab({ data, persist }) {
         React.createElement("div", { className: "text-xs tracking-widest", style: { fontFamily: "Oswald", color: "#999" } }, "DONE"),
         React.createElement(
           "button",
-          { onClick: clearDone, className: "text-[11px] underline", style: { fontFamily: "Inter", color: "#999" } },
+          { onClick: clearDone, className: "text-xs underline", style: { fontFamily: "Inter", color: "#999" } },
           "Clear finished"
         )
       ),
@@ -2356,7 +2434,7 @@ function TasksTab({ data, persist }) {
               React.createElement(Check, { size: 12, color: "white" })
             ),
             React.createElement("span", { className: "text-sm line-through truncate", style: { fontFamily: "Inter", color: COLORS.crust } }, t.text),
-            React.createElement("span", { className: "text-[10px] flex-shrink-0", style: { fontFamily: "Inter", color: "#aaa" } }, stationOf(t))
+            React.createElement("span", { className: "text-xs flex-shrink-0", style: { fontFamily: "Inter", color: "#aaa" } }, stationOf(t))
           ),
           React.createElement("button", { onClick: () => remove(t.id) }, React.createElement(Trash2, { size: 13, color: "#999" }))
         ))
