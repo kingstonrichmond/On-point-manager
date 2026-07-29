@@ -153,8 +153,38 @@ const Volume2 = makeIcon(
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DEFAULT_DATA = {
   schedule: {
-    Mon: [{ id: "s1", name: "Maria", time: "4pm\u2013close" }],
-    Tue: [],
+    Mon: [
+      { id: "sch1", name: "Pop (cooking)", time: "8am\u20134pm" },
+      { id: "sch2", name: "Shawn (cooking)", time: "9am\u20134pm" },
+      { id: "sch3", name: "Alan (prep)", time: "8am\u20133pm" },
+      { id: "sch4", name: "Bella (front)", time: "11am\u20137pm" },
+      { id: "sch5", name: "Samoia (front)", time: "11am\u20132:30pm" },
+      { id: "sch6", name: "Tasheka (prep)", time: "11am\u20132:30pm" },
+      { id: "sch7", name: "Tyler (oven)", time: "4pm\u2013close" },
+      { id: "sch8", name: "Andy (cooking)", time: "4pm\u2013close" },
+      { id: "sch9", name: "Ricky (fryer)", time: "4pm\u2013close" },
+      { id: "sch10", name: "Gilly (cooking)", time: "~4pm\u2013close" },
+      { id: "sch11", name: "Taber (cooking)", time: "5:30pm\u2013close" },
+      { id: "sch12", name: "Aruzan (front)", time: "4:30pm\u2013close" },
+      { id: "sch13", name: "Karina (front)", time: "4:30pm\u2013close" },
+      { id: "sch14", name: "Murph (dish)", time: "hours TBD" }
+    ],
+    Tue: [
+      { id: "sch15", name: "Pop (cooking)", time: "8am\u20134pm" },
+      { id: "sch16", name: "Shawn (cooking)", time: "9am\u20134:30pm" },
+      { id: "sch17", name: "Bella (front)", time: "10:30am\u20134:30pm" },
+      { id: "sch18", name: "Samoia (front)", time: "11am\u20132:30pm" },
+      { id: "sch19", name: "Tasheka (prep)", time: "11am\u20132:30pm" },
+      { id: "sch20", name: "Tyler (oven)", time: "11am\u2013close" },
+      { id: "sch21", name: "PJ (cooking)", time: "12pm\u20137pm" },
+      { id: "sch22", name: "Ricky (fryer)", time: "4pm\u2013close" },
+      { id: "sch23", name: "Caitlin (pies)", time: "4pm\u2013close" },
+      { id: "sch24", name: "Aruzan (front)", time: "4:30pm\u2013close" },
+      { id: "sch25", name: "Karina (front)", time: "4:30pm\u2013close" },
+      { id: "sch26", name: "Taber (cooking)", time: "5:30pm\u2013close" },
+      { id: "sch27", name: "Andy (cooking)", time: "start TBD\u2013close" },
+      { id: "sch28", name: "Luke John (pies)", time: "open-ended / maybe" }
+    ],
     Wed: [
       { id: "s2", name: "Pop", time: "8am\u20134pm" },
       { id: "s6", name: "Chris (owner)", time: "11am\u20137:30pm" },
@@ -166,17 +196,57 @@ const DEFAULT_DATA = {
       { id: "s12", name: "Dave", time: "3pm\u2013close" },
       { id: "s13", name: "Ruzhan", time: "3pm\u2013close" },
       { id: "s14", name: "Karina", time: "3pm\u2013close" },
-      { id: "s15", name: "Caitlin", time: "4pm\u2013close" }
+      { id: "s15", name: "Caitlin", time: "4pm\u2013close" },
+      { id: "schCARA_W", name: "Cara (cooking)", time: "4pm\u2013close" }
     ],
     Thu: [
-      { id: "s16", name: "Pop", time: "8am\u20134pm" },
-      { id: "s17", name: "Tyler", time: "11am\u2013close" },
-      { id: "s18", name: "Abby", time: "10am\u20137pm" }
+      { id: "sch29", name: "Chris (owner)", time: "day" },
+      { id: "sch30", name: "Pop (cooking)", time: "8am\u20134pm" },
+      { id: "sch31", name: "Shawn (cooking)", time: "9am\u20134:30pm" },
+      { id: "sch32", name: "Abby (cooking)", time: "10am\u20137pm" },
+      { id: "sch33", name: "Alan (prep)", time: "8am\u20133pm" },
+      { id: "sch34", name: "** OPEN (front)", time: "NEEDS FILLING" },
+      { id: "sch35", name: "Tyler (oven)", time: "11am\u2013close" },
+      { id: "sch36", name: "Dave (oven)", time: "3pm\u2013close" },
+      { id: "sch37", name: "Ricky (fryer)", time: "4pm\u2013close" },
+      { id: "sch38", name: "Caitlin (front \u2014 covering)", time: "4pm\u2013close" },
+      { id: "sch39", name: "Cara (cooking)", time: "4pm\u2013close" },
+      { id: "sch40", name: "Taber (cooking)", time: "5:30pm\u2013close" },
+      { id: "sch41", name: "Andy (cooking)", time: "start TBD\u2013close" },
+      { id: "sch42", name: "Murph (dish)", time: "hours TBD" },
+      { id: "sch43", name: "Luke John (pies)", time: "floats in 3\u20135pm, unreliable" },
+      { id: "sch44", name: "? Bella (front)", time: "11am\u20137pm \u2014 CONFIRM" },
+      { id: "sch45", name: "\u2014 Aruzan + Karina OFF today \u2014", time: "front is thin" }
     ],
-    Fri: [{ id: "s3", name: "Maria", time: "4pm\u2013close" }, { id: "s4", name: "Deshawn", time: "5pm\u2013close" }],
-    Sat: [{ id: "s5", name: "Jon", time: "11am\u20137pm" }],
-    Sun: []
+    Fri: [
+      { id: "sch46", name: "Chris (owner)", time: "day" },
+      { id: "sch47", name: "Pop (cooking)", time: "8am\u20134pm" },
+      { id: "sch48", name: "Alan (prep)", time: "8am\u20133pm" },
+      { id: "sch49", name: "Abby (cooking)", time: "10am\u20137pm" },
+      { id: "sch50", name: "Cara (cooking)", time: "11am\u20137pm" },
+      { id: "sch51", name: "Tyler (oven)", time: "11am\u2013close" },
+      { id: "sch52", name: "Samoia (front)", time: "11am\u20132:30pm" },
+      { id: "sch53", name: "Tasheka (prep)", time: "11am\u20132:30pm" },
+      { id: "sch54", name: "PJ (cooking)", time: "~3pm\u2013end TBD" },
+      { id: "sch55", name: "Dave (oven)", time: "3pm\u2013close" },
+      { id: "sch56", name: "Ricky (fryer)", time: "4pm\u2013close" },
+      { id: "sch57", name: "Caitlin (front \u2014 covering)", time: "4pm\u2013close" },
+      { id: "sch58", name: "Gilly (cooking)", time: "~4pm\u2013close" },
+      { id: "sch59", name: "Andy (cooking)", time: "start TBD\u2013close" },
+      { id: "sch60", name: "Murph (dish)", time: "hours TBD" },
+      { id: "sch61", name: "Luke John (pies)", time: "open-ended / maybe" },
+      { id: "sch62", name: "? Bella (front)", time: "11am\u20134pm \u2014 CONFIRM" },
+      { id: "sch63", name: "\u2014 Aruzan + Karina OFF today \u2014", time: "front is thin" }
+    ],
+    Sat: [{ id: "s5", name: "Jon", time: "11am\u20137pm" },
+      { id: "schCHRIS_S", name: "Chris (owner)", time: "open or close" },
+      { id: "schCARA_S", name: "Cara (cooking)", time: "4pm\u2013close" }
+    ],
+    Sun: [
+      { id: "schCHRIS_U", name: "Chris (owner)", time: "open or close" }
+    ]
   },
+  scheduleVersion: "2026-07-28",
   inventory: [
     { id: "i1", item: "Block Whole Milk Mozzarella", qty: 40, unit: "lb", low: 20, cost: 111.61, vendor: "Thomsen" },
     { id: "i2", item: "Liuzzi Fresh Mozzarella", qty: 10, unit: "lb", low: 10, cost: null, vendor: "QFC" },
@@ -289,9 +359,9 @@ const DEFAULT_DATA = {
     { id: "r6", name: "Buffalo Sauce", steps: "Equal parts Frank's RedHot and Frank's Extra Hot\nClarify melted butter by letting solids settle and pouring off top layer\nMix clarified butter into hot sauce mixture\nAdd 1 cup Romano cheese\nStir thoroughly." }
   ],
   tasks: [
-    { id: "t1", text: "Confirm salami re-ship from Quality Food Co", assignee: "Manager", done: false },
-    { id: "t2", text: "Deep clean walk-in", assignee: "Closer", done: false },
-    { id: "t3", text: "Restock boxes before Friday rush", assignee: "Jon", done: false }
+    { id: "t1", text: "Confirm salami re-ship from Quality Food Co", station: "Manager", assignee: "Manager", done: false },
+    { id: "t2", text: "Deep clean walk-in", station: "Back of House", assignee: "Closer", done: false },
+    { id: "t3", text: "Restock boxes before Friday rush", station: "Back of House", assignee: "Jon", done: false }
   ],
   prep: {
     par: [
@@ -532,6 +602,17 @@ const COLORS = {
   card: "#FAFAF5",
   line: "#E4D9BE"
 };
+const TASK_STATIONS = ["Front", "Line", "Pizza", "Oven", "Fryer", "Salad", "Sandwich", "Prep", "Dish", "Back of House", "Manager"];
+const GUIDES = [
+  { id: "g1", file: "guides/pizza-sauce.jpg", title: "Pizza Sauce", sub: "3 cases Tomato Magic \u2014 full build", group: "Recipes" },
+  { id: "g2", file: "guides/dough-recipe.jpg", title: "Dough", sub: "Mixer steps, level 1, 8 minutes", group: "Recipes" },
+  { id: "g3", file: "guides/pizza-line-map.jpg", title: "Pizza Line Map", sub: "Where every topping goes back", group: "Line & Stations" },
+  { id: "g4", file: "guides/clean-dishes.jpg", title: "Clean Dishes \u2014 Top Shelf", sub: "Pan sizes and where they stack", group: "Line & Stations" },
+  { id: "g5", file: "guides/prep-walkin.jpg", title: "Prep Walk-In", sub: "Shelf-by-shelf layout", group: "Storage & Layout" },
+  { id: "g6", file: "guides/bulk-walkin.jpg", title: "Bulk Storage Walk-In", sub: "Cheese, dough rotation, FIFO", group: "Storage & Layout" },
+  { id: "g7", file: "guides/backroom-freezer.jpg", title: "Backroom Freezer", sub: "Top / middle / bottom shelf", group: "Storage & Layout" },
+  { id: "g8", file: "guides/backroom-shelf.jpg", title: "Backroom Shelf", sub: "Condiments, oils, tomatoes", group: "Storage & Layout" }
+];
 function uid() {
   return Math.random().toString(36).slice(2, 9);
 }
@@ -557,7 +638,25 @@ function PizzaOpsManager() {
     (async () => {
       try {
         const res = await window.storage.get("shop-data", true);
-        setData(res && res.value ? JSON.parse(res.value) : DEFAULT_DATA);
+        let loadedData = res && res.value ? JSON.parse(res.value) : DEFAULT_DATA;
+        if (loadedData !== DEFAULT_DATA && loadedData.scheduleVersion !== DEFAULT_DATA.scheduleVersion) {
+          loadedData.schedule = loadedData.schedule || {};
+          ["Mon", "Tue", "Thu", "Fri"].forEach((dy) => {
+            loadedData.schedule[dy] = JSON.parse(JSON.stringify(DEFAULT_DATA.schedule[dy]));
+          });
+          ["Wed", "Sat", "Sun"].forEach((dy) => {
+            const keep = loadedData.schedule[dy] || [];
+            const have = new Set(keep.map((s) => String(s.name).toLowerCase().split(" (")[0].trim()));
+            DEFAULT_DATA.schedule[dy].forEach((s) => {
+              const who = String(s.name).toLowerCase().split(" (")[0].trim();
+              if (!have.has(who)) keep.push(JSON.parse(JSON.stringify(s)));
+            });
+            loadedData.schedule[dy] = keep;
+          });
+          loadedData.scheduleVersion = DEFAULT_DATA.scheduleVersion;
+          try { await window.storage.set("shop-data", JSON.stringify(loadedData), true); } catch (e) {}
+        }
+        setData(loadedData);
       } catch (e) {
         setData(DEFAULT_DATA);
       } finally {
@@ -588,6 +687,7 @@ function PizzaOpsManager() {
     { id: "order", label: "Order", icon: ShoppingCart, badge: lowStockCount },
     { id: "prep", label: "Prep & Par", icon: ChefHat, badge: boardFlags },
     { id: "recipes", label: "Recipes", icon: Pizza },
+    { id: "guides", label: "Guides", icon: Camera },
     { id: "menu", label: "Menu", icon: BookOpen },
     { id: "liveops", label: "Live Ops", icon: Activity },
     { id: "tasks", label: "Tasks", icon: ClipboardList, badge: openTasks }
@@ -633,7 +733,7 @@ function PizzaOpsManager() {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, saveError && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-3 px-3 py-2 rounded", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, "Couldn't save the last change \u2014 data may not persist."), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "order" && /* @__PURE__ */ React.createElement(OrderTab, { data }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist })));
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, saveError && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-3 px-3 py-2 rounded", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, "Couldn't save the last change \u2014 data may not persist."), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "order" && /* @__PURE__ */ React.createElement(OrderTab, { data }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, null), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist })));
 }
 function AssistantAvatar({ state }) {
   const blobs = {
@@ -853,7 +953,7 @@ The "menu" object has the full menu: pizza sizes and topping prices, specialty p
 
 The "liveOps" object has: "orderQueue" (how many of each pizza size are currently queued to be spread/built \u2014 hand-entered by staff, not live POS data) and "stationLog" (recent camera snapshot checks of a prep station, each with a timestamp and a short plain-language read on how busy/backed-up it looked).
 
-The "staff" array has each person's phone, the positions they can fill with a 1-5 skill rating, and a dated notes log (things like availability or preferences). If asked to find coverage or a fill-in for a position, rank candidates by skill (highest first) from their "positions" list and mention their phone number so they can be called. If no one is listed for that position, say so plainly rather than guessing.
+There is also a "Guides" tab in this app with illustrated wall-poster guides: Pizza Sauce and Dough (recipes), Pizza Line Map (where each topping goes back on the line), Clean Dishes top shelf (pan sizes), and layout posters for the Prep Walk-In, Bulk Storage Walk-In, Backroom Freezer, and Backroom Shelf. When a question would be easier to answer with a picture \u2014 where something is stored, how the line is laid out, how to build sauce or dough \u2014 answer it in words AND tell them which guide to open, e.g. "check the Guides tab, Prep Walk-In poster".\n\nTasks are organized by station. Each task has a "station" field (Front, Line, Pizza, Oven, Fryer, Salad, Sandwich, Prep, Dish, Back of House, or Manager). If someone asks what they need to do, ask which station they are on if it is not obvious, and list only that station\u0027s open tasks. Always set a sensible station when adding a task.\n\nThe "staff" array has each person's phone, the positions they can fill with a 1-5 skill rating, and a dated notes log (things like availability or preferences). If asked to find coverage or a fill-in for a position, rank candidates by skill (highest first) from their "positions" list and mention their phone number so they can be called. If no one is listed for that position, say so plainly rather than guessing.
 
 Respond ONLY with a JSON object \u2014 no markdown fences, no code blocks, no preamble or text before/after it, in this exact shape:
 {
@@ -863,7 +963,7 @@ Respond ONLY with a JSON object \u2014 no markdown fences, no code blocks, no pr
 Keep "reply" concise \u2014 a few sentences at most \u2014 so the whole response stays well within the token limit and the JSON is never cut off mid-object.
 
 "actions" is an array of zero or more of these action objects, only include if the user is clearly asking you to change something:
-- {"type": "add_task", "text": "...", "assignee": "..."}
+- {"type": "add_task", "text": "...", "station": "one of: Front, Line, Pizza, Oven, Fryer, Salad, Sandwich, Prep, Dish, Back of House, Manager", "assignee": "..."}
 - {"type": "complete_task", "text_match": "substring of an existing task's text"}
 - {"type": "update_inventory", "item_match": "substring of an existing inventory item name", "qty": number}
 - {"type": "add_shift", "day": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "name": "...", "time": "..."}
@@ -930,7 +1030,7 @@ If the user is just asking a question, return an empty actions array. Never inve
       let changed = false;
       for (const action of parsed.actions || []) {
         if (action.type === "add_task") {
-          next.tasks.push({ id: uid(), text: action.text || "New task", assignee: action.assignee || "Unassigned", done: false });
+          next.tasks.push({ id: uid(), text: action.text || "New task", station: action.station || "Back of House", assignee: action.assignee || "Anyone", done: false });
           changed = true;
         } else if (action.type === "complete_task") {
           const t = next.tasks.find((t2) => t2.text.toLowerCase().includes((action.text_match || "").toLowerCase()));
@@ -1389,67 +1489,249 @@ function InventoryTab({ data, persist }) {
     setMapDraft({ area: "", items: "" });
   }, color: COLORS.crust }, /* @__PURE__ */ React.createElement(Plus, { size: 13 }), " Add storage area"))));
 }
-function OrderTab({ data }) {
-  const [overrides, setOverrides] = useState({});
-  const [checked, setChecked] = useState({});
-  const [copied, setCopied] = useState(false);
-  const suggested = data.inventory.filter((i) => i.qty <= i.low).map((i) => {
-    const target = i.low * 2;
-    const defaultQty = Math.max(Math.ceil(target - i.qty), 1);
-    const qty = overrides[i.id] !== void 0 ? overrides[i.id] : defaultQty;
-    return { ...i, suggestedQty: qty };
-  });
-  const setQty = (id, val) => setOverrides((o) => ({ ...o, [id]: Number(val) }));
-  const toggle = (id) => setChecked((c) => ({ ...c, [id]: !c[id] }));
-  const active = suggested.filter((i) => !checked[i.id]);
-  const byVendor = active.reduce((acc, i) => {
-    const v = i.vendor || "Unassigned vendor";
-    (acc[v] = acc[v] || []).push(i);
-    return acc;
-  }, {});
-  const total = active.reduce((sum, i) => sum + (i.cost ? i.cost * i.suggestedQty : 0), 0);
-  const missingCost = active.filter((i) => !i.cost).length;
-  const buildText = () => {
-    let out = `ON POINT PIZZA \u2014 SUGGESTED ORDER (${(/* @__PURE__ */ new Date()).toLocaleDateString()})
+function itemCategory(name) {
+  const n = (name || "").toLowerCase();
+  const has = (arr) => arr.some((w) => n.indexOf(w) !== -1);
+  if (has(["box", "cup", "container", "foil", "glove", "napkin", "towel", "wrap", "bag", "parchment", "apron"])) return "Paper & Packaging";
+  if (has(["mozzarella", "cheddar", "romano", "provolone", "feta", "ricotta", "cheese", "parmesan", "asiago", "gorgonzola", "deli log"])) return "Cheese";
+  if (has(["chicken", "pepperoni", "bacon", "sausage", "salami", "capicola", "meatball", "ham", "turkey", "wing", "steak", "beef"])) return "Meat";
+  if (has(["romaine", "lettuce", "pepper", "onion", "tomato", "mushroom", "spinach", "broccoli", "celery", "cucumber", "basil", "parsley", "produce"])) return "Produce";
+  if (has(["dressing", "sauce", "mayo", "mustard", "vinegar", "oil", "dip"])) return "Sauces, Oils & Dressings";
+  if (has(["water", "soda", "milk", "juice", "drink", "cola", "seltzer"])) return "Beverages";
+  if (has(["flour", "yeast", "crust", "salt", "sugar", "spice", "can", "dough"])) return "Dry Goods";
+  return "Other";
+}
+const CATEGORY_ORDER = ["Cheese", "Meat", "Produce", "Sauces, Oils & Dressings", "Dry Goods", "Beverages", "Paper & Packaging", "Other"];
 
-`;
-    Object.entries(byVendor).forEach(([vendor, items]) => {
-      out += `${vendor.toUpperCase()}
-`;
-      items.forEach((i) => {
-        const line = i.cost ? ` ($${(i.cost * i.suggestedQty).toFixed(2)})` : "";
-        out += `  - ${i.suggestedQty} ${i.unit} ${i.item}${line}
-`;
-      });
-      out += "\n";
+function OrderTab({ data }) {
+  const [qty, setQty] = useState({});
+  const [checked, setChecked] = useState({});
+  const [search, setSearch] = useState("");
+  const [vendorFilter, setVendorFilter] = useState("All");
+  const [copied, setCopied] = useState(false);
+
+  const inv = data.inventory || [];
+  const vendors = ["All"].concat(inv.map((i) => i.vendor || "Unassigned").filter((v, idx, a) => a.indexOf(v) === idx));
+  const getQty = (i) => (qty[i.id] !== void 0 ? qty[i.id] : 1);
+  const bump = (i, delta) => {
+    const next = Math.max(1, getQty(i) + delta);
+    setQty((q) => ({ ...q, [i.id]: next }));
+    setChecked((c) => ({ ...c, [i.id]: true }));
+    setCopied(false);
+  };
+  const setExact = (i, val) => {
+    const n = parseFloat(val);
+    setQty((q) => ({ ...q, [i.id]: isNaN(n) || n < 0 ? 1 : n }));
+    setCopied(false);
+  };
+  const toggle = (i) => {
+    setChecked((c) => ({ ...c, [i.id]: !c[i.id] }));
+    setCopied(false);
+  };
+  const addAllLow = () => {
+    const nextChecked = { ...checked };
+    const nextQty = { ...qty };
+    inv.forEach((i) => {
+      if (i.qty <= i.low) {
+        nextChecked[i.id] = true;
+        if (nextQty[i.id] === void 0) nextQty[i.id] = Math.max(Math.ceil(i.low * 2 - i.qty), 1);
+      }
     });
-    if (total > 0) out += `Estimated total (priced items only): $${total.toFixed(2)}
-`;
+    setChecked(nextChecked);
+    setQty(nextQty);
+    setCopied(false);
+  };
+  const clearAll = () => {
+    setChecked({});
+    setQty({});
+    setCopied(false);
+  };
+
+  const visible = inv.filter((i) => {
+    if (vendorFilter !== "All" && (i.vendor || "Unassigned") !== vendorFilter) return false;
+    if (search.trim() && i.item.toLowerCase().indexOf(search.trim().toLowerCase()) === -1) return false;
+    return true;
+  });
+  const cats = [];
+  visible.forEach((i) => {
+    const c = itemCategory(i.item);
+    let g = cats.find((x) => x.name === c);
+    if (!g) {
+      g = { name: c, items: [] };
+      cats.push(g);
+    }
+    g.items.push(i);
+  });
+  cats.sort((a, b) => {
+    const ia = CATEGORY_ORDER.indexOf(a.name), ib = CATEGORY_ORDER.indexOf(b.name);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  const cart = inv.filter((i) => checked[i.id]);
+  const total = cart.reduce((s, i) => s + (i.cost ? i.cost * getQty(i) : 0), 0);
+  const noCost = cart.filter((i) => !i.cost).length;
+
+  const buildText = () => {
+    const byVendor = {};
+    cart.forEach((i) => {
+      const v = i.vendor || "Unassigned vendor";
+      (byVendor[v] = byVendor[v] || []).push(i);
+    });
+    let out = "ON POINT PIZZA \u2014 ORDER (" + (new Date()).toLocaleDateString() + ")\n";
+    Object.keys(byVendor).forEach((v) => {
+      out += "\n" + v.toUpperCase() + "\n";
+      byVendor[v].forEach((i) => {
+        out += "  " + getQty(i) + " " + (i.unit || "") + " \u2014 " + i.item + "\n";
+      });
+    });
+    out += "\nTotal items: " + cart.length;
     return out;
   };
-  const copyOrder = async () => {
-    try {
-      await navigator.clipboard.writeText(buildText());
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2e3);
-    } catch (e) {
-      setCopied(false);
+  const copy = () => {
+    const t = buildText();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(() => setCopied(true)).catch(() => setCopied(false));
+    } else {
+      const ta = document.createElement("textarea");
+      ta.value = t;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); setCopied(true); } catch (e) { setCopied(false); }
+      document.body.removeChild(ta);
     }
   };
-  if (suggested.length === 0) {
-    return /* @__PURE__ */ React.createElement("div", { className: "text-sm italic", style: { fontFamily: "Inter", color: "#999" } }, "Nothing at or below par right now \u2014 no order needed.");
-  }
-  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, 'Built from Inventory items at or below their "low" line. Suggested qty restocks to 2\xD7 low \u2014 adjust as needed.'), /* @__PURE__ */ React.createElement(TicketButton, { onClick: copyOrder, color: COLORS.crust }, /* @__PURE__ */ React.createElement(Copy, { size: 13 }), " ", copied ? "Copied!" : "Copy order")), missingCost > 0 && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-3 px-3 py-2 rounded", style: { background: "#FBF0DA", color: "#8A6116", fontFamily: "Inter" } }, missingCost, " item", missingCost > 1 ? "s" : "", " on this list ", missingCost > 1 ? "don't" : "doesn't", " have a unit cost yet \u2014 add one in Inventory (Show cost/vendor) for a full total."), Object.entries(byVendor).map(([vendor, items]) => /* @__PURE__ */ React.createElement("div", { key: vendor, className: "mb-4" }, /* @__PURE__ */ React.createElement(SectionHeader, null, vendor), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, items.map((i) => /* @__PURE__ */ React.createElement("div", { key: i.id, className: "flex items-center justify-between px-3 py-2 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => toggle(i.id), className: "w-4 h-4 rounded border flex items-center justify-center", style: { borderColor: COLORS.tomato } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 500, color: COLORS.crust } }, i.item), /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "on hand ", i.qty, " ", i.unit, " \xB7 low at ", i.low))), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(
-    "input",
-    {
-      type: "number",
-      min: "0",
-      value: i.suggestedQty,
-      onChange: (e) => setQty(i.id, e.target.value),
-      className: "w-14 text-sm px-2 py-1 rounded text-right",
-      style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono", color: COLORS.crust }
-    }
-  ), /* @__PURE__ */ React.createElement("span", { className: "text-xs w-10", style: { fontFamily: "Inter", color: "#888" } }, i.unit), /* @__PURE__ */ React.createElement("span", { className: "text-xs w-16 text-right", style: { fontFamily: "JetBrains Mono", color: i.cost ? COLORS.crust : "#bbb" } }, i.cost ? `$${(i.cost * i.suggestedQty).toFixed(2)}` : "no cost"))))))), total > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between px-3 py-2.5 mt-2 rounded", style: { background: COLORS.crust } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.cream } }, "Estimated total (priced items only)"), /* @__PURE__ */ React.createElement("span", { className: "text-sm font-semibold", style: { fontFamily: "JetBrains Mono", color: COLORS.cream } }, "$", total.toFixed(2))), Object.keys(checked).some((k) => checked[k]) && /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-3 italic", style: { fontFamily: "Inter", color: "#999" } }, "Checked-off items are hidden from the copy list above \u2014 uncheck to bring them back."));
+
+  const row = (i) => {
+    const on = !!checked[i.id];
+    const low = i.qty <= i.low;
+    return React.createElement(
+      "div",
+      {
+        key: i.id,
+        className: "flex items-center gap-2 px-2.5 py-2.5 rounded",
+        style: { background: on ? "#FFF7E8" : COLORS.card, border: `1px solid ${on ? COLORS.tomato : COLORS.line}` }
+      },
+      React.createElement(
+        "button",
+        {
+          onClick: () => toggle(i),
+          className: "w-6 h-6 rounded flex-shrink-0 flex items-center justify-center",
+          style: { border: `2px solid ${COLORS.tomato}`, background: on ? COLORS.tomato : "transparent" }
+        },
+        on && React.createElement(Check, { size: 14, color: "white" })
+      ),
+      React.createElement(
+        "div",
+        { className: "flex-1 min-w-0" },
+        React.createElement(
+          "div",
+          { className: "text-sm leading-tight", style: { fontFamily: "Inter", color: COLORS.crust, fontWeight: on ? 600 : 400 } },
+          i.item
+        ),
+        React.createElement(
+          "div",
+          { className: "text-[11px] mt-0.5 flex items-center gap-1.5", style: { fontFamily: "Inter", color: "#8a7a6c" } },
+          i.vendor || "No vendor",
+          low && React.createElement("span", { style: { color: COLORS.tomato, fontWeight: 700 } }, "\u2022 LOW"),
+          i.cost ? React.createElement("span", null, "\u00b7 $" + i.cost.toFixed(2) + "/" + (i.unit || "ea")) : null
+        )
+      ),
+      React.createElement(
+        "div",
+        { className: "flex items-center gap-1 flex-shrink-0" },
+        React.createElement(
+          "button",
+          { onClick: () => bump(i, -1), className: "w-8 h-8 rounded text-lg leading-none", style: { background: COLORS.crust, color: COLORS.cream, fontWeight: 700 } },
+          "\u2212"
+        ),
+        React.createElement("input", {
+          value: getQty(i),
+          onChange: (e) => setExact(i, e.target.value),
+          inputMode: "decimal",
+          className: "w-11 text-center text-sm py-1.5 rounded outline-none",
+          style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" }
+        }),
+        React.createElement(
+          "button",
+          { onClick: () => bump(i, 1), className: "w-8 h-8 rounded text-lg leading-none", style: { background: COLORS.basil, color: "white", fontWeight: 700 } },
+          "+"
+        ),
+        React.createElement("span", { className: "text-[10px] w-7", style: { fontFamily: "Inter", color: "#999" } }, i.unit || "")
+      )
+    );
+  };
+
+  return React.createElement(
+    "div",
+    { style: { paddingBottom: cart.length ? "90px" : "0" } },
+    React.createElement("input", {
+      placeholder: "Search items...",
+      value: search,
+      onChange: (e) => setSearch(e.target.value),
+      className: "w-full text-sm px-3 py-2.5 rounded outline-none mb-2",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+    }),
+    React.createElement(
+      "div",
+      { className: "flex gap-1.5 mb-2 overflow-x-auto pb-1" },
+      vendors.map((v) => React.createElement(
+        "button",
+        {
+          key: v,
+          onClick: () => setVendorFilter(v),
+          className: "px-3 py-1.5 text-xs whitespace-nowrap",
+          style: {
+            fontFamily: "Inter", fontWeight: 600, borderRadius: "999px",
+            background: vendorFilter === v ? COLORS.crust : COLORS.card,
+            color: vendorFilter === v ? COLORS.cream : COLORS.crust,
+            border: `1px solid ${vendorFilter === v ? COLORS.crust : COLORS.line}`
+          }
+        },
+        v
+      ))
+    ),
+    React.createElement(
+      "div",
+      { className: "flex gap-1.5 mb-4" },
+      React.createElement(TicketButton, { onClick: addAllLow, color: COLORS.tomato, style: { fontSize: "12px" } }, "Add everything low"),
+      cart.length > 0 && React.createElement(TicketButton, { onClick: clearAll, color: "#8a7a6c", style: { fontSize: "12px" } }, "Clear")
+    ),
+    cats.map((c) => React.createElement(
+      "div",
+      { key: c.name, className: "mb-5" },
+      React.createElement(
+        "div",
+        { className: "text-xs mb-1.5 tracking-widest flex items-center gap-2", style: { fontFamily: "Oswald", color: COLORS.tomato, fontWeight: 600 } },
+        c.name.toUpperCase(),
+        React.createElement("span", { style: { flex: 1, height: "1px", background: COLORS.line } })
+      ),
+      React.createElement("div", { className: "space-y-1.5" }, c.items.map(row))
+    )),
+    visible.length === 0 && React.createElement("div", { className: "text-sm italic py-6 text-center", style: { fontFamily: "Inter", color: "#999" } }, "No items match that search."),
+    cart.length > 0 && React.createElement(
+      "div",
+      {
+        className: "fixed left-0 right-0 bottom-0 px-4 py-3 flex items-center gap-3",
+        style: { background: COLORS.crust, borderTop: `3px solid ${COLORS.tomato}`, zIndex: 40 }
+      },
+      React.createElement(
+        "div",
+        { className: "flex-1 min-w-0" },
+        React.createElement("div", { className: "text-sm", style: { fontFamily: "Oswald", color: COLORS.cream, fontWeight: 600 } }, cart.length + (cart.length === 1 ? " item" : " items")),
+        React.createElement(
+          "div",
+          { className: "text-[11px]", style: { fontFamily: "Inter", color: COLORS.parm } },
+          total > 0 ? "\u2248 $" + total.toFixed(2) + (noCost ? " (" + noCost + " without a price)" : "") : "No prices on file"
+        )
+      ),
+      React.createElement(
+        TicketButton,
+        { onClick: copy, color: copied ? COLORS.basil : COLORS.tomato },
+        React.createElement(Copy, { size: 14 }),
+        React.createElement("span", { style: { marginLeft: "6px" } }, copied ? "Copied" : "Copy list")
+      )
+    )
+  );
 }
 function RecipesTab({ data, persist }) {
   const recipes = data.recipes || DEFAULT_DATA.recipes;
@@ -1871,9 +2153,104 @@ function LiveOpsTab({ data, persist }) {
     m === 0 ? "Off" : `${m}m`
   ))), lastResult && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-4 rounded", style: { background: COLORS.card, border: `1px dashed ${COLORS.line}`, fontFamily: "JetBrains Mono", fontSize: 13, color: COLORS.crust } }, lastResult), liveOps.stationLog.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(SectionHeader, null, "Recent Checks"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, liveOps.stationLog.map((l) => /* @__PURE__ */ React.createElement("div", { key: l.id, className: "px-3 py-2 rounded text-xs", style: { background: COLORS.card, border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("div", { className: "mb-0.5 flex items-center gap-1.5" }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.tomato, fontWeight: 600 } }, l.station), /* @__PURE__ */ React.createElement("span", { style: { color: "#999" } }, "\xB7 ", l.time)), /* @__PURE__ */ React.createElement("div", { style: { color: COLORS.crust } }, l.note))))));
 }
+function GuidesTab() {
+  const [open, setOpen] = useState(null);
+  const [zoomed, setZoomed] = useState(false);
+  const groups = [];
+  GUIDES.forEach((g) => {
+    let grp = groups.find((x) => x.name === g.group);
+    if (!grp) {
+      grp = { name: g.group, items: [] };
+      groups.push(grp);
+    }
+    grp.items.push(g);
+  });
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    null,
+    /* @__PURE__ */ React.createElement("p", { className: "text-xs mb-4", style: { fontFamily: "Inter", color: "#7a6a5c" } }, "Tap any guide to open it full screen. Tap the picture again to zoom in and drag around."),
+    groups.map((grp) => /* @__PURE__ */ React.createElement(
+      "div",
+      { key: grp.name, className: "mb-6" },
+      /* @__PURE__ */ React.createElement(
+        "h3",
+        { className: "text-sm mb-2 tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato, fontWeight: 600 } },
+        grp.name.toUpperCase()
+      ),
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "grid grid-cols-2 gap-3" },
+        grp.items.map((g) => /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            key: g.id,
+            onClick: () => {
+              setZoomed(false);
+              setOpen(g);
+            },
+            className: "text-left overflow-hidden",
+            style: { background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: "3px" }
+          },
+          /* @__PURE__ */ React.createElement("img", {
+            src: g.file,
+            alt: g.title,
+            loading: "lazy",
+            className: "w-full",
+            style: { height: "150px", objectFit: "cover", objectPosition: "top", display: "block", background: "#e9e2d6" }
+          }),
+          /* @__PURE__ */ React.createElement(
+            "div",
+            { className: "px-2.5 py-2" },
+            /* @__PURE__ */ React.createElement("div", { className: "text-sm leading-tight", style: { fontFamily: "Oswald", color: COLORS.crust, fontWeight: 600 } }, g.title),
+            /* @__PURE__ */ React.createElement("div", { className: "text-[11px] mt-0.5 leading-snug", style: { fontFamily: "Inter", color: "#8a7a6c" } }, g.sub)
+          )
+        ))
+      )
+    )),
+    open && /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: "fixed inset-0 z-50 flex flex-col",
+        style: { background: "rgba(20,14,10,0.96)" }
+      },
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "flex items-center justify-between px-4 py-3 flex-shrink-0" },
+        /* @__PURE__ */ React.createElement("div", { className: "text-base", style: { fontFamily: "Oswald", color: COLORS.cream, fontWeight: 600 } }, open.title),
+        /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: () => setOpen(null),
+            className: "px-4 py-2 text-sm",
+            style: { fontFamily: "Inter", fontWeight: 600, background: COLORS.tomato, color: COLORS.cream, borderRadius: "3px" }
+          },
+          "Close"
+        )
+      ),
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "flex-1 overflow-auto px-2 pb-4", style: { WebkitOverflowScrolling: "touch" } },
+        /* @__PURE__ */ React.createElement("img", {
+          src: open.file,
+          alt: open.title,
+          onClick: () => setZoomed(!zoomed),
+          style: zoomed ? { width: "200%", maxWidth: "none", display: "block" } : { width: "100%", display: "block", margin: "0 auto" }
+        })
+      ),
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "text-center text-[11px] pb-3 flex-shrink-0", style: { fontFamily: "Inter", color: "#b8a99a" } },
+        zoomed ? "Tap picture to zoom out" : "Tap picture to zoom in"
+      )
+    )
+  );
+}
 function TasksTab({ data, persist }) {
   const [text, setText] = useState("");
   const [assignee, setAssignee] = useState("");
+  const [station, setStation] = useState(TASK_STATIONS[0]);
+  const [filter, setFilter] = useState("All");
+  const stationOf = (t) => t.station || "Unsorted";
   const toggle = (id) => {
     const next = JSON.parse(JSON.stringify(data));
     const t = next.tasks.find((t2) => t2.id === id);
@@ -1885,36 +2262,195 @@ function TasksTab({ data, persist }) {
     next.tasks = next.tasks.filter((t) => t.id !== id);
     persist(next);
   };
+  const move = (id, newStation) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const t = next.tasks.find((t2) => t2.id === id);
+    if (t) t.station = newStation;
+    persist(next);
+  };
+  const clearDone = () => {
+    const next = JSON.parse(JSON.stringify(data));
+    next.tasks = next.tasks.filter((t) => !t.done);
+    persist(next);
+  };
   const add = () => {
     if (!text.trim()) return;
     const next = JSON.parse(JSON.stringify(data));
-    next.tasks.push({ id: uid(), text: text.trim(), assignee: assignee.trim() || "Unassigned", done: false });
+    next.tasks.push({ id: uid(), text: text.trim(), station, assignee: assignee.trim() || "Anyone", done: false });
     persist(next);
     setText("");
     setAssignee("");
   };
-  const open = data.tasks.filter((t) => !t.done);
-  const done = data.tasks.filter((t) => t.done);
-  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 mb-3" }, /* @__PURE__ */ React.createElement(
-    "input",
+
+  const allStations = TASK_STATIONS.slice();
+  data.tasks.forEach((t) => {
+    if (allStations.indexOf(stationOf(t)) === -1) allStations.push(stationOf(t));
+  });
+  const openCount = (s) => data.tasks.filter((t) => !t.done && stationOf(t) === s).length;
+  const shown = filter === "All" ? allStations : [filter];
+  const doneTasks = data.tasks.filter((t) => t.done && (filter === "All" || stationOf(t) === filter));
+
+  const chip = (label, count, active) => React.createElement(
+    "button",
     {
-      placeholder: "New task...",
-      value: text,
-      onChange: (e) => setText(e.target.value),
-      onKeyDown: (e) => e.key === "Enter" && add(),
-      className: "flex-1 text-sm px-2.5 py-2 rounded outline-none",
-      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
-    }
-  ), /* @__PURE__ */ React.createElement(
-    "input",
+      key: label,
+      onClick: () => setFilter(label),
+      className: "px-3 py-1.5 text-xs whitespace-nowrap flex items-center gap-1.5",
+      style: {
+        fontFamily: "Inter",
+        fontWeight: 600,
+        borderRadius: "999px",
+        background: active ? COLORS.crust : COLORS.card,
+        color: active ? COLORS.cream : COLORS.crust,
+        border: `1px solid ${active ? COLORS.crust : COLORS.line}`
+      }
+    },
+    label,
+    count > 0 && React.createElement(
+      "span",
+      {
+        className: "text-[10px] px-1.5 rounded-full",
+        style: { background: COLORS.tomato, color: COLORS.cream, fontWeight: 700 }
+      },
+      count
+    )
+  );
+
+  const taskRow = (t) => React.createElement(
+    "div",
     {
-      placeholder: "Assignee",
-      value: assignee,
-      onChange: (e) => setAssignee(e.target.value),
-      className: "w-28 text-sm px-2.5 py-2 rounded outline-none",
-      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
-    }
-  ), /* @__PURE__ */ React.createElement(TicketButton, { onClick: add, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 14 }))), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5 mb-4" }, open.map((t) => /* @__PURE__ */ React.createElement("div", { key: t.id, className: "flex items-center justify-between px-3 py-2 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => toggle(t.id), className: "w-4 h-4 rounded border flex items-center justify-center", style: { borderColor: COLORS.tomato } }), /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, t.text)), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs px-2 py-0.5 rounded-full", style: { background: COLORS.crust, color: COLORS.parm, fontFamily: "Inter" } }, t.assignee), /* @__PURE__ */ React.createElement("button", { onClick: () => remove(t.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 13, color: "#999" }))))), open.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#999" } }, "All caught up.")), done.length > 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-1.5 tracking-widest", style: { fontFamily: "Oswald", color: "#999" } }, "DONE"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, done.map((t) => /* @__PURE__ */ React.createElement("div", { key: t.id, className: "flex items-center justify-between px-3 py-2 rounded opacity-60", style: { background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => toggle(t.id), className: "w-4 h-4 rounded flex items-center justify-center", style: { background: COLORS.basil } }, /* @__PURE__ */ React.createElement(Check, { size: 11, color: "white" })), /* @__PURE__ */ React.createElement("span", { className: "text-sm line-through", style: { fontFamily: "Inter", color: COLORS.crust } }, t.text)), /* @__PURE__ */ React.createElement("button", { onClick: () => remove(t.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 13, color: "#999" })))))));
+      key: t.id,
+      className: "flex items-center justify-between px-3 py-2.5 rounded gap-2",
+      style: { background: COLORS.card, border: `1px solid ${COLORS.line}` }
+    },
+    React.createElement(
+      "div",
+      { className: "flex items-center gap-2.5 min-w-0" },
+      React.createElement("button", {
+        onClick: () => toggle(t.id),
+        className: "w-5 h-5 rounded border flex-shrink-0",
+        style: { borderColor: COLORS.tomato, borderWidth: "2px" }
+      }),
+      React.createElement("span", { className: "text-sm truncate", style: { fontFamily: "Inter", color: COLORS.crust } }, t.text)
+    ),
+    React.createElement(
+      "div",
+      { className: "flex items-center gap-1.5 flex-shrink-0" },
+      React.createElement(
+        "span",
+        { className: "text-xs px-2 py-0.5 rounded-full", style: { background: COLORS.crust, color: COLORS.parm, fontFamily: "Inter" } },
+        t.assignee || "Anyone"
+      ),
+      React.createElement(
+        "select",
+        {
+          value: stationOf(t),
+          onChange: (e) => move(t.id, e.target.value),
+          className: "text-[11px] px-1 py-1 rounded outline-none",
+          style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", background: "white", maxWidth: "90px" }
+        },
+        allStations.map((s) => React.createElement("option", { key: s, value: s }, s))
+      ),
+      React.createElement("button", { onClick: () => remove(t.id) }, React.createElement(Trash2, { size: 14, color: "#999" }))
+    )
+  );
+
+  return React.createElement(
+    "div",
+    null,
+    React.createElement(
+      "div",
+      { className: "flex gap-1.5 mb-3 overflow-x-auto pb-1" },
+      chip("All", data.tasks.filter((t) => !t.done).length, filter === "All"),
+      allStations.map((s) => chip(s, openCount(s), filter === s))
+    ),
+    React.createElement(
+      "div",
+      { className: "flex gap-1.5 mb-4 flex-wrap" },
+      React.createElement("input", {
+        placeholder: "New task...",
+        value: text,
+        onChange: (e) => setText(e.target.value),
+        onKeyDown: (e) => e.key === "Enter" && add(),
+        className: "flex-1 text-sm px-2.5 py-2 rounded outline-none",
+        style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", minWidth: "140px" }
+      }),
+      React.createElement(
+        "select",
+        {
+          value: station,
+          onChange: (e) => setStation(e.target.value),
+          className: "text-sm px-2 py-2 rounded outline-none",
+          style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", background: "white" }
+        },
+        TASK_STATIONS.map((s) => React.createElement("option", { key: s, value: s }, s))
+      ),
+      React.createElement("input", {
+        placeholder: "Who",
+        value: assignee,
+        onChange: (e) => setAssignee(e.target.value),
+        className: "w-20 text-sm px-2.5 py-2 rounded outline-none",
+        style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+      }),
+      React.createElement(TicketButton, { onClick: add, color: COLORS.basil }, React.createElement(Plus, { size: 14 }))
+    ),
+    shown.map((s) => {
+      const items = data.tasks.filter((t) => !t.done && stationOf(t) === s);
+      if (items.length === 0 && filter === "All") return null;
+      return React.createElement(
+        "div",
+        { key: s, className: "mb-4" },
+        React.createElement(
+          "div",
+          { className: "text-xs mb-1.5 tracking-widest flex items-center gap-2", style: { fontFamily: "Oswald", color: COLORS.tomato, fontWeight: 600 } },
+          s.toUpperCase(),
+          React.createElement("span", { style: { flex: 1, height: "1px", background: COLORS.line } })
+        ),
+        items.length === 0
+          ? React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#999" } }, "Nothing open at this station.")
+          : React.createElement("div", { className: "space-y-1.5" }, items.map(taskRow))
+      );
+    }),
+    data.tasks.filter((t) => !t.done).length === 0 && React.createElement(
+      "div",
+      { className: "text-sm italic py-4 text-center", style: { fontFamily: "Inter", color: "#999" } },
+      "All caught up \u2014 every station clear."
+    ),
+    doneTasks.length > 0 && React.createElement(
+      "div",
+      { className: "mt-5 pt-3", style: { borderTop: `1px solid ${COLORS.line}` } },
+      React.createElement(
+        "div",
+        { className: "flex items-center justify-between mb-1.5" },
+        React.createElement("div", { className: "text-xs tracking-widest", style: { fontFamily: "Oswald", color: "#999" } }, "DONE"),
+        React.createElement(
+          "button",
+          { onClick: clearDone, className: "text-[11px] underline", style: { fontFamily: "Inter", color: "#999" } },
+          "Clear finished"
+        )
+      ),
+      React.createElement(
+        "div",
+        { className: "space-y-1.5" },
+        doneTasks.map((t) => React.createElement(
+          "div",
+          { key: t.id, className: "flex items-center justify-between px-3 py-2 rounded opacity-60", style: { background: COLORS.card } },
+          React.createElement(
+            "div",
+            { className: "flex items-center gap-2.5 min-w-0" },
+            React.createElement(
+              "button",
+              { onClick: () => toggle(t.id), className: "w-5 h-5 rounded flex items-center justify-center flex-shrink-0", style: { background: COLORS.basil } },
+              React.createElement(Check, { size: 12, color: "white" })
+            ),
+            React.createElement("span", { className: "text-sm line-through truncate", style: { fontFamily: "Inter", color: COLORS.crust } }, t.text),
+            React.createElement("span", { className: "text-[10px] flex-shrink-0", style: { fontFamily: "Inter", color: "#aaa" } }, stationOf(t))
+          ),
+          React.createElement("button", { onClick: () => remove(t.id) }, React.createElement(Trash2, { size: 13, color: "#999" }))
+        ))
+      )
+    )
+  );
 }
 
 
