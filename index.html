@@ -722,6 +722,7 @@ function AssistantTab({ data, persist }) {
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [voiceError, setVoiceError] = useState("");
+  const [pauseSecs, setPauseSecs] = useState(4);
   const recogRef = useRef(null);
   const voiceModeRef = useRef("off");
   const wakeWordRef = useRef("computer");
@@ -729,9 +730,12 @@ function AssistantTab({ data, persist }) {
   const liveRef = useRef("");
   const genRef = useRef(0);
   const restartTimerRef = useRef(null);
+  const silenceTimerRef = useRef(null);
+  const pauseSecsRef = useRef(4);
   const speakingRef = useRef(false);
   voiceModeRef.current = voiceMode;
   speakingRef.current = speaking;
+  pauseSecsRef.current = pauseSecs;
   wakeWordRef.current = wakeWord;
   const speechSupported = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
   const speak = (text, onDone) => {
@@ -752,6 +756,29 @@ function AssistantTab({ data, persist }) {
       onDone && onDone();
     };
     window.speechSynthesis.speak(u);
+  };
+  const clearSilenceTimer = () => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+  };
+  // The browser cuts at its own short pause; we treat that as a segment break
+  // and only send once the user has actually been quiet for pauseSecs.
+  const armSilenceTimer = () => {
+    clearSilenceTimer();
+    if (voiceModeRef.current !== "push") return;
+    silenceTimerRef.current = setTimeout(() => {
+      silenceTimerRef.current = null;
+      if (voiceModeRef.current !== "push") return;
+      const q = collapseRepeats(stitch(committedRef.current, liveRef.current)).trim();
+      if (!q) return; // nothing said yet \u2014 keep the mic open
+      committedRef.current = "";
+      liveRef.current = "";
+      stopListening();
+      setInput("");
+      sendText(q);
+    }, Math.max(1, pauseSecsRef.current) * 1e3);
   };
   const startListening = (resume) => {
     if (!resume) {
@@ -775,7 +802,7 @@ function AssistantTab({ data, persist }) {
     const r = new SR();
     r.lang = "en-US";
     r.interimResults = true;
-    r.continuous = true;
+    r.continuous = voiceModeRef.current === "wake";
     liveRef.current = "";
     r.onstart = () => {
       if (myGen !== genRef.current) return;
@@ -806,8 +833,9 @@ function AssistantTab({ data, persist }) {
         }
         return;
       }
-      liveRef.current = finalText.trim();
-      setInput(joinParts(committedRef.current, liveRef.current, interim.trim()));
+      clearSilenceTimer();
+      liveRef.current = collapseRepeats(finalText.trim());
+      setInput(collapseRepeats(stitch(stitch(committedRef.current, liveRef.current), interim.trim())));
     };
     r.onerror = (e) => {
       if (myGen !== genRef.current) return;
@@ -824,21 +852,23 @@ function AssistantTab({ data, persist }) {
       if (myGen !== genRef.current) return;
       setListening(false);
       // Carry this instance's text forward so a browser timeout doesn't lose it.
-      committedRef.current = joinParts(committedRef.current, liveRef.current);
+      committedRef.current = collapseRepeats(stitch(committedRef.current, liveRef.current));
       liveRef.current = "";
       const mode = voiceModeRef.current;
       if ((mode === "wake" || mode === "push") && !speakingRef.current && !restartTimerRef.current) {
         restartTimerRef.current = setTimeout(() => {
           restartTimerRef.current = null;
           if (voiceModeRef.current === mode) startListening(true);
-        }, 300);
+        }, mode === "push" ? 120 : 300);
       }
+      if (mode === "push" && !speakingRef.current) armSilenceTimer();
     };
     recogRef.current = r;
     try { r.start(); } catch (e) {}
   };
   const stopListening = () => {
     genRef.current++;
+    clearSilenceTimer();
     if (restartTimerRef.current) {
       clearTimeout(restartTimerRef.current);
       restartTimerRef.current = null;
@@ -868,7 +898,7 @@ function AssistantTab({ data, persist }) {
       // The input box already shows the full transcript (committed + live +
       // interim), so send exactly that \u2014 combining it with the refs again
       // is what was duplicating the text.
-      const q = joinParts(input);
+      const q = collapseRepeats(joinParts(input));
       committedRef.current = "";
       liveRef.current = "";
       stopListening();
@@ -881,6 +911,7 @@ function AssistantTab({ data, persist }) {
   useEffect(() => () => {
     genRef.current++;
     if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     if (recogRef.current) {
       const old = recogRef.current;
       recogRef.current = null;
@@ -1083,7 +1114,7 @@ If the user is just asking a question, return an empty actions array. Never inve
       /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-1 tracking-widest", style: { color: COLORS.tomato, fontFamily: "Inter", fontWeight: 600 } }, "MANAGER"),
       m.text
     ))
-  ), busy && /* @__PURE__ */ React.createElement("div", { className: "flex justify-start" }, /* @__PURE__ */ React.createElement("div", { className: "px-4 py-3 flex items-center gap-2 text-sm", style: { color: COLORS.crust, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(Loader2, { size: 14, className: "animate-spin" }), " thinking..."))), voiceError && /* @__PURE__ */ React.createElement("div", { className: "text-xs px-1 pb-1", style: { fontFamily: "Inter", color: COLORS.tomato } }, voiceError), voiceMode === "wake" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 px-1 pb-1 text-xs", style: { fontFamily: "Inter", color: listening ? COLORS.basil : "#888" } }, /* @__PURE__ */ React.createElement(Volume2, { size: 12 }), busy ? "Thinking..." : speaking ? "Speaking..." : `Always listening \u2014 say "${wakeWord}" followed by your question.`), voiceMode === "push" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 px-1 pb-1 text-xs", style: { fontFamily: "Inter", color: listening ? COLORS.basil : "#888" } }, /* @__PURE__ */ React.createElement(Volume2, { size: 12 }), listening ? "Listening \u2014 take your time, tap \u201CTap when done\u201D to send." : busy ? "Thinking..." : "Tap-to-talk mode \u2014 replies are spoken aloud."), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 pt-2 pb-1.5 flex-wrap", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-xs mr-1", style: { fontFamily: "Inter", color: "#888" } }, "Voice:"), [
+  ), busy && /* @__PURE__ */ React.createElement("div", { className: "flex justify-start" }, /* @__PURE__ */ React.createElement("div", { className: "px-4 py-3 flex items-center gap-2 text-sm", style: { color: COLORS.crust, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(Loader2, { size: 14, className: "animate-spin" }), " thinking..."))), voiceError && /* @__PURE__ */ React.createElement("div", { className: "text-xs px-1 pb-1", style: { fontFamily: "Inter", color: COLORS.tomato } }, voiceError), voiceMode === "wake" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 px-1 pb-1 text-xs", style: { fontFamily: "Inter", color: listening ? COLORS.basil : "#888" } }, /* @__PURE__ */ React.createElement(Volume2, { size: 12 }), busy ? "Thinking..." : speaking ? "Speaking..." : `Always listening \u2014 say "${wakeWord}" followed by your question.`), voiceMode === "push" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 px-1 pb-1 text-xs", style: { fontFamily: "Inter", color: listening ? COLORS.basil : "#888" } }, /* @__PURE__ */ React.createElement(Volume2, { size: 12 }), listening ? `Listening \u2014 sends after ${pauseSecs}s of quiet, or tap to send now.` : busy ? "Thinking..." : "Tap-to-talk mode \u2014 replies are spoken aloud."), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 pt-2 pb-1.5 flex-wrap", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-xs mr-1", style: { fontFamily: "Inter", color: "#888" } }, "Voice:"), [
     { id: "off", label: "Off" },
     { id: "push", label: "Tap to talk" },
     { id: "wake", label: `Always on ("${wakeWord}")` }
@@ -1100,19 +1131,38 @@ If the user is just asking a question, return an empty actions array. Never inve
         color: voiceMode === opt.id ? COLORS.cream : COLORS.crust
       }
     },
-    opt.id === "push" && voiceMode === "push" && listening ? "Tap when done \u2713" : opt.label
-  )), voiceMode !== "off" && /* @__PURE__ */ React.createElement(
+    opt.id === "push" && voiceMode === "push" && listening ? "Send now \u2713" : opt.label
+  )), voiceMode === "wake" && /* @__PURE__ */ React.createElement(
     "select",
     {
       value: wakeWord,
       onChange: (e) => {
         setWakeWord(e.target.value);
       },
-      className: "text-xs px-2 py-1 rounded-full outline-none",
-      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", color: COLORS.crust }
+      className: "text-sm px-3 py-2 rounded-full outline-none",
+      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", color: COLORS.crust, background: "white" }
     },
     /* @__PURE__ */ React.createElement("option", { value: "computer" }, '"computer"'),
     /* @__PURE__ */ React.createElement("option", { value: "opps" }, '"opps"')
+  ), voiceMode === "push" && /* @__PURE__ */ React.createElement(
+    "div",
+    { className: "flex items-center gap-1.5" },
+    /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "Pause:"),
+    [2, 4, 6, 10].map((s) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: s,
+        onClick: () => setPauseSecs(s),
+        className: "text-sm px-3 py-2 rounded-full",
+        style: {
+          fontFamily: "Inter",
+          border: `1px solid ${pauseSecs === s ? COLORS.basil : COLORS.line}`,
+          background: pauseSecs === s ? COLORS.basil : "transparent",
+          color: pauseSecs === s ? COLORS.cream : COLORS.crust
+        }
+      },
+      s + "s"
+    ))
   )), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 pt-1" }, /* @__PURE__ */ React.createElement(
     "input",
     {
@@ -1517,6 +1567,46 @@ function costAmt(i) {
 function priceLabel(p) {
   if (!p) return null;
   return "$" + p.amt.toFixed(2) + "/" + (p.unit || "ea");
+}
+
+// Android Chrome re-delivers speech results and restarts constantly in
+// continuous mode, so the raw transcript arrives with phrases already
+// duplicated. Collapse any run of words that immediately repeats itself:
+// "what should I what should I have" -> "what should I have".
+function collapseRepeats(s) {
+  const words = String(s || "").split(/\s+/).filter(Boolean);
+  const out = [];
+  const norm = (w) => w.toLowerCase().replace(/[.,!?;:]/g, "");
+  for (const w of words) {
+    out.push(w);
+    for (let n = Math.floor(out.length / 2); n >= 1; n--) {
+      const a = out.slice(out.length - 2 * n, out.length - n).map(norm).join(" ");
+      const b = out.slice(out.length - n).map(norm).join(" ");
+      if (a && a === b) {
+        out.splice(out.length - n, n);
+        break;
+      }
+    }
+  }
+  return out.join(" ");
+}
+
+// Drop the longest suffix of `a` that is already the prefix of `b`, so a
+// recognizer restart mid-sentence doesn't re-add what we already captured.
+function stitch(a, b) {
+  a = (a || "").trim();
+  b = (b || "").trim();
+  if (!a) return b;
+  if (!b) return a;
+  const aw = a.split(/\s+/), bw = b.split(/\s+/);
+  const max = Math.min(aw.length, bw.length);
+  const norm = (w) => w.toLowerCase().replace(/[.,!?;:]/g, "");
+  for (let n = max; n >= 1; n--) {
+    const tail = aw.slice(aw.length - n).map(norm).join(" ");
+    const head = bw.slice(0, n).map(norm).join(" ");
+    if (tail === head) return aw.concat(bw.slice(n)).join(" ");
+  }
+  return a + " " + b;
 }
 
 function joinParts() {
