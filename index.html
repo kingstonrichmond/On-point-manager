@@ -1496,13 +1496,23 @@ function scoreMatch(line, item) {
   return hits;
 }
 
+function cleanItemName(desc) {
+  let s = String(desc || "").trim();
+  s = s.replace(/\b\d{4,}\b/g, " ");                 // strip embedded item codes
+  s = s.replace(/\s+/g, " ").trim();
+  if (s === s.toUpperCase()) {
+    s = s.toLowerCase().replace(/(^|[\s(\/-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
+  }
+  return s.slice(0, 60);
+}
+
 function InvoiceScanner({ data, persist, onClose }) {
   const [imgs, setImgs] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [parsed, setParsed] = useState(null);
   const [rows, setRows] = useState([]);
-  const [applied, setApplied] = useState(0);
+  const [applied, setApplied] = useState(null);
 
   const addFiles = async (files) => {
     setErr("");
@@ -1563,6 +1573,7 @@ function InvoiceScanner({ data, persist, onClose }) {
           unit: l.unit || "ea",
           price: Number(l.price),
           matchId: bs >= 2 ? best.id : "",
+          newName: cleanItemName(l.desc),
           include: bs >= 2
         };
       }));
@@ -1582,21 +1593,42 @@ function InvoiceScanner({ data, persist, onClose }) {
     const vk = vendorKey();
     const date = (parsed && parsed.date) || "";
     const next = JSON.parse(JSON.stringify(data));
-    let n = 0;
+    let n = 0, added = 0;
     rows.forEach((r) => {
       if (!r.include || !r.matchId) return;
+      const price = { amt: Number(r.price), unit: r.unit || "ea", date: date || null };
+      if (r.matchId === "__new__") {
+        const name = (r.newName || "").trim();
+        if (!name) return;
+        const prices = { qfc: null, thomsen: null };
+        prices[vk] = price;
+        next.inventory.push({
+          id: uid(),
+          item: name,
+          qty: 0,
+          unit: r.unit || "ea",
+          low: 1,
+          vendor: vk === "thomsen" ? "Thomsen" : "QFC",
+          thomsenSku: vk === "thomsen" && r.code ? String(r.code) : void 0,
+          prices
+        });
+        added++;
+        return;
+      }
       const it = next.inventory.find((i) => i.id === r.matchId);
       if (!it) return;
       if (!it.prices) it.prices = { qfc: null, thomsen: null };
-      it.prices[vk] = { amt: Number(r.price), unit: r.unit || "ea", date: date || null };
+      it.prices[vk] = price;
       n++;
     });
     persist(next);
-    setApplied(n);
+    setApplied({ updated: n, added });
   };
 
   const inv = data.inventory || [];
-  const willApply = rows.filter((r) => r.include && r.matchId).length;
+  const willApply = rows.filter((r) => r.include && r.matchId && (r.matchId !== "__new__" || (r.newName || "").trim())).length;
+  const newCount = rows.filter((r) => r.include && r.matchId === "__new__" && (r.newName || "").trim()).length;
+  const unmatched = rows.filter((r) => !r.matchId).length;
 
   return /* @__PURE__ */ React.createElement(
     "div",
@@ -1618,8 +1650,9 @@ function InvoiceScanner({ data, persist, onClose }) {
       applied ? /* @__PURE__ */ React.createElement(
         "div",
         { className: "text-center py-10" },
-        /* @__PURE__ */ React.createElement("div", { className: "text-2xl mb-2", style: { fontFamily: "Oswald", color: COLORS.basil } }, "Updated " + applied + (applied === 1 ? " price" : " prices")),
-        /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", color: "#7a6a5c" } }, "Check the Inventory tab \u2014 each one is stamped with the invoice date.")
+        /* @__PURE__ */ React.createElement("div", { className: "text-2xl mb-2", style: { fontFamily: "Oswald", color: COLORS.basil } }, applied.updated + (applied.updated === 1 ? " price updated" : " prices updated")),
+        applied.added ? /* @__PURE__ */ React.createElement("div", { className: "text-lg mb-2", style: { fontFamily: "Oswald", color: COLORS.crust } }, applied.added + (applied.added === 1 ? " new item added" : " new items added")) : null,
+        /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", color: "#7a6a5c", lineHeight: 1.5 } }, "Check the Inventory tab \u2014 prices are stamped with the invoice date." + (applied.added ? " New items start at qty 0, so set their count and low-stock level when you get a chance." : ""))
       ) : /* @__PURE__ */ React.createElement(
         "div",
         null,
@@ -1667,6 +1700,15 @@ function InvoiceScanner({ data, persist, onClose }) {
             /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, (parsed && parsed.vendor ? parsed.vendor : "Unknown vendor") + (parsed && parsed.date ? " \u00b7 " + parsed.date : " \u00b7 no date read")),
             /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "Prices will land on the " + (vendorKey() === "thomsen" ? "Thomsen" : "Quality") + " side. Untick anything that looks wrong before applying.")
           ),
+          unmatched > 0 ? /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: () => setRows(rows.map((x) => x.matchId ? x : { ...x, matchId: "__new__", include: true })),
+              className: "w-full px-3 py-3 rounded mb-3",
+              style: { background: "transparent", color: COLORS.crust, fontFamily: "Inter", fontWeight: 600, border: `1px dashed ${COLORS.basil}` }
+            },
+            "\uff0b Add all " + unmatched + " unmatched " + (unmatched === 1 ? "line" : "lines") + " as new items"
+          ) : null,
           /* @__PURE__ */ React.createElement(
             "div",
             { className: "space-y-1.5 mb-3" },
@@ -1696,15 +1738,23 @@ function InvoiceScanner({ data, persist, onClose }) {
                   className: "w-full text-sm px-2 py-2 rounded",
                   style: { border: `1px solid ${r.matchId ? COLORS.line : COLORS.tomato}`, fontFamily: "Inter", background: "white", color: COLORS.crust }
                 },
-                /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 skip, no matching item \u2014"),
+                /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 skip this line \u2014"),
+                /* @__PURE__ */ React.createElement("option", { value: "__new__" }, "\uff0b Add as a NEW inventory item"),
                 inv.map((it) => /* @__PURE__ */ React.createElement("option", { key: it.id, value: it.id }, it.item))
-              )
+              ),
+              r.matchId === "__new__" ? /* @__PURE__ */ React.createElement("input", {
+                value: r.newName || "",
+                onChange: (e) => setRows(rows.map((x, j) => j === i ? { ...x, newName: e.target.value } : x)),
+                placeholder: "Name for the new item",
+                className: "w-full text-sm px-2 py-2 rounded mt-1.5",
+                style: { border: `1px solid ${COLORS.basil}`, fontFamily: "Inter", color: COLORS.crust }
+              }) : null
             ))
           ),
           /* @__PURE__ */ React.createElement(
             "button",
             { onClick: apply, disabled: !willApply, className: "w-full px-3 py-4 rounded", style: { background: willApply ? COLORS.basil : "#c9bda8", color: COLORS.cream, fontFamily: "Inter", fontWeight: 600, border: "none" } },
-            willApply ? "Update " + willApply + (willApply === 1 ? " price" : " prices") : "Nothing selected"
+            willApply ? (newCount ? "Apply \u2014 " + (willApply - newCount) + " updated, " + newCount + " new" : "Update " + willApply + (willApply === 1 ? " price" : " prices")) : "Nothing selected"
           )
         )
       )
