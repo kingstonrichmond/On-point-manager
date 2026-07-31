@@ -152,9 +152,40 @@ const Volume2 = makeIcon(
 );
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DEFAULT_DATA = {
+  scheduleVersion: 2,
   schedule: {
-    Mon: [{ id: "s1", name: "Maria", time: "4pm\u2013close" }],
-    Tue: [],
+    Mon: [
+      { id: "mo1", name: "Pop (cooking)", time: "8am\u20134pm" },
+      { id: "mo2", name: "Alan (prep)", time: "8am\u20133pm" },
+      { id: "mo3", name: "Shawn (cooking)", time: "9am\u20134pm" },
+      { id: "mo4", name: "Bella (front)", time: "11am\u20137pm" },
+      { id: "mo5", name: "Samoya (front)", time: "11am\u20132:30pm" },
+      { id: "mo6", name: "Tasheka (prep)", time: "11am\u20132:30pm" },
+      { id: "mo7", name: "Tyler (oven)", time: "4pm\u2013close" },
+      { id: "mo8", name: "Andy (cooking)", time: "4pm\u2013close" },
+      { id: "mo9", name: "Ricky (fryer)", time: "4pm\u2013close" },
+      { id: "mo10", name: "Gilly (cooking)", time: "~4pm\u2013close" },
+      { id: "mo11", name: "Aruzan (front)", time: "4:30pm\u2013close" },
+      { id: "mo12", name: "Karina (front)", time: "4:30pm\u2013close" },
+      { id: "mo13", name: "Taber (cooking)", time: "5:30pm\u2013close" },
+      { id: "mo14", name: "Murph (dishes)", time: "hours TBD" }
+    ],
+    Tue: [
+      { id: "tu1", name: "Pop (cooking)", time: "8am\u20134pm" },
+      { id: "tu2", name: "Shawn (cooking)", time: "9am\u20134:30pm" },
+      { id: "tu3", name: "Bella (front)", time: "10:30am\u20134:30pm" },
+      { id: "tu4", name: "Samoya (front)", time: "11am\u20132:30pm" },
+      { id: "tu5", name: "Tasheka (prep)", time: "11am\u20132:30pm" },
+      { id: "tu6", name: "Tyler (oven)", time: "11am\u2013close" },
+      { id: "tu7", name: "PJ (cooking)", time: "12pm\u20137pm" },
+      { id: "tu8", name: "Ricky (fryer)", time: "4pm\u2013close" },
+      { id: "tu9", name: "Caitlin (pie spreading)", time: "4pm\u2013close" },
+      { id: "tu10", name: "Aruzan (front)", time: "4:30pm\u2013close" },
+      { id: "tu11", name: "Karina (front)", time: "4:30pm\u2013close" },
+      { id: "tu12", name: "Taber (cooking)", time: "5:30pm\u2013close" },
+      { id: "tu13", name: "Andy (cooking)", time: "start TBD\u2013close" },
+      { id: "tu14", name: "Luke John (pies)", time: "open-ended / maybe" }
+    ],
     Wed: [
       { id: "s2", name: "Pop", time: "8am\u20134pm" },
       { id: "s6", name: "Chris (owner)", time: "11am\u20137:30pm" },
@@ -166,16 +197,53 @@ const DEFAULT_DATA = {
       { id: "s12", name: "Dave", time: "3pm\u2013close" },
       { id: "s13", name: "Ruzhan", time: "3pm\u2013close" },
       { id: "s14", name: "Karina", time: "3pm\u2013close" },
-      { id: "s15", name: "Caitlin", time: "4pm\u2013close" }
+      { id: "s15", name: "Caitlin", time: "4pm\u2013close" },
+      { id: "we1", name: "Cara (cooking)", time: "4pm\u2013close" }
     ],
     Thu: [
-      { id: "s16", name: "Pop", time: "8am\u20134pm" },
-      { id: "s17", name: "Tyler", time: "11am\u2013close" },
-      { id: "s18", name: "Abby", time: "10am\u20137pm" }
+      { id: "th1", name: "Chris (owner)", time: "day" },
+      { id: "th2", name: "Pop (cooking)", time: "8am\u20134pm" },
+      { id: "th3", name: "Alan (prep)", time: "8am\u20133pm" },
+      { id: "th4", name: "Shawn (cooking)", time: "9am\u20134:30pm" },
+      { id: "th5", name: "Abby (cooking)", time: "10am\u20137pm" },
+      { id: "th6", name: "Tyler (oven)", time: "11am\u2013close" },
+      { id: "th7", name: "Bella (front)", time: "11am\u20137pm? \u2014 confirm" },
+      { id: "th8", name: "OPEN \u2014 front (day)", time: "NEEDS FILLING" },
+      { id: "th9", name: "Dave (oven)", time: "3pm\u2013close" },
+      { id: "th10", name: "Luke John (pies)", time: "floats 3\u20135pm, unreliable" },
+      { id: "th11", name: "Ricky (fryer)", time: "4pm\u2013close" },
+      { id: "th12", name: "Caitlin (front \u2014 covering)", time: "4pm\u2013close" },
+      { id: "th13", name: "Cara (cooking)", time: "4pm\u2013close" },
+      { id: "th14", name: "Taber (cooking)", time: "5:30pm\u2013close" },
+      { id: "th15", name: "Andy (cooking)", time: "start TBD\u2013close" },
+      { id: "th16", name: "Murph (dishes)", time: "hours TBD" }
     ],
-    Fri: [{ id: "s3", name: "Maria", time: "4pm\u2013close" }, { id: "s4", name: "Deshawn", time: "5pm\u2013close" }],
-    Sat: [{ id: "s5", name: "Jon", time: "11am\u20137pm" }],
-    Sun: []
+    Fri: [
+      { id: "fr1", name: "Chris (owner)", time: "day" },
+      { id: "fr2", name: "Pop (cooking)", time: "8am\u20134pm" },
+      { id: "fr3", name: "Alan (prep)", time: "8am\u20133pm" },
+      { id: "fr4", name: "Abby (cooking)", time: "10am\u20137pm" },
+      { id: "fr5", name: "Cara (cooking)", time: "11am\u20137pm" },
+      { id: "fr6", name: "Tyler (oven)", time: "11am\u2013close" },
+      { id: "fr7", name: "Samoya (front)", time: "11am\u20132:30pm" },
+      { id: "fr8", name: "Tasheka (prep)", time: "11am\u20132:30pm" },
+      { id: "fr9", name: "Bella (front)", time: "11am\u20134pm? \u2014 confirm" },
+      { id: "fr10", name: "PJ (cooking)", time: "~3pm\u2013end TBD" },
+      { id: "fr11", name: "Dave (oven)", time: "3pm\u2013close" },
+      { id: "fr12", name: "Ricky (fryer)", time: "4pm\u2013close" },
+      { id: "fr13", name: "Caitlin (front \u2014 covering)", time: "4pm\u2013close" },
+      { id: "fr14", name: "Gilly (cooking)", time: "~4pm\u2013close" },
+      { id: "fr15", name: "Andy (cooking)", time: "start TBD\u2013close" },
+      { id: "fr16", name: "Murph (dishes)", time: "hours TBD" },
+      { id: "fr17", name: "Luke John (pies)", time: "open-ended / maybe" }
+    ],
+    Sat: [
+      { id: "sa1", name: "Chris (owner)", time: "open or close" },
+      { id: "sa2", name: "Cara (cooking)", time: "4pm\u2013close" }
+    ],
+    Sun: [
+      { id: "su1", name: "Chris (owner)", time: "open or close" }
+    ]
   },
   inventory: [
     { id: "i1", item: "Block Whole Milk Mozzarella", qty: 40, unit: "lb", low: 20, vendor: "QFC", thomsenSku: "80736", thomsenUom: "Case", prices: { qfc: { amt: 2.19, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 111.61, unit: "case", date: null } } },
@@ -304,83 +372,83 @@ const DEFAULT_DATA = {
   ],
   prep: {
     par: [
-      { id: "p1", item: "Dough", qty1: "", qty2: "" },
-      { id: "p2", item: "Block & Shred Cheese", qty1: "", qty2: "" },
-      { id: "p3", item: "Detroit Cheese (Shred)", qty1: "", qty2: "" },
-      { id: "p4", item: "Pizza Sauce", qty1: "", qty2: "" },
-      { id: "p5", item: "Marinara Sauce", qty1: "", qty2: "" },
-      { id: "p6", item: "Mushrooms", qty1: "", qty2: "" },
-      { id: "p7", item: "Green Peppers", qty1: "", qty2: "" },
-      { id: "p8", item: "Onions", qty1: "", qty2: "" },
-      { id: "p9", item: "Red Onions", qty1: "", qty2: "" },
-      { id: "p10", item: "Shredded Iceberg", qty1: "", qty2: "" },
-      { id: "p11", item: "Sliced Meatballs", qty1: "", qty2: "" },
-      { id: "p12", item: "Chopped Roasted Chicken", qty1: "", qty2: "" },
-      { id: "p13", item: "Chopped Fried Chicken", qty1: "", qty2: "" },
-      { id: "p14", item: "Sliced Tomato", qty1: "", qty2: "" },
-      { id: "p15", item: "Sliced Mozzarella", qty1: "", qty2: "" },
-      { id: "p16", item: "Provolone", qty1: "", qty2: "" },
-      { id: "p17", item: "Ham", qty1: "", qty2: "" },
-      { id: "p18", item: "Turkey", qty1: "", qty2: "" },
-      { id: "p19", item: "Genoa", qty1: "", qty2: "" },
-      { id: "p20", item: "Capicola", qty1: "", qty2: "" },
-      { id: "p21", item: "Roast Chicken", qty1: "", qty2: "" },
-      { id: "p22", item: "Cooked Wings", qty1: "", qty2: "" },
-      { id: "p23", item: "Salad Lettuce", qty1: "", qty2: "" },
-      { id: "p24", item: "Tomatoes", qty1: "", qty2: "" },
-      { id: "p25", item: "Cucumber", qty1: "", qty2: "" },
-      { id: "p26", item: "Celery", qty1: "", qty2: "" },
-      { id: "p27", item: "Roast Garlic", qty1: "", qty2: "" },
-      { id: "p28", item: "Ricotta", qty1: "", qty2: "" },
-      { id: "p29", item: "Roma Tomatoes", qty1: "", qty2: "" },
-      { id: "p30", item: "Layout Bacon", qty1: "", qty2: "" },
-      { id: "p31", item: "Cooked Sausage", qty1: "", qty2: "" },
-      { id: "p32", item: "Ground Sausage", qty1: "", qty2: "" },
-      { id: "p33", item: "Buffalo Sauce", qty1: "", qty2: "" },
-      { id: "p34", item: "Vodka Sauce", qty1: "", qty2: "" },
-      { id: "p35", item: "Rolls", qty1: "", qty2: "" },
-      { id: "p36", item: "Detroits", qty1: "", qty2: "" },
-      { id: "p37", item: "Breadsticks", qty1: "", qty2: "" },
-      { id: "p38", item: "Garlic Knots", qty1: "", qty2: "" },
-      { id: "p39", item: "Spinach Pies", qty1: "", qty2: "" },
-      { id: "p40", item: "Italian Dressing", qty1: "", qty2: "" },
-      { id: "p41", item: "Garlic Oil", qty1: "", qty2: "" },
-      { id: "p42", item: "Garlic Butter", qty1: "", qty2: "" },
-      { id: "p43", item: "Blue Cheese", qty1: "", qty2: "" },
-      { id: "p44", item: "Ranch", qty1: "", qty2: "" },
-      { id: "p45", item: "Honey Mustard", qty1: "", qty2: "" },
-      { id: "p46", item: "Caesar", qty1: "", qty2: "" },
-      { id: "p47", item: "Icing", qty1: "", qty2: "" },
-      { id: "p48", item: "Italian", qty1: "", qty2: "" },
-      { id: "p49", item: "Croutons", qty1: "", qty2: "" },
-      { id: "p50", item: "Greek", qty1: "", qty2: "" },
-      { id: "p51", item: "Cookies", qty1: "", qty2: "" },
-      { id: "p52", item: "Pulled Spinach", qty1: "", qty2: "" },
-      { id: "p53", item: "Pulled Broccoli", qty1: "", qty2: "" },
-      { id: "p54", item: "Squeezed/Seasoned Spinach", qty1: "", qty2: "" }
+      { id: "p1", item: "Dough", need: null, done: false },
+      { id: "p2", item: "Block & Shred Cheese", need: null, done: false },
+      { id: "p3", item: "Detroit Cheese (Shred)", need: null, done: false },
+      { id: "p4", item: "Pizza Sauce", need: null, done: false },
+      { id: "p5", item: "Marinara Sauce", need: null, done: false },
+      { id: "p6", item: "Mushrooms", need: null, done: false },
+      { id: "p7", item: "Green Peppers", need: null, done: false },
+      { id: "p8", item: "Onions", need: null, done: false },
+      { id: "p9", item: "Red Onions", need: null, done: false },
+      { id: "p10", item: "Shredded Iceberg", need: null, done: false },
+      { id: "p11", item: "Sliced Meatballs", need: null, done: false },
+      { id: "p12", item: "Chopped Roasted Chicken", need: null, done: false },
+      { id: "p13", item: "Chopped Fried Chicken", need: null, done: false },
+      { id: "p14", item: "Sliced Tomato", need: null, done: false },
+      { id: "p15", item: "Sliced Mozzarella", need: null, done: false },
+      { id: "p16", item: "Provolone", need: null, done: false },
+      { id: "p17", item: "Ham", need: null, done: false },
+      { id: "p18", item: "Turkey", need: null, done: false },
+      { id: "p19", item: "Genoa", need: null, done: false },
+      { id: "p20", item: "Capicola", need: null, done: false },
+      { id: "p21", item: "Roast Chicken", need: null, done: false },
+      { id: "p22", item: "Cooked Wings", need: null, done: false },
+      { id: "p23", item: "Salad Lettuce", need: null, done: false },
+      { id: "p24", item: "Tomatoes", need: null, done: false },
+      { id: "p25", item: "Cucumber", need: null, done: false },
+      { id: "p26", item: "Celery", need: null, done: false },
+      { id: "p27", item: "Roast Garlic", need: null, done: false },
+      { id: "p28", item: "Ricotta", need: null, done: false },
+      { id: "p29", item: "Roma Tomatoes", need: null, done: false },
+      { id: "p30", item: "Layout Bacon", need: null, done: false },
+      { id: "p31", item: "Cooked Sausage", need: null, done: false },
+      { id: "p32", item: "Ground Sausage", need: null, done: false },
+      { id: "p33", item: "Buffalo Sauce", need: null, done: false },
+      { id: "p34", item: "Vodka Sauce", need: null, done: false },
+      { id: "p35", item: "Rolls", need: null, done: false },
+      { id: "p36", item: "Detroits", need: null, done: false },
+      { id: "p37", item: "Breadsticks", need: null, done: false },
+      { id: "p38", item: "Garlic Knots", need: null, done: false },
+      { id: "p39", item: "Spinach Pies", need: null, done: false },
+      { id: "p40", item: "Italian Dressing", need: null, done: false },
+      { id: "p41", item: "Garlic Oil", need: null, done: false },
+      { id: "p42", item: "Garlic Butter", need: null, done: false },
+      { id: "p43", item: "Blue Cheese", need: null, done: false },
+      { id: "p44", item: "Ranch", need: null, done: false },
+      { id: "p45", item: "Honey Mustard", need: null, done: false },
+      { id: "p46", item: "Caesar", need: null, done: false },
+      { id: "p47", item: "Icing", need: null, done: false },
+      { id: "p48", item: "Italian", need: null, done: false },
+      { id: "p49", item: "Croutons", need: null, done: false },
+      { id: "p50", item: "Greek", need: null, done: false },
+      { id: "p51", item: "Cookies", need: null, done: false },
+      { id: "p52", item: "Pulled Spinach", need: null, done: false },
+      { id: "p53", item: "Pulled Broccoli", need: null, done: false },
+      { id: "p54", item: "Squeezed/Seasoned Spinach", need: null, done: false }
     ],
     produce: [
-      { id: "pr1", item: "Carrots", qty: "", notes: "" },
-      { id: "pr2", item: "Celery", qty: "", notes: "" },
-      { id: "pr3", item: "Cucumbers", qty: "", notes: "" },
-      { id: "pr4", item: "Iceberg Lettuce", qty: "", notes: "" },
-      { id: "pr5", item: "Romaine Hearts", qty: "", notes: "" },
-      { id: "pr6", item: "Green Peppers", qty: "", notes: "" },
-      { id: "pr7", item: "Red Onions", qty: "", notes: "" },
-      { id: "pr8", item: "Yellow Onions (Regular)", qty: "", notes: "" },
-      { id: "pr9", item: "Tomatoes (6x6)", qty: "", notes: "" },
-      { id: "pr10", item: "Cherry Grape Tomatoes", qty: "", notes: "" },
-      { id: "pr11", item: "Mushrooms", qty: "", notes: "" },
-      { id: "pr12", item: "Garlic (Peeled)", qty: "", notes: "" },
-      { id: "pr13", item: "Parsley", qty: "", notes: "" },
-      { id: "pr14", item: "Basil", qty: "", notes: "" },
-      { id: "pr15", item: "Scallions", qty: "", notes: "" },
-      { id: "pr16", item: "Eggplant", qty: "", notes: "" },
-      { id: "pr17", item: "Green Seedless Grapes", qty: "", notes: "" },
-      { id: "pr18", item: "Whole Seedless Watermelon", qty: "", notes: "" },
-      { id: "pr19", item: "Strawberries", qty: "", notes: "" },
-      { id: "pr20", item: "Blueberries", qty: "", notes: "" },
-      { id: "pr21", item: "Whole Milk Vanilla Yogurt", qty: "", notes: "" }
+      { id: "pr1", item: "Carrots", need: null, done: false },
+      { id: "pr2", item: "Celery", need: null, done: false },
+      { id: "pr3", item: "Cucumbers", need: null, done: false },
+      { id: "pr4", item: "Iceberg Lettuce", need: null, done: false },
+      { id: "pr5", item: "Romaine Hearts", need: null, done: false },
+      { id: "pr6", item: "Green Peppers", need: null, done: false },
+      { id: "pr7", item: "Red Onions", need: null, done: false },
+      { id: "pr8", item: "Yellow Onions (Regular)", need: null, done: false },
+      { id: "pr9", item: "Tomatoes (6x6)", need: null, done: false },
+      { id: "pr10", item: "Cherry Grape Tomatoes", need: null, done: false },
+      { id: "pr11", item: "Mushrooms", need: null, done: false },
+      { id: "pr12", item: "Garlic (Peeled)", need: null, done: false },
+      { id: "pr13", item: "Parsley", need: null, done: false },
+      { id: "pr14", item: "Basil", need: null, done: false },
+      { id: "pr15", item: "Scallions", need: null, done: false },
+      { id: "pr16", item: "Eggplant", need: null, done: false },
+      { id: "pr17", item: "Green Seedless Grapes", need: null, done: false },
+      { id: "pr18", item: "Whole Seedless Watermelon", need: null, done: false },
+      { id: "pr19", item: "Strawberries", need: null, done: false },
+      { id: "pr20", item: "Blueberries", need: null, done: false },
+      { id: "pr21", item: "Whole Milk Vanilla Yogurt", need: null, done: false }
     ],
     lowStock: []
   },
@@ -543,15 +611,41 @@ const COLORS = {
 };
 const TASK_STATIONS = ["Front", "Line", "Pizza", "Oven", "Fryer", "Salad", "Sandwich", "Prep", "Dish", "Back of House", "Manager"];
 const GUIDES = [
-  { id: "g1", file: "guides/pizza-sauce.jpg", title: "Pizza Sauce", sub: "3 cases Tomato Magic \u2014 full build", group: "Recipes" },
-  { id: "g2", file: "guides/dough-recipe.jpg", title: "Dough", sub: "Mixer steps, level 1, 8 minutes", group: "Recipes" },
-  { id: "g3", file: "guides/pizza-line-map.jpg", title: "Pizza Line Map", sub: "Where every topping goes back", group: "Line & Stations" },
-  { id: "g4", file: "guides/clean-dishes.jpg", title: "Clean Dishes \u2014 Top Shelf", sub: "Pan sizes and where they stack", group: "Line & Stations" },
-  { id: "g5", file: "guides/prep-walkin.jpg", title: "Prep Walk-In", sub: "Shelf-by-shelf layout", group: "Storage & Layout" },
-  { id: "g6", file: "guides/bulk-walkin.jpg", title: "Bulk Storage Walk-In", sub: "Cheese, dough rotation, FIFO", group: "Storage & Layout" },
-  { id: "g7", file: "guides/backroom-freezer.jpg", title: "Backroom Freezer", sub: "Top / middle / bottom shelf", group: "Storage & Layout" },
-  { id: "g8", file: "guides/backroom-shelf.jpg", title: "Backroom Shelf", sub: "Condiments, oils, tomatoes", group: "Storage & Layout" }
+  { id: "g1", file: "/guides/pizza-sauce.jpg", title: "Pizza Sauce", sub: "3 cases Tomato Magic \u2014 full build", group: "Recipes" },
+  { id: "g2", file: "/guides/dough-recipe.jpg", title: "Dough", sub: "Mixer steps, level 1, 8 minutes", group: "Recipes" },
+  { id: "g3", file: "/guides/pizza-line-map.jpg", title: "Pizza Line Map", sub: "Where every topping goes back", group: "Line & Stations" },
+  { id: "g4", file: "/guides/clean-dishes.jpg", title: "Clean Dishes \u2014 Top Shelf", sub: "Pan sizes and where they stack", group: "Line & Stations" },
+  { id: "g5", file: "/guides/prep-walkin.jpg", title: "Prep Walk-In", sub: "Shelf-by-shelf layout", group: "Storage & Layout" },
+  { id: "g6", file: "/guides/bulk-walkin.jpg", title: "Bulk Storage Walk-In", sub: "Cheese, dough rotation, FIFO", group: "Storage & Layout" },
+  { id: "g7", file: "/guides/backroom-freezer.jpg", title: "Backroom Freezer", sub: "Top / middle / bottom shelf", group: "Storage & Layout" },
+  { id: "g8", file: "/guides/backroom-shelf.jpg", title: "Backroom Shelf", sub: "Condiments, oils, tomatoes", group: "Storage & Layout" }
 ];
+const SCHEDULE_VERSION = 2;
+// Saved data replaces DEFAULT_DATA outright, so a new seed alone never reaches
+// a tablet that already has data. Bump SCHEDULE_VERSION to push a schedule out.
+// Mon/Tue/Thu/Fri are fully specified, so they get replaced. Wed/Sat/Sun are
+// only partly known, so we just append anyone missing and leave edits alone.
+function migrateSchedule(d) {
+  if (!d || typeof d !== "object") return { data: DEFAULT_DATA, changed: false };
+  if ((d.scheduleVersion || 0) >= SCHEDULE_VERSION) return { data: d, changed: false };
+  const seed = DEFAULT_DATA.schedule;
+  const baseName = (s) => String((s && s.name) || "").toLowerCase().split("(")[0].replace(/[^a-z ]/g, "").trim();
+  d.schedule = d.schedule || {};
+  ["Mon", "Tue", "Thu", "Fri"].forEach((k) => {
+    d.schedule[k] = JSON.parse(JSON.stringify(seed[k] || []));
+  });
+  ["Wed", "Sat", "Sun"].forEach((k) => {
+    const have = Array.isArray(d.schedule[k]) ? d.schedule[k] : [];
+    const names = have.map(baseName);
+    (seed[k] || []).forEach((s) => {
+      if (names.indexOf(baseName(s)) === -1) have.push(JSON.parse(JSON.stringify(s)));
+    });
+    d.schedule[k] = have;
+  });
+  d.scheduleVersion = SCHEDULE_VERSION;
+  return { data: d, changed: true };
+}
+
 function uid() {
   return Math.random().toString(36).slice(2, 9);
 }
@@ -577,7 +671,15 @@ function PizzaOpsManager() {
     (async () => {
       try {
         const res = await window.storage.get("shop-data", true);
-        setData(res && res.value ? JSON.parse(res.value) : DEFAULT_DATA);
+        const saved = res && res.value ? JSON.parse(res.value) : DEFAULT_DATA;
+        const mig = migrateSchedule(saved);
+        setData(mig.data);
+        if (mig.changed) {
+          try {
+            await window.storage.set("shop-data", JSON.stringify(mig.data), true);
+          } catch (e2) {
+          }
+        }
       } catch (e) {
         setData(DEFAULT_DATA);
       } finally {
@@ -600,13 +702,17 @@ function PizzaOpsManager() {
   const lowStockCount = data.inventory.filter((i) => i.qty <= i.low).length;
   const openTasks = data.tasks.filter((t) => !t.done).length;
   const boardFlags = (((_a = data.prep) == null ? void 0 : _a.lowStock) || []).filter((i) => i.status === "low" || i.status === "86").length;
+  const prepTodo = (((_a = data.prep) == null ? void 0 : _a.par) || []).filter((i) => Number(i.need) > 0 && !i.done).length;
+  const belmontNeed = (((_a = data.prep) == null ? void 0 : _a.produce) || []).filter((i) => Number(i.need) > 0).length;
   const tabs = [
     { id: "assistant", label: "Ask the Manager", icon: MessageSquare },
     { id: "schedule", label: "Schedule", icon: Users },
     { id: "staff", label: "Staff", icon: Users },
     { id: "inventory", label: "Inventory", icon: Package, badge: lowStockCount },
     { id: "order", label: "Order", icon: ShoppingCart, badge: lowStockCount },
-    { id: "prep", label: "Prep & Par", icon: ChefHat, badge: boardFlags },
+    { id: "preplist", label: "Prep List", icon: ClipboardList, badge: prepTodo },
+    { id: "belmont", label: "Belmont Order", icon: ShoppingCart, badge: belmontNeed },
+    { id: "prep", label: "86 Board", icon: AlertTriangle, badge: boardFlags },
     { id: "recipes", label: "Recipes", icon: Pizza },
     { id: "guides", label: "Guides", icon: Camera },
     { id: "menu", label: "Menu", icon: BookOpen },
@@ -654,7 +760,7 @@ function PizzaOpsManager() {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, saveError && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-3 px-3 py-2 rounded", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, "Couldn't save the last change \u2014 data may not persist."), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "order" && /* @__PURE__ */ React.createElement(OrderTab, { data }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, null), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist })));
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, saveError && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-3 px-3 py-2 rounded", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, "Couldn't save the last change \u2014 data may not persist."), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "order" && /* @__PURE__ */ React.createElement(OrderTab, { data }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, null), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist })));
 }
 function AssistantAvatar({ state }) {
   const blobs = {
@@ -722,7 +828,7 @@ function AssistantTab({ data, persist }) {
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [voiceError, setVoiceError] = useState("");
-  const [pauseSecs, setPauseSecs] = useState(4);
+  const [pauseSecs, setPauseSecs] = useState(0);
   const recogRef = useRef(null);
   const voiceModeRef = useRef("off");
   const wakeWordRef = useRef("computer");
@@ -731,7 +837,8 @@ function AssistantTab({ data, persist }) {
   const genRef = useRef(0);
   const restartTimerRef = useRef(null);
   const silenceTimerRef = useRef(null);
-  const pauseSecsRef = useRef(4);
+  const pauseSecsRef = useRef(0);
+  const sessionRef = useRef(false);
   const speakingRef = useRef(false);
   voiceModeRef.current = voiceMode;
   speakingRef.current = speaking;
@@ -768,17 +875,19 @@ function AssistantTab({ data, persist }) {
   const armSilenceTimer = () => {
     clearSilenceTimer();
     if (voiceModeRef.current !== "push") return;
+    if (!pauseSecsRef.current) return; // 0 = manual, only send on tap
     silenceTimerRef.current = setTimeout(() => {
       silenceTimerRef.current = null;
       if (voiceModeRef.current !== "push") return;
       const q = collapseRepeats(stitch(committedRef.current, liveRef.current)).trim();
       if (!q) return; // nothing said yet \u2014 keep the mic open
+      sessionRef.current = false;
       committedRef.current = "";
       liveRef.current = "";
       stopListening();
       setInput("");
       sendText(q);
-    }, Math.max(1, pauseSecsRef.current) * 1e3);
+    }, pauseSecsRef.current * 1e3);
   };
   const startListening = (resume) => {
     if (!resume) {
@@ -883,6 +992,7 @@ function AssistantTab({ data, persist }) {
     setListening(false);
   };
   const setMode = (mode) => {
+    sessionRef.current = mode === "push";
     stopListening();
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     committedRef.current = "";
@@ -894,17 +1004,19 @@ function AssistantTab({ data, persist }) {
     }
   };
   const pushTap = () => {
-    if (voiceModeRef.current === "push" && listening) {
+    if (voiceModeRef.current === "push" && sessionRef.current) {
       // The input box already shows the full transcript (committed + live +
       // interim), so send exactly that \u2014 combining it with the refs again
       // is what was duplicating the text.
       const q = collapseRepeats(joinParts(input));
+      sessionRef.current = false;
       committedRef.current = "";
       liveRef.current = "";
       stopListening();
       setInput("");
       if (q) sendText(q);
     } else {
+      sessionRef.current = true;
       setMode("push");
     }
   };
@@ -938,7 +1050,7 @@ function AssistantTab({ data, persist }) {
 Current data (JSON):
 ${JSON.stringify({ schedule: data.schedule, staff: data.staff, standardPositions: data.standardPositions, inventory: data.inventory, tasks: data.tasks, prep: data.prep, menu: data.menu, recipes: data.recipes, storageMap: data.storageMap, liveOps: data.liveOps })}
 
-The "prep" object has: "par" (the prep par sheet \u2014 item, qty1, qty2), "produce" (the produce order sheet \u2014 item, qty, notes), and "lowStock" (the 86/low-stock board \u2014 item, status of ok/low/86).
+The "prep" object has: "par" (the daily PREP LIST, its own tab \u2014 each item has "need" and "done". need = null means nobody has looked at it yet, need = 0 means marked all set / none needed, need > 0 means that many are on the prep list. done = true means it has been crossed off as made). When asked what still needs to be done, list items where need > 0 and done is false, with how many of each. Ignore items with need of null or 0 \u2014 those are not on the list. Also "produce" (the Belmont produce ORDER sheet (its own tab, same need/done shape as par \u2014 need > 0 means that many go on the Belmont order) \u2014 item, qty, notes) and "lowStock" (the 86/low-stock board \u2014 item, status of ok/low/86).
 
 The "menu" object has the full menu: pizza sizes and topping prices, specialty pizza names with their exact ingredients, calzone pricing, and other categories (appetizers, tenders & wings, salads, ice cream, drinks). Use it to answer questions like "what's on the Buffalo Chicken pizza" or "how much is a large veggie". Some prices may be blank (unverified) \u2014 if asked about a blank price, say it hasn't been confirmed yet rather than guessing.
 
@@ -954,12 +1066,11 @@ Respond ONLY with a JSON object \u2014 no markdown fences, no code blocks, no pr
 Keep "reply" concise \u2014 a few sentences at most \u2014 so the whole response stays well within the token limit and the JSON is never cut off mid-object.
 
 "actions" is an array of zero or more of these action objects, only include if the user is clearly asking you to change something:
-- {"type": "add_task", "text": "...", "station": "one of: Front, Line, Pizza, Oven, Fryer, Salad, Sandwich, Prep, Dish, Back of House, Manager", "assignee": "..."}
+- {"type": "set_prep_par", "item_match": "dough", "need": 3}  (put 3 of an item on the prep list; use need 0 for "all set / don\u0027t need any", need null to clear it back to unassessed)\n- {"type": "set_prep_par", "item_match": "dough", "done": true}  (cross an item off the prep list once it is made)\n- {"type": "add_task", "text": "...", "station": "one of: Front, Line, Pizza, Oven, Fryer, Salad, Sandwich, Prep, Dish, Back of House, Manager", "assignee": "..."}
 - {"type": "complete_task", "text_match": "substring of an existing task's text"}
 - {"type": "update_inventory", "item_match": "substring of an existing inventory item name", "qty": number}
 - {"type": "add_shift", "day": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "name": "...", "time": "..."}
-- {"type": "set_par", "item_match": "substring of an existing par sheet item", "qty1": "...", "qty2": "..."}
-- {"type": "set_produce", "item_match": "substring of an existing produce item", "qty": "...", "notes": "..."}
+- {"type": "set_produce", "item_match": "romaine", "need": 2}  (put an item on the Belmont produce order; need 0 = all set, need null = not looked at yet}
 - {"type": "flag_stock", "item": "...", "status": "ok|low|86"}
 - {"type": "set_queue", "size_match": "substring of an order queue size label, e.g. 'XL' or 'Medium'", "count": number}
 
@@ -1042,18 +1153,21 @@ If the user is just asking a question, return an empty actions array. Never inve
             next.schedule[action.day].push({ id: uid(), name: action.name || "TBD", time: action.time || "" });
             changed = true;
           }
-        } else if (action.type === "set_par") {
+        } else if (action.type === "set_par" || action.type === "set_prep_par") {
           const r = (_a = next.prep) == null ? void 0 : _a.par.find((r2) => r2.item.toLowerCase().includes((action.item_match || "").toLowerCase()));
           if (r) {
-            if (action.qty1 !== void 0) r.qty1 = action.qty1;
-            if (action.qty2 !== void 0) r.qty2 = action.qty2;
+            if (action.need !== void 0) {
+              r.need = action.need === null ? null : Number(action.need);
+              r.done = false;
+            }
+            if (action.done !== void 0) r.done = !!action.done;
             changed = true;
           }
         } else if (action.type === "set_produce") {
           const r = (_b = next.prep) == null ? void 0 : _b.produce.find((r2) => r2.item.toLowerCase().includes((action.item_match || "").toLowerCase()));
           if (r) {
-            if (action.qty !== void 0) r.qty = action.qty;
-            if (action.notes !== void 0) r.notes = action.notes;
+            if (action.need !== void 0) r.need = action.need === null ? null : Number(action.need);
+            if (action.qty !== void 0) r.need = Number(action.qty) || 0;
             changed = true;
           }
         } else if (action.type === "flag_stock") {
@@ -1114,7 +1228,7 @@ If the user is just asking a question, return an empty actions array. Never inve
       /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-1 tracking-widest", style: { color: COLORS.tomato, fontFamily: "Inter", fontWeight: 600 } }, "MANAGER"),
       m.text
     ))
-  ), busy && /* @__PURE__ */ React.createElement("div", { className: "flex justify-start" }, /* @__PURE__ */ React.createElement("div", { className: "px-4 py-3 flex items-center gap-2 text-sm", style: { color: COLORS.crust, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(Loader2, { size: 14, className: "animate-spin" }), " thinking..."))), voiceError && /* @__PURE__ */ React.createElement("div", { className: "text-xs px-1 pb-1", style: { fontFamily: "Inter", color: COLORS.tomato } }, voiceError), voiceMode === "wake" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 px-1 pb-1 text-xs", style: { fontFamily: "Inter", color: listening ? COLORS.basil : "#888" } }, /* @__PURE__ */ React.createElement(Volume2, { size: 12 }), busy ? "Thinking..." : speaking ? "Speaking..." : `Always listening \u2014 say "${wakeWord}" followed by your question.`), voiceMode === "push" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 px-1 pb-1 text-xs", style: { fontFamily: "Inter", color: listening ? COLORS.basil : "#888" } }, /* @__PURE__ */ React.createElement(Volume2, { size: 12 }), listening ? `Listening \u2014 sends after ${pauseSecs}s of quiet, or tap to send now.` : busy ? "Thinking..." : "Tap-to-talk mode \u2014 replies are spoken aloud."), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 pt-2 pb-1.5 flex-wrap", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-xs mr-1", style: { fontFamily: "Inter", color: "#888" } }, "Voice:"), [
+  ), busy && /* @__PURE__ */ React.createElement("div", { className: "flex justify-start" }, /* @__PURE__ */ React.createElement("div", { className: "px-4 py-3 flex items-center gap-2 text-sm", style: { color: COLORS.crust, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(Loader2, { size: 14, className: "animate-spin" }), " thinking..."))), voiceError && /* @__PURE__ */ React.createElement("div", { className: "text-xs px-1 pb-1", style: { fontFamily: "Inter", color: COLORS.tomato } }, voiceError), voiceMode === "wake" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 px-1 pb-1 text-xs", style: { fontFamily: "Inter", color: listening ? COLORS.basil : "#888" } }, /* @__PURE__ */ React.createElement(Volume2, { size: 12 }), busy ? "Thinking..." : speaking ? "Speaking..." : `Always listening \u2014 say "${wakeWord}" followed by your question.`), voiceMode === "push" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 px-1 pb-1 text-xs", style: { fontFamily: "Inter", color: listening ? COLORS.basil : "#888" } }, /* @__PURE__ */ React.createElement(Volume2, { size: 12 }), listening ? (pauseSecs ? `Listening \u2014 sends after ${pauseSecs}s of quiet, or tap to send now.` : "Listening \u2014 tap \u201CSend now\u201D when you\u2019re done.") : busy ? "Thinking..." : "Tap-to-talk mode \u2014 replies are spoken aloud."), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 pt-2 pb-1.5 flex-wrap", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-xs mr-1", style: { fontFamily: "Inter", color: "#888" } }, "Voice:"), [
     { id: "off", label: "Off" },
     { id: "push", label: "Tap to talk" },
     { id: "wake", label: `Always on ("${wakeWord}")` }
@@ -1147,8 +1261,8 @@ If the user is just asking a question, return an empty actions array. Never inve
   ), voiceMode === "push" && /* @__PURE__ */ React.createElement(
     "div",
     { className: "flex items-center gap-1.5" },
-    /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "Pause:"),
-    [2, 4, 6, 10].map((s) => /* @__PURE__ */ React.createElement(
+    /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "Send:"),
+    [0, 3, 5, 8].map((s) => /* @__PURE__ */ React.createElement(
       "button",
       {
         key: s,
@@ -1161,7 +1275,7 @@ If the user is just asking a question, return an empty actions array. Never inve
           color: pauseSecs === s ? COLORS.cream : COLORS.crust
         }
       },
-      s + "s"
+      s === 0 ? "Manual" : s + "s"
     ))
   )), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 pt-1" }, /* @__PURE__ */ React.createElement(
     "input",
@@ -1340,7 +1454,266 @@ function StaffTab({ data, persist }) {
     ), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => addNote(s.id), color: COLORS.crust }, /* @__PURE__ */ React.createElement(Plus, { size: 12 }))))));
   })));
 }
+// Downscale before upload — full-res phone photos are slow and can blow the
+// request size, and invoices stay readable at this width.
+function shrinkImage(file, maxW) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL("image/jpeg", 0.82).split(",")[1]);
+      };
+      img.onerror = () => reject(new Error("Couldn't read that image."));
+      img.src = reader.result;
+    };
+    reader.onerror = () => reject(new Error("Couldn't read that file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function normName(s) {
+  return String(s || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+}
+const NOISE = ["the", "and", "in", "of", "for", "with", "case", "bx", "box", "ea", "lb", "oz", "ct", "pack", "pk"];
+function nameTokens(s) {
+  return normName(s).split(" ").filter((w) => w.length > 2 && NOISE.indexOf(w) === -1);
+}
+// Score a parsed invoice line against an inventory item.
+function scoreMatch(line, item) {
+  if (line.code && item.thomsenSku && String(line.code).trim() === String(item.thomsenSku).trim()) return 99;
+  const a = nameTokens(line.desc), b = nameTokens(item.item);
+  if (!a.length || !b.length) return 0;
+  let hits = 0;
+  a.forEach((t) => {
+    if (b.some((u) => u === t || (t.length > 4 && u.indexOf(t) === 0) || (u.length > 4 && t.indexOf(u) === 0))) hits++;
+  });
+  return hits;
+}
+
+function InvoiceScanner({ data, persist, onClose }) {
+  const [imgs, setImgs] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [parsed, setParsed] = useState(null);
+  const [rows, setRows] = useState([]);
+  const [applied, setApplied] = useState(0);
+
+  const addFiles = async (files) => {
+    setErr("");
+    const list = Array.prototype.slice.call(files || []);
+    if (!list.length) return;
+    setBusy(true);
+    try {
+      const out = [];
+      for (const f of list) out.push(await shrinkImage(f, 1600));
+      setImgs((prev) => prev.concat(out).slice(0, 8));
+    } catch (e) {
+      setErr(e.message || "Couldn't process those photos.");
+    }
+    setBusy(false);
+  };
+
+  const readInvoice = async () => {
+    if (!imgs.length) return;
+    setBusy(true);
+    setErr("");
+    setParsed(null);
+    setRows([]);
+    try {
+      const content = imgs.map((b64) => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } }));
+      content.push({
+        type: "text",
+        text: 'These photos are pages of one food-distributor invoice for a pizza shop. Read every line item across all the pages. Respond with ONLY raw JSON, no prose and no markdown fences, in exactly this shape:\n{"vendor":"QFC" or "Thomsen" or the vendor name you see,"invoice_date":"YYYY-MM-DD","lines":[{"desc":"item description as printed","code":"item/product number if shown else empty string","unit":"the unit the PRICE is per - lb, case, box, ea, bag, bundle, pail","price":0.00}]}\nRules: "price" must be the UNIT price (price per lb, per case, etc), NOT the extended line total. If a line shows both a unit price and a total, use the unit price. Skip any line you cannot read a price for. If the invoice date is unclear use an empty string.'
+      });
+      const res = await fetch(window.CHAT_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 3000, messages: [{ role: "user", content }] })
+      });
+      const raw = await res.text();
+      if (!res.ok) throw new Error(`Server said ${res.status}. ${raw.slice(0, 200)}`);
+      const json = JSON.parse(raw);
+      if (json.error) throw new Error(json.error.message || "API error");
+      let text = (json.content || []).map((c) => c.text || "").join("\n").trim();
+      text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+      const m = text.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error("Couldn't read line items from those photos. Try a straighter, better-lit shot.");
+      const out = JSON.parse(m[0]);
+      const lines = (out.lines || []).filter((l) => l && l.desc && Number(l.price) > 0);
+      if (!lines.length) throw new Error("No priced line items found. Make sure the price column is in frame.");
+      setParsed({ vendor: out.vendor || "", date: out.invoice_date || "" });
+
+      const inv = data.inventory || [];
+      setRows(lines.map((l) => {
+        let best = null, bs = 0;
+        inv.forEach((it) => {
+          const s = scoreMatch(l, it);
+          if (s > bs) { bs = s; best = it; }
+        });
+        return {
+          id: uid(),
+          desc: l.desc,
+          code: l.code || "",
+          unit: l.unit || "ea",
+          price: Number(l.price),
+          matchId: bs >= 2 ? best.id : "",
+          include: bs >= 2
+        };
+      }));
+    } catch (e) {
+      setErr(e.message || "Something went wrong reading that invoice.");
+    }
+    setBusy(false);
+  };
+
+  const vendorKey = () => {
+    const v = normName(parsed && parsed.vendor);
+    if (v.indexOf("thomsen") !== -1) return "thomsen";
+    return "qfc";
+  };
+
+  const apply = () => {
+    const vk = vendorKey();
+    const date = (parsed && parsed.date) || "";
+    const next = JSON.parse(JSON.stringify(data));
+    let n = 0;
+    rows.forEach((r) => {
+      if (!r.include || !r.matchId) return;
+      const it = next.inventory.find((i) => i.id === r.matchId);
+      if (!it) return;
+      if (!it.prices) it.prices = { qfc: null, thomsen: null };
+      it.prices[vk] = { amt: Number(r.price), unit: r.unit || "ea", date: date || null };
+      n++;
+    });
+    persist(next);
+    setApplied(n);
+  };
+
+  const inv = data.inventory || [];
+  const willApply = rows.filter((r) => r.include && r.matchId).length;
+
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    { className: "fixed inset-0 z-50 flex flex-col", style: { background: COLORS.cream } },
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "flex items-center justify-between px-4 py-3 flex-shrink-0", style: { background: COLORS.crust } },
+      /* @__PURE__ */ React.createElement("div", { className: "text-lg", style: { fontFamily: "Oswald", color: COLORS.cream } }, "Scan an invoice"),
+      /* @__PURE__ */ React.createElement(
+        "button",
+        { onClick: onClose, className: "px-4 py-2 text-sm rounded", style: { fontFamily: "Inter", fontWeight: 600, background: COLORS.tomato, color: COLORS.cream, border: "none" } },
+        applied ? "Done" : "Close"
+      )
+    ),
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "flex-1 overflow-y-auto p-4" },
+      err ? /* @__PURE__ */ React.createElement("div", { className: "text-sm px-3 py-2.5 rounded mb-3", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, err) : null,
+      applied ? /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "text-center py-10" },
+        /* @__PURE__ */ React.createElement("div", { className: "text-2xl mb-2", style: { fontFamily: "Oswald", color: COLORS.basil } }, "Updated " + applied + (applied === 1 ? " price" : " prices")),
+        /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", color: "#7a6a5c" } }, "Check the Inventory tab \u2014 each one is stamped with the invoice date.")
+      ) : /* @__PURE__ */ React.createElement(
+        "div",
+        null,
+        !rows.length ? /* @__PURE__ */ React.createElement(
+          "div",
+          null,
+          /* @__PURE__ */ React.createElement("p", { className: "text-sm mb-3", style: { fontFamily: "Inter", color: "#7a6a5c", lineHeight: 1.5 } }, "Take a photo of each page of the invoice \u2014 make sure the item descriptions and the price column are both in frame. Up to 8 pages."),
+          /* @__PURE__ */ React.createElement(
+            "label",
+            { className: "flex items-center justify-center gap-2 w-full px-3 py-4 rounded mb-3", style: { background: COLORS.tomato, color: COLORS.cream, fontFamily: "Inter", fontWeight: 600 } },
+            /* @__PURE__ */ React.createElement(Camera, { size: 18 }),
+            imgs.length ? "Add another page" : "Take / choose photos",
+            /* @__PURE__ */ React.createElement("input", {
+              type: "file", accept: "image/*", capture: "environment", multiple: true,
+              style: { display: "none" },
+              onChange: (e) => { addFiles(e.target.files); e.target.value = ""; }
+            })
+          ),
+          imgs.length ? /* @__PURE__ */ React.createElement(
+            "div",
+            { className: "grid grid-cols-4 gap-2 mb-3" },
+            imgs.map((b, i) => /* @__PURE__ */ React.createElement(
+              "div",
+              { key: i, className: "relative" },
+              /* @__PURE__ */ React.createElement("img", { src: "data:image/jpeg;base64," + b, className: "w-full rounded", style: { height: "80px", objectFit: "cover", border: `1px solid ${COLORS.line}` } }),
+              /* @__PURE__ */ React.createElement(
+                "button",
+                { onClick: () => setImgs(imgs.filter((_, j) => j !== i)), className: "absolute top-0 right-0 px-1.5 py-0.5 rounded", style: { background: COLORS.tomato, color: COLORS.cream, fontSize: "11px", border: "none" } },
+                "\u00d7"
+              )
+            ))
+          ) : null,
+          imgs.length ? /* @__PURE__ */ React.createElement(
+            "button",
+            { onClick: readInvoice, disabled: busy, className: "w-full px-3 py-4 rounded", style: { background: busy ? "#9aa892" : COLORS.basil, color: COLORS.cream, fontFamily: "Inter", fontWeight: 600, border: "none" } },
+            busy ? "Reading the invoice\u2026" : "Read " + imgs.length + (imgs.length === 1 ? " page" : " pages")
+          ) : null,
+          busy && !imgs.length ? /* @__PURE__ */ React.createElement("div", { className: "text-sm text-center py-4", style: { fontFamily: "Inter", color: "#7a6a5c" } }, "Processing photos\u2026") : null
+        ) : /* @__PURE__ */ React.createElement(
+          "div",
+          null,
+          /* @__PURE__ */ React.createElement(
+            "div",
+            { className: "px-3 py-2.5 rounded mb-3", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } },
+            /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, (parsed && parsed.vendor ? parsed.vendor : "Unknown vendor") + (parsed && parsed.date ? " \u00b7 " + parsed.date : " \u00b7 no date read")),
+            /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "Prices will land on the " + (vendorKey() === "thomsen" ? "Thomsen" : "Quality") + " side. Untick anything that looks wrong before applying.")
+          ),
+          /* @__PURE__ */ React.createElement(
+            "div",
+            { className: "space-y-1.5 mb-3" },
+            rows.map((r, i) => /* @__PURE__ */ React.createElement(
+              "div",
+              { key: r.id, className: "px-3 py-2.5 rounded", style: { background: COLORS.card, border: `1px solid ${r.include && r.matchId ? COLORS.basil : COLORS.line}` } },
+              /* @__PURE__ */ React.createElement(
+                "div",
+                { className: "flex items-start gap-2 mb-1.5" },
+                /* @__PURE__ */ React.createElement("input", {
+                  type: "checkbox", checked: r.include,
+                  onChange: (e) => setRows(rows.map((x, j) => j === i ? { ...x, include: e.target.checked } : x)),
+                  style: { width: 20, height: 20, marginTop: 2, flexShrink: 0 }
+                }),
+                /* @__PURE__ */ React.createElement(
+                  "div",
+                  { className: "flex-1" },
+                  /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, r.desc),
+                  /* @__PURE__ */ React.createElement("div", { className: "text-sm mt-0.5", style: { fontFamily: "JetBrains Mono", color: COLORS.tomato, fontWeight: 700 } }, "$" + Number(r.price).toFixed(2) + "/" + r.unit + (r.code ? "  #" + r.code : ""))
+                )
+              ),
+              /* @__PURE__ */ React.createElement(
+                "select",
+                {
+                  value: r.matchId,
+                  onChange: (e) => setRows(rows.map((x, j) => j === i ? { ...x, matchId: e.target.value, include: !!e.target.value } : x)),
+                  className: "w-full text-sm px-2 py-2 rounded",
+                  style: { border: `1px solid ${r.matchId ? COLORS.line : COLORS.tomato}`, fontFamily: "Inter", background: "white", color: COLORS.crust }
+                },
+                /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 skip, no matching item \u2014"),
+                inv.map((it) => /* @__PURE__ */ React.createElement("option", { key: it.id, value: it.id }, it.item))
+              )
+            ))
+          ),
+          /* @__PURE__ */ React.createElement(
+            "button",
+            { onClick: apply, disabled: !willApply, className: "w-full px-3 py-4 rounded", style: { background: willApply ? COLORS.basil : "#c9bda8", color: COLORS.cream, fontFamily: "Inter", fontWeight: 600, border: "none" } },
+            willApply ? "Update " + willApply + (willApply === 1 ? " price" : " prices") : "Nothing selected"
+          )
+        )
+      )
+    )
+  );
+}
+
 function InventoryTab({ data, persist }) {
+  const [scanning, setScanning] = useState(false);
   const [draft, setDraft] = useState({ item: "", qty: "", unit: "", low: "", cost: "", vendor: "" });
   const [showCost, setShowCost] = useState(false);
   const [showMap, setShowMap] = useState(false);
@@ -1408,7 +1781,7 @@ function InventoryTab({ data, persist }) {
     persist(next);
     setDraft({ item: "", qty: "", unit: "", low: "", cost: "", vendor: "" });
   };
-  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "Set unit cost + vendor here so the Order tab can suggest restocks."), /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", null, scanning && /* @__PURE__ */ React.createElement(InvoiceScanner, { data, persist, onClose: () => setScanning(false) }), /* @__PURE__ */ React.createElement("button", { onClick: () => setScanning(true), className: "w-full flex items-center justify-center gap-2 px-3 py-3 rounded mb-3", style: { background: COLORS.crust, color: COLORS.cream, fontFamily: "Inter", fontWeight: 600, border: "none" } }, /* @__PURE__ */ React.createElement(Camera, { size: 17 }), "Scan an invoice to update prices"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, "Set unit cost + vendor here so the Order tab can suggest restocks."), /* @__PURE__ */ React.createElement(
     "button",
     {
       onClick: () => setShowCost((s) => !s),
@@ -1932,21 +2305,285 @@ function RecipesTab({ data, persist }) {
 function SectionHeader({ children }) {
   return /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-2 mt-5 tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato } }, children);
 }
+function PrepListTab({ data, persist, listKey, mode }) {
+  const key = listKey || "par";
+  const isOrder = mode === "order";
+  const prep = data.prep || {};
+  const list = prep[key] || [];
+  const [view, setView] = useState("todo");
+  const [copied, setCopied] = useState(false);
+  const [q, setQ] = useState("");
+
+  const patch = (id, changes) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const row = next.prep[key].find((r) => r.id === id);
+    if (!row) return;
+    Object.assign(row, changes);
+    persist(next);
+  };
+  const resetDay = () => {
+    const next = JSON.parse(JSON.stringify(data));
+    next.prep[key].forEach((r) => {
+      r.need = null;
+      r.done = false;
+    });
+    persist(next);
+  };
+
+  const onList = list.filter((r) => Number(r.need) > 0);
+  const todo = onList.filter((r) => !r.done);
+  const finished = onList.filter((r) => r.done);
+  const allSet = list.filter((r) => r.need === 0).length;
+
+  const match = (r) => !q.trim() || r.item.toLowerCase().includes(q.trim().toLowerCase());
+  const shown = (view === "todo" ? todo : view === "done" ? finished : list).filter(match);
+
+  const views = isOrder ? [
+    { id: "todo", label: "Order", n: todo.length },
+    { id: "setup", label: "Set Up List", n: list.length }
+  ] : [
+    { id: "todo", label: "To Prep", n: todo.length },
+    { id: "done", label: "Done", n: finished.length },
+    { id: "setup", label: "Set Up List", n: list.length }
+  ];
+  const copyOrder = () => {
+    const t = onList.map((r) => "\u2022 " + r.item + " \u00d7 " + r.need).join("\n");
+    if (!t) return;
+    if (navigator.clipboard) navigator.clipboard.writeText(t);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  // A row in the working list: one big tap target that crosses the item off.
+  const workRow = (r) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: r.id,
+      onClick: () => patch(r.id, { done: !r.done }),
+      className: "w-full flex items-center gap-3 px-3 py-3.5 rounded text-left",
+      style: {
+        background: r.done ? "#F1F4EE" : COLORS.card,
+        border: `1px solid ${r.done ? COLORS.basil : COLORS.line}`,
+        borderLeft: `5px solid ${r.done ? COLORS.basil : COLORS.tomato}`
+      }
+    },
+    /* @__PURE__ */ React.createElement(
+      "span",
+      {
+        className: "flex items-center justify-center rounded-full flex-shrink-0",
+        style: {
+          width: 26,
+          height: 26,
+          border: `2px solid ${r.done ? COLORS.basil : "#c9bda8"}`,
+          background: r.done ? COLORS.basil : "transparent"
+        }
+      },
+      r.done ? /* @__PURE__ */ React.createElement(Check, { size: 15, color: COLORS.cream }) : null
+    ),
+    /* @__PURE__ */ React.createElement(
+      "span",
+      {
+        className: "flex-1 text-base",
+        style: {
+          fontFamily: "Inter",
+          color: r.done ? "#8a9584" : COLORS.crust,
+          textDecoration: r.done ? "line-through" : "none"
+        }
+      },
+      r.item
+    ),
+    /* @__PURE__ */ React.createElement(
+      "span",
+      {
+        className: "text-lg px-2.5 py-0.5 rounded-full flex-shrink-0",
+        style: {
+          fontFamily: "JetBrains Mono",
+          fontWeight: 700,
+          color: r.done ? "#8a9584" : COLORS.cream,
+          background: r.done ? "transparent" : COLORS.tomato
+        }
+      },
+      "\u00d7" + r.need
+    )
+  );
+
+  // A row in setup: mark all-set, or dial in how many you need.
+  const setupRow = (r) => {
+    const need = r.need;
+    const isSet = need === 0;
+    const on = Number(need) > 0;
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: r.id,
+        className: "px-3 py-2.5 rounded",
+        style: {
+          background: COLORS.card,
+          border: `1px solid ${on ? COLORS.tomato : isSet ? COLORS.basil : COLORS.line}`,
+          borderLeft: `5px solid ${on ? COLORS.tomato : isSet ? COLORS.basil : COLORS.line}`
+        }
+      },
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "flex items-center justify-between gap-2 mb-2" },
+        /* @__PURE__ */ React.createElement(
+          "span",
+          { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } },
+          r.item
+        ),
+        on ? /* @__PURE__ */ React.createElement(
+          "span",
+          { className: "text-sm", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.tomato } },
+          "need " + need
+        ) : isSet ? /* @__PURE__ */ React.createElement(
+          "span",
+          { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.basil } },
+          "all set"
+        ) : null
+      ),
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "flex items-center gap-1.5 flex-wrap" },
+        /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: () => patch(r.id, { need: isSet ? null : 0, done: false }),
+            className: "text-sm px-3 py-2 rounded-full",
+            style: {
+              fontFamily: "Inter",
+              border: `1px solid ${isSet ? COLORS.basil : COLORS.line}`,
+              background: isSet ? COLORS.basil : "transparent",
+              color: isSet ? COLORS.cream : COLORS.crust
+            }
+          },
+          "All set"
+        ),
+        [1, 2, 3, 4].map((n) => /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            key: n,
+            onClick: () => patch(r.id, { need: need === n ? null : n, done: false }),
+            className: "text-base px-3.5 py-2 rounded-full",
+            style: {
+              fontFamily: "JetBrains Mono",
+              fontWeight: 700,
+              border: `1px solid ${need === n ? COLORS.tomato : COLORS.line}`,
+              background: need === n ? COLORS.tomato : "transparent",
+              color: need === n ? COLORS.cream : COLORS.crust
+            }
+          },
+          n
+        )),
+        /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: () => patch(r.id, { need: (Number(need) || 0) + 1, done: false }),
+            className: "px-3 py-2 rounded-full flex items-center",
+            style: { border: `1px solid ${COLORS.line}`, background: "transparent" }
+          },
+          /* @__PURE__ */ React.createElement(Plus, { size: 16, color: COLORS.crust })
+        ),
+        on ? /* @__PURE__ */ React.createElement(
+          "input",
+          {
+            type: "number",
+            value: need,
+            onChange: (e) => patch(r.id, { need: e.target.value === "" ? null : Number(e.target.value), done: false }),
+            className: "w-16 text-base px-2 py-2 rounded text-center",
+            style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" }
+          }
+        ) : null
+      )
+    );
+  };
+
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    null,
+    /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: "flex items-center justify-between gap-2 px-3 py-3 rounded mb-3",
+        style: { background: COLORS.crust }
+      },
+      /* @__PURE__ */ React.createElement(
+        "div",
+        null,
+        /* @__PURE__ */ React.createElement(
+          "div",
+          { className: "text-2xl", style: { fontFamily: "Oswald", color: COLORS.cream, lineHeight: 1.1 } },
+          todo.length === 0 ? (isOrder ? "Nothing to order" : "All caught up") : todo.length + (todo.length === 1 ? (isOrder ? " item to order" : " item to prep") : (isOrder ? " items to order" : " items to prep"))
+        ),
+        /* @__PURE__ */ React.createElement(
+          "div",
+          { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#c9bda8" } },
+          isOrder ? allSet + " marked all set \u00b7 " + list.filter((r) => r.need == null).length + " not looked at" : finished.length + " done \u00b7 " + allSet + " marked all set"
+        )
+      ),
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: resetDay,
+          className: "text-sm px-3 py-2 rounded-full flex-shrink-0",
+          style: { fontFamily: "Inter", border: "1px solid #6b5545", color: COLORS.cream, background: "transparent" }
+        },
+        isOrder ? "Reset" : "Reset day"
+      )
+    ),
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "flex items-center gap-1.5 mb-2 flex-wrap" },
+      views.map((v) => /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: v.id,
+          onClick: () => setView(v.id),
+          className: "text-sm px-3.5 py-2 rounded-full",
+          style: {
+            fontFamily: "Inter",
+            border: `1px solid ${view === v.id ? COLORS.tomato : COLORS.line}`,
+            background: view === v.id ? COLORS.tomato : "transparent",
+            color: view === v.id ? COLORS.cream : COLORS.crust
+          }
+        },
+        v.label + " (" + v.n + ")"
+      ))
+    ),
+    isOrder && view === "todo" && onList.length > 0 ? /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: copyOrder,
+        className: "w-full flex items-center justify-center gap-2 px-3 py-3 rounded mb-2",
+        style: { background: COLORS.basil, color: COLORS.cream, fontFamily: "Inter", fontWeight: 600, border: "none" }
+      },
+      /* @__PURE__ */ React.createElement(Copy, { size: 16 }),
+      copied ? "Copied \u2014 paste it to Belmont" : "Copy order (" + onList.length + " items)"
+    ) : null,
+    view === "setup" ? /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        placeholder: "Search the list\u2026",
+        value: q,
+        onChange: (e) => setQ(e.target.value),
+        className: "w-full text-base px-3 py-2.5 rounded mb-2 outline-none",
+        style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+      }
+    ) : null,
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "space-y-1.5" },
+      shown.length === 0 ? /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } },
+        view === "todo" ? (isOrder ? "Nothing on the order yet \u2014 go through \u201CSet Up List\u201D and mark what you need." : "Nothing on the prep list yet \u2014 set it up in \u201CSet Up List\u201D, or tell the Manager (\u201Cput three doughs on there\u201D).") : view === "done" ? "Nothing crossed off yet." : "No items match that search."
+      ) : shown.map((r) => view === "setup" ? setupRow(r) : workRow(r))
+    )
+  );
+}
+
 function PrepParTab({ data, persist }) {
-  const prep = data.prep || { par: [], produce: [], lowStock: [] };
+  const prep = data.prep || { lowStock: [] };
   const [newFlag, setNewFlag] = useState("");
-  const updatePar = (id, field, value) => {
-    const next = JSON.parse(JSON.stringify(data));
-    const row = next.prep.par.find((r) => r.id === id);
-    row[field] = value;
-    persist(next);
-  };
-  const updateProduce = (id, field, value) => {
-    const next = JSON.parse(JSON.stringify(data));
-    const row = next.prep.produce.find((r) => r.id === id);
-    row[field] = value;
-    persist(next);
-  };
   const addFlag = () => {
     if (!newFlag.trim()) return;
     const next = JSON.parse(JSON.stringify(data));
@@ -1967,85 +2604,90 @@ function PrepParTab({ data, persist }) {
   };
   const statusColor = { ok: COLORS.basil, low: COLORS.parm, "86": COLORS.tomato };
   const statusLabel = { ok: "OK", low: "LOW", "86": "86" };
-  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(SectionHeader, null, "86 / Low Stock Board"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5 mb-2" }, prep.lowStock.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#999" } }, "Nothing flagged right now."), prep.lowStock.map((f) => /* @__PURE__ */ React.createElement("div", { key: f.id, className: "flex items-center justify-between px-3 py-2 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, f.item), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1" }, ["ok", "low", "86"].map((s) => /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      key: s,
-      onClick: () => setFlagStatus(f.id, s),
-      className: "text-xs px-2 py-1 rounded-full",
-      style: {
-        fontFamily: "Inter",
-        fontWeight: 600,
-        background: f.status === s ? statusColor[s] : "transparent",
-        color: f.status === s ? COLORS.cream : "#999",
-        border: `1px solid ${f.status === s ? statusColor[s] : COLORS.line}`
-      }
-    },
-    statusLabel[s]
-  )), /* @__PURE__ */ React.createElement("button", { onClick: () => removeFlag(f.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 12, color: "#999", className: "ml-1" })))))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 mb-2" }, /* @__PURE__ */ React.createElement(
-    "input",
-    {
-      placeholder: "Flag an item (e.g. Roma tomatoes)",
-      value: newFlag,
-      onChange: (e) => setNewFlag(e.target.value),
-      onKeyDown: (e) => e.key === "Enter" && addFlag(),
-      className: "flex-1 text-xs px-2.5 py-1.5 rounded outline-none",
-      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
-    }
-  ), /* @__PURE__ */ React.createElement(TicketButton, { onClick: addFlag, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 12 }))), /* @__PURE__ */ React.createElement(SectionHeader, null, "Prep Par Sheet"), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_60px_60px] px-3 py-1.5 text-xs tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#999", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "ITEM"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "QTY 1"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "QTY 2")), /* @__PURE__ */ React.createElement("div", { className: "max-h-72 overflow-y-auto" }, prep.par.map((row, idx) => /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement(
     "div",
-    {
-      key: row.id,
-      className: "grid grid-cols-[1fr_60px_60px] items-center px-3 py-1.5 text-sm",
-      style: { fontFamily: "Inter", background: idx % 2 ? COLORS.cream : COLORS.card, color: COLORS.crust }
-    },
-    /* @__PURE__ */ React.createElement("span", null, row.item),
+    null,
+    /* @__PURE__ */ React.createElement(SectionHeader, null, "86 / Low Stock Board"),
     /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        value: row.qty1,
-        onChange: (e) => updatePar(row.id, "qty1", e.target.value),
-        className: "w-14 text-right text-xs px-1 py-0.5 rounded justify-self-end",
-        style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" }
-      }
+      "p",
+      { className: "text-xs mb-3", style: { fontFamily: "Inter", color: "#7a6a5c" } },
+      "Flag anything we\u2019re out of or running low on so the whole crew can see it."
     ),
     /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        value: row.qty2,
-        onChange: (e) => updatePar(row.id, "qty2", e.target.value),
-        className: "w-14 text-right text-xs px-1 py-0.5 rounded justify-self-end",
-        style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" }
-      }
-    )
-  )))), /* @__PURE__ */ React.createElement(SectionHeader, null, "Produce Order Sheet"), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-hidden", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[1fr_50px_1fr] px-3 py-1.5 text-xs tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#999", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "ITEM"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "QTY"), /* @__PURE__ */ React.createElement("span", { className: "pl-2" }, "NOTES")), /* @__PURE__ */ React.createElement("div", { className: "max-h-72 overflow-y-auto" }, prep.produce.map((row, idx) => /* @__PURE__ */ React.createElement(
-    "div",
-    {
-      key: row.id,
-      className: "grid grid-cols-[1fr_50px_1fr] items-center px-3 py-1.5 text-sm gap-1",
-      style: { fontFamily: "Inter", background: idx % 2 ? COLORS.cream : COLORS.card, color: COLORS.crust }
-    },
-    /* @__PURE__ */ React.createElement("span", null, row.item),
-    /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        value: row.qty,
-        onChange: (e) => updateProduce(row.id, "qty", e.target.value),
-        className: "w-12 text-right text-xs px-1 py-0.5 rounded justify-self-end",
-        style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" }
-      }
+      "div",
+      { className: "space-y-1.5 mb-3" },
+      prep.lowStock.length === 0 && /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } },
+        "Nothing flagged right now."
+      ),
+      prep.lowStock.map((f) => /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: f.id,
+          className: "flex items-center justify-between gap-2 px-3 py-3 rounded",
+          style: {
+            background: COLORS.card,
+            border: `1px solid ${COLORS.line}`,
+            borderLeft: `5px solid ${statusColor[f.status] || COLORS.line}`
+          }
+        },
+        /* @__PURE__ */ React.createElement(
+          "span",
+          { className: "text-base flex-1", style: { fontFamily: "Inter", color: COLORS.crust } },
+          f.item
+        ),
+        /* @__PURE__ */ React.createElement(
+          "div",
+          { className: "flex items-center gap-1 flex-shrink-0" },
+          ["ok", "low", "86"].map((s) => /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              key: s,
+              onClick: () => setFlagStatus(f.id, s),
+              className: "text-sm px-3 py-2 rounded-full",
+              style: {
+                fontFamily: "Inter",
+                fontWeight: 600,
+                background: f.status === s ? statusColor[s] : "transparent",
+                color: f.status === s ? COLORS.cream : "#999",
+                border: `1px solid ${f.status === s ? statusColor[s] : COLORS.line}`
+              }
+            },
+            statusLabel[s]
+          )),
+          /* @__PURE__ */ React.createElement(
+            "button",
+            { onClick: () => removeFlag(f.id), className: "px-2 py-2" },
+            /* @__PURE__ */ React.createElement(Trash2, { size: 15, color: "#999" })
+          )
+        )
+      ))
     ),
     /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        value: row.notes,
-        onChange: (e) => updateProduce(row.id, "notes", e.target.value),
-        className: "text-xs px-1.5 py-0.5 rounded",
+      "div",
+      { className: "flex gap-1.5" },
+      /* @__PURE__ */ React.createElement("input", {
+        placeholder: "Flag an item (e.g. Roma tomatoes)",
+        value: newFlag,
+        onChange: (e) => setNewFlag(e.target.value),
+        onKeyDown: (e) => e.key === "Enter" && addFlag(),
+        className: "flex-1 text-base px-3 py-2.5 rounded outline-none",
         style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
-      }
+      }),
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: addFlag,
+          className: "px-4 py-2.5 rounded flex items-center",
+          style: { background: COLORS.basil, color: COLORS.cream, border: "none" }
+        },
+        /* @__PURE__ */ React.createElement(Plus, { size: 16 })
+      )
     )
-  )))));
+  );
 }
+
 function PriceInput({ value, onChange }) {
   const empty = value === "";
   return /* @__PURE__ */ React.createElement(
@@ -2312,8 +2954,21 @@ function GuidesTab() {
             alt: g.title,
             loading: "lazy",
             className: "w-full",
+            onError: (e) => {
+              e.target.style.display = "none";
+              const sib = e.target.nextSibling;
+              if (sib) sib.style.display = "flex";
+            },
             style: { height: "150px", objectFit: "cover", objectPosition: "top", display: "block", background: "#e9e2d6" }
           }),
+          /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              className: "w-full items-center justify-center text-center px-2",
+              style: { height: "150px", display: "none", background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "JetBrains Mono", fontSize: "11px", lineHeight: 1.4, wordBreak: "break-all" }
+            },
+            "missing: " + g.file
+          ),
           /* @__PURE__ */ React.createElement(
             "div",
             { className: "px-2.5 py-2" },
@@ -2350,8 +3005,20 @@ function GuidesTab() {
           src: open.file,
           alt: open.title,
           onClick: () => setZoomed(!zoomed),
+          onError: (e) => {
+            e.target.style.display = "none";
+            const sib = e.target.nextSibling;
+            if (sib) sib.style.display = "block";
+          },
           style: zoomed ? { width: "200%", maxWidth: "none", display: "block" } : { width: "100%", display: "block", margin: "0 auto" }
-        })
+        }),
+        /* @__PURE__ */ React.createElement(
+          "div",
+          { style: { display: "none", padding: "24px", textAlign: "center", fontFamily: "Inter", color: COLORS.cream } },
+          /* @__PURE__ */ React.createElement("div", { style: { fontSize: "15px", marginBottom: "8px" } }, "This guide image didn\u2019t load."),
+          /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: "12px", color: "#e0a898", wordBreak: "break-all" } }, open.file),
+          /* @__PURE__ */ React.createElement("div", { style: { fontSize: "13px", color: "#b8a99a", marginTop: "12px", lineHeight: 1.5 } }, "That exact path needs to exist in the GitHub repo. Filenames are case-sensitive on Netlify, and .jpg / .JPG / .png are all different files.")
+        )
       ),
       /* @__PURE__ */ React.createElement(
         "div",
