@@ -75,6 +75,7 @@
     },
   };
   window.CHAT_ENDPOINT = "/.netlify/functions/chat";
+  window.SYNC_URL = "/.netlify/functions/data";
 </script>
 
 <script>
@@ -620,6 +621,87 @@ const GUIDES = [
   { id: "g7", file: "/guides/backroom-freezer.jpg", title: "Backroom Freezer", sub: "Top / middle / bottom shelf", group: "Storage & Layout" },
   { id: "g8", file: "/guides/backroom-shelf.jpg", title: "Backroom Shelf", sub: "Condiments, oils, tomatoes", group: "Storage & Layout" }
 ];
+// ---- multi-device sync helpers ----
+// Two tablets and a phone all edit the same document. Last-write-wins would let
+// a stale tablet erase checkmarks someone made 30 seconds ago, so instead we
+// keep the copy we last agreed on with the server ("base") and three-way merge:
+// a field I changed wins, a field only they changed keeps their value, and
+// lists of {id,...} rows merge row by row instead of whole-list clobbering.
+
+function isPlainObj(v) {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+function sameJSON(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+function isRowList(v) {
+  return Array.isArray(v) && v.every((x) => isPlainObj(x) && typeof x.id !== "undefined");
+}
+function byId(list) {
+  const m = {};
+  (list || []).forEach((r) => {
+    m[r.id] = r;
+  });
+  return m;
+}
+
+function mergeRows(base, mine, theirs) {
+  const b = byId(base), m = byId(mine), t = byId(theirs);
+  const out = [];
+  const placed = {};
+  // Keep their ordering as the spine so a row someone reordered upstream
+  // doesn't jump around, then append anything I added.
+  (theirs || []).forEach((row) => {
+    placed[row.id] = true;
+    const mineRow = m[row.id];
+    if (typeof mineRow === "undefined") {
+      if (typeof b[row.id] === "undefined") out.push(row); // they added it
+      return; // otherwise I deleted it — stay deleted
+    }
+    out.push(merge3(b[row.id], mineRow, row));
+  });
+  (mine || []).forEach((row) => {
+    if (placed[row.id]) return;
+    if (typeof b[row.id] !== "undefined") return; // they deleted it
+    out.push(row); // I added it
+  });
+  return out;
+}
+
+function merge3(base, mine, theirs) {
+  if (sameJSON(mine, theirs)) return mine;
+  if (typeof mine === "undefined") return theirs;
+  if (typeof theirs === "undefined") return mine;
+
+  if (isRowList(mine) && isRowList(theirs)) {
+    return mergeRows(isRowList(base) ? base : [], mine, theirs);
+  }
+  if (isPlainObj(mine) && isPlainObj(theirs)) {
+    const out = {};
+    const keys = {};
+    Object.keys(mine).forEach((k) => (keys[k] = 1));
+    Object.keys(theirs).forEach((k) => (keys[k] = 1));
+    const b = isPlainObj(base) ? base : {};
+    Object.keys(keys).forEach((k) => {
+      const hasMine = Object.prototype.hasOwnProperty.call(mine, k);
+      const hasTheirs = Object.prototype.hasOwnProperty.call(theirs, k);
+      if (!hasMine) {
+        if (typeof b[k] === "undefined") out[k] = theirs[k]; // they added
+        return; // else I deleted
+      }
+      if (!hasTheirs) {
+        if (typeof b[k] === "undefined") out[k] = mine[k]; // I added
+        return; // else they deleted
+      }
+      out[k] = merge3(b[k], mine[k], theirs[k]);
+    });
+    return out;
+  }
+  // Scalars and ragged arrays: if I didn't touch it, take theirs.
+  return sameJSON(base, mine) ? theirs : mine;
+}
+
+const SYNC_URL = (typeof window !== "undefined" && window.SYNC_URL) || "/.netlify/functions/data";
 const SCHEDULE_VERSION = 2;
 // Saved data replaces DEFAULT_DATA outright, so a new seed alone never reaches
 // a tablet that already has data. Bump SCHEDULE_VERSION to push a schedule out.
@@ -661,40 +743,315 @@ function TicketButton({ children, onClick, color = COLORS.tomato, style = {}, ..
     children
   );
 }
+function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServer, rev }) {
+  const [device, setDevice] = useState(() => localStorage.getItem("opp:device") || "");
+  const saveDevice = (v) => {
+    setDevice(v);
+    try {
+      localStorage.setItem("opp:device", v);
+    } catch (e) {}
+  };
+  const setSecs = (v) => {
+    setSyncSecs(v);
+    try {
+      localStorage.setItem("opp:syncSecs", String(v));
+    } catch (e) {}
+  };
+  const ago = (t) => {
+    if (!t) return "never";
+    const s = Math.round((Date.now() - t) / 1000);
+    if (s < 10) return "just now";
+    if (s < 60) return s + "s ago";
+    const m = Math.round(s / 60);
+    return m + (m === 1 ? " min ago" : " mins ago");
+  };
+  const stateColor =
+    sync.state === "ok" ? COLORS.basil : sync.state === "offline" ? COLORS.tomato : COLORS.parm;
+  const stateLabel =
+    sync.state === "ok" ? "Synced" : sync.state === "offline" ? "Can't reach the shop data" : "Connecting\u2026";
+
+  const Row = (label, hint, control) =>
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "py-3.5", style: { borderBottom: `1px dashed ${COLORS.line}` } },
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "text-base mb-0.5", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } },
+        label
+      ),
+      hint
+        ? /* @__PURE__ */ React.createElement(
+            "div",
+            { className: "text-xs mb-2.5", style: { fontFamily: "Inter", color: "#8a7a6c", lineHeight: 1.5 } },
+            hint
+          )
+        : null,
+      control
+    );
+
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    null,
+    /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: "px-3 py-3.5 rounded mb-4",
+        style: { background: COLORS.crust }
+      },
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "flex items-center gap-2.5" },
+        /* @__PURE__ */ React.createElement("span", {
+          style: { width: 11, height: 11, borderRadius: "50%", background: stateColor, flexShrink: 0, display: "inline-block" }
+        }),
+        /* @__PURE__ */ React.createElement(
+          "span",
+          { className: "text-lg", style: { fontFamily: "Oswald", color: COLORS.cream } },
+          stateLabel
+        )
+      ),
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "text-xs mt-1", style: { fontFamily: "Inter", color: "#c9bda8" } },
+        "Last checked " + ago(sync.at) + (rev ? " \u00b7 revision " + rev : "") + (sync.from ? " \u00b7 last change from " + sync.from : "")
+      )
+    ),
+
+    /* @__PURE__ */ React.createElement(SectionHeader, null, "Sync"),
+    Row(
+      "This device's name",
+      "Shows up on other devices as who made the last change. Something like \u201Cfront tablet\u201D or \u201CChris phone\u201D.",
+      /* @__PURE__ */ React.createElement("input", {
+        value: device,
+        onChange: (e) => saveDevice(e.target.value),
+        placeholder: "Name this device",
+        className: "w-full text-base px-3 py-2.5 rounded outline-none",
+        style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+      })
+    ),
+    Row(
+      "Check for changes every",
+      "How often this device looks for edits made somewhere else. It also checks instantly whenever you switch back to the app, so a short interval mostly matters for a screen sitting untouched on the wall.",
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "flex gap-1.5 flex-wrap" },
+        [5, 10, 30, 60, 0].map((s) =>
+          /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              key: s,
+              onClick: () => setSecs(s),
+              className: "text-sm px-3.5 py-2 rounded-full",
+              style: {
+                fontFamily: "Inter",
+                border: `1px solid ${syncSecs === s ? COLORS.tomato : COLORS.line}`,
+                background: syncSecs === s ? COLORS.tomato : "transparent",
+                color: syncSecs === s ? COLORS.cream : COLORS.crust
+              }
+            },
+            s === 0 ? "Off" : s < 60 ? s + "s" : "1 min"
+          )
+        )
+      )
+    ),
+    Row(
+      "Check right now",
+      null,
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: onSyncNow,
+          className: "px-4 py-2.5 rounded text-sm",
+          style: { fontFamily: "Inter", fontWeight: 600, background: COLORS.basil, color: COLORS.cream, border: "none" }
+        },
+        "Sync now"
+      )
+    ),
+
+    /* @__PURE__ */ React.createElement("div", { style: { height: 18 } }),
+    /* @__PURE__ */ React.createElement(SectionHeader, null, "If something looks wrong"),
+    Row(
+      "Reload everything from the shop data",
+      "Throws away anything on this device that hasn\u2019t been sent up and takes the shop\u2019s copy as-is. Use it if this tablet is showing something stale or strange.",
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => {
+            if (window.confirm("Replace this device's copy with the shop's current data?")) onReloadFromServer();
+          },
+          className: "px-4 py-2.5 rounded text-sm",
+          style: { fontFamily: "Inter", fontWeight: 600, background: "transparent", color: COLORS.tomatoDark, border: `1px solid ${COLORS.tomato}` }
+        },
+        "Reload from shop data"
+      )
+    ),
+    /* @__PURE__ */ React.createElement(
+      "p",
+      { className: "text-xs mt-4", style: { fontFamily: "Inter", color: "#8a7a6c", lineHeight: 1.6 } },
+      "Everything here is per-device. The name and sync interval only affect this tablet or phone \u2014 the shop data itself is shared by all of them."
+    )
+  );
+}
+
 function PizzaOpsManager() {
   var _a;
   const [data, setData] = useState(null);
   const [tab, setTab] = useState("assistant");
   const [loaded, setLoaded] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [sync, setSync] = useState({ state: "starting", at: null, from: "" });
+  const [syncSecs, setSyncSecs] = useState(() => {
+    const v = Number(localStorage.getItem("opp:syncSecs"));
+    return Number.isFinite(v) && v >= 0 ? v : 10;
+  });
+  const dataRef = useRef(null);
+  const baseRef = useRef(null);   // last doc we agreed on with the server
+  const revRef = useRef(0);
+  const pushTimerRef = useRef(null);
+  const pushingRef = useRef(false);
+  const dirtyRef = useRef(false);
+  const syncSecsRef = useRef(10);
+  syncSecsRef.current = syncSecs;
+  const deviceName = useRef(localStorage.getItem("opp:device") || "").current;
+
+  const cacheLocal = (d) => {
+    try {
+      localStorage.setItem("shared:shop-data", JSON.stringify(d));
+    } catch (e) {}
+  };
+
+  // Pull the server copy and fold it into whatever is on screen. Anything this
+  // device changed since the last sync survives; everything else takes theirs.
+  const pull = async (opts) => {
+    try {
+      const res = await fetch(SYNC_URL, { headers: { "cache-control": "no-cache" } });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const doc = await res.json();
+      if (doc.error) throw new Error(doc.error);
+      if (!doc.data) {
+        // Nothing on the server yet — this device seeds it.
+        setSync({ state: "ok", at: Date.now(), from: "" });
+        if (opts && opts.initial) {
+          revRef.current = 0;
+          baseRef.current = null;
+          queuePush(true);
+        }
+        return;
+      }
+      if (doc.rev === revRef.current && !(opts && opts.initial)) {
+        setSync({ state: "ok", at: Date.now(), from: "" });
+        return;
+      }
+      const mine = dataRef.current;
+      const merged = mine && baseRef.current
+        ? merge3(baseRef.current, mine, doc.data)
+        : doc.data;
+      const mig = migrateSchedule(merged);
+      revRef.current = doc.rev;
+      baseRef.current = JSON.parse(JSON.stringify(doc.data));
+      dataRef.current = mig.data;
+      setData(mig.data);
+      cacheLocal(mig.data);
+      setSync({ state: "ok", at: Date.now(), from: doc.by || "" });
+      // If merging surfaced local edits the server hasn't seen, send them up.
+      if (mig.changed || !sameJSON(mig.data, doc.data)) queuePush();
+    } catch (e) {
+      setSync({ state: "offline", at: Date.now(), from: "" });
+    }
+  };
+
+  const push = async () => {
+    if (pushingRef.current) return;
+    if (!dataRef.current) return;
+    pushingRef.current = true;
+    dirtyRef.current = false;
+    const attempt = async (tries) => {
+      const body = JSON.stringify({
+        data: dataRef.current,
+        baseRev: revRef.current,
+        by: deviceName
+      });
+      const res = await fetch(SYNC_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body
+      });
+      if (res.status === 409) {
+        const doc = await res.json();
+        // Someone else wrote first. Merge onto their copy and try again.
+        const merged = merge3(baseRef.current, dataRef.current, doc.data);
+        revRef.current = doc.rev;
+        baseRef.current = JSON.parse(JSON.stringify(doc.data));
+        dataRef.current = merged;
+        setData(merged);
+        cacheLocal(merged);
+        if (tries > 0) return attempt(tries - 1);
+        throw new Error("Couldn't settle a conflict.");
+      }
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const out = await res.json();
+      if (out.error) throw new Error(out.error);
+      revRef.current = out.rev;
+      baseRef.current = JSON.parse(JSON.stringify(dataRef.current));
+      setSaveError(false);
+      setSync({ state: "ok", at: Date.now(), from: "" });
+    };
+    try {
+      await attempt(3);
+    } catch (e) {
+      setSync({ state: "offline", at: Date.now(), from: "" });
+    }
+    pushingRef.current = false;
+    if (dirtyRef.current) queuePush();
+  };
+
+  // Coalesce rapid edits (typing, tapping down a list) into one write.
+  const queuePush = (now) => {
+    dirtyRef.current = true;
+    if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+    pushTimerRef.current = setTimeout(() => {
+      pushTimerRef.current = null;
+      push();
+    }, now ? 0 : 700);
+  };
+
   useEffect(() => {
     (async () => {
+      // Show the cached copy immediately so the app opens instantly, then sync.
       try {
-        const res = await window.storage.get("shop-data", true);
-        const saved = res && res.value ? JSON.parse(res.value) : DEFAULT_DATA;
+        const raw = localStorage.getItem("shared:shop-data");
+        const saved = raw ? JSON.parse(raw) : DEFAULT_DATA;
         const mig = migrateSchedule(saved);
+        dataRef.current = mig.data;
         setData(mig.data);
-        if (mig.changed) {
-          try {
-            await window.storage.set("shop-data", JSON.stringify(mig.data), true);
-          } catch (e2) {
-          }
-        }
       } catch (e) {
+        dataRef.current = DEFAULT_DATA;
         setData(DEFAULT_DATA);
-      } finally {
-        setLoaded(true);
       }
+      setLoaded(true);
+      await pull({ initial: true });
     })();
+    const onVis = () => {
+      if (!document.hidden) pull();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("online", () => pull());
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
-  const persist = async (next) => {
+
+  useEffect(() => {
+    if (!syncSecs) return;
+    const id = setInterval(() => {
+      if (!document.hidden) pull();
+    }, Math.max(3, syncSecs) * 1000);
+    return () => clearInterval(id);
+  }, [syncSecs]);
+
+  const persist = (next) => {
+    dataRef.current = next;
     setData(next);
-    try {
-      const result = await window.storage.set("shop-data", JSON.stringify(next), true);
-      setSaveError(!result);
-    } catch (e) {
-      setSaveError(true);
-    }
+    cacheLocal(next);
+    queuePush();
   };
   if (!loaded || !data) {
     return /* @__PURE__ */ React.createElement("div", { className: "w-full h-full flex items-center justify-center", style: { background: COLORS.crust, minHeight: 500 } }, /* @__PURE__ */ React.createElement("style", null, FONTS), /* @__PURE__ */ React.createElement(Loader2, { className: "animate-spin", color: COLORS.cream, size: 28 }));
@@ -717,7 +1074,8 @@ function PizzaOpsManager() {
     { id: "guides", label: "Guides", icon: Camera },
     { id: "menu", label: "Menu", icon: BookOpen },
     { id: "liveops", label: "Live Ops", icon: Activity },
-    { id: "tasks", label: "Tasks", icon: ClipboardList, badge: openTasks }
+    { id: "tasks", label: "Tasks", icon: ClipboardList, badge: openTasks },
+    { id: "settings", label: "Settings", icon: Activity, badge: 0 }
   ];
   return /* @__PURE__ */ React.createElement("div", { className: "w-full min-h-screen", style: { background: COLORS.crust } }, /* @__PURE__ */ React.createElement("style", null, FONTS), /* @__PURE__ */ React.createElement("div", { className: "px-5 pt-6 pb-4 flex items-center gap-3", style: { borderBottom: `3px dashed ${COLORS.parm}` } }, /* @__PURE__ */ React.createElement(
     "div",
@@ -760,7 +1118,7 @@ function PizzaOpsManager() {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, saveError && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-3 px-3 py-2 rounded", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, "Couldn't save the last change \u2014 data may not persist."), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "order" && /* @__PURE__ */ React.createElement(OrderTab, { data }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, null), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist })));
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-center gap-2", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15 }), "Working offline \u2014 changes are saved on this device and will sync when the connection is back."), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "order" && /* @__PURE__ */ React.createElement(OrderTab, { data }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, null), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); } })));
 }
 function AssistantAvatar({ state }) {
   const blobs = {
