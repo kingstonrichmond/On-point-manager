@@ -76,6 +76,7 @@
   };
   window.CHAT_ENDPOINT = "/.netlify/functions/chat";
   window.SYNC_URL = "/.netlify/functions/data";
+  window.MEDIA_URL = "/.netlify/functions/media";
 </script>
 
 <script>
@@ -702,6 +703,7 @@ function merge3(base, mine, theirs) {
 }
 
 const SYNC_URL = (typeof window !== "undefined" && window.SYNC_URL) || "/.netlify/functions/data";
+const MEDIA_URL = (typeof window !== "undefined" && window.MEDIA_URL) || "/.netlify/functions/media";
 const SCHEDULE_VERSION = 2;
 // Saved data replaces DEFAULT_DATA outright, so a new seed alone never reaches
 // a tablet that already has data. Bump SCHEDULE_VERSION to push a schedule out.
@@ -814,7 +816,19 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
         "div",
         { className: "text-xs mt-1", style: { fontFamily: "Inter", color: "#c9bda8" } },
         "Last checked " + ago(sync.at) + (rev ? " \u00b7 revision " + rev : "") + (sync.from ? " \u00b7 last change from " + sync.from : "")
-      )
+      ),
+      sync.state === "offline" && sync.why
+        ? /* @__PURE__ */ React.createElement(
+            "div",
+            { className: "text-xs mt-2.5 pt-2.5", style: { fontFamily: "Inter", color: "#e8b9a8", borderTop: "1px solid #4a3428", lineHeight: 1.55 } },
+            sync.why,
+            /* @__PURE__ */ React.createElement(
+              "div",
+              { className: "mt-1.5", style: { fontFamily: "JetBrains Mono", fontSize: "11px", color: "#c9bda8", wordBreak: "break-all" } },
+              "Open this in a browser to test: " + (location.origin + SYNC_URL)
+            )
+          )
+        : null
     ),
 
     /* @__PURE__ */ React.createElement(SectionHeader, null, "Sync"),
@@ -914,6 +928,22 @@ function PizzaOpsManager() {
   syncSecsRef.current = syncSecs;
   const deviceName = useRef(localStorage.getItem("opp:device") || "").current;
 
+  // "Offline" is useless on its own — say which failure it was.
+  const explain = (e) => {
+    const m = String((e && e.message) || e || "");
+    if (/HTTP 404/.test(m))
+      return "The sync function isn't deployed yet \u2014 netlify/functions/data.mjs is missing from the site.";
+    if (/Storage unavailable|Write failed|Read failed/.test(m))
+      return "The sync function deployed but can't reach storage \u2014 @netlify/blobs is probably missing from package.json. " + m;
+    if (/HTTP 5/.test(m))
+      return "The sync function errored (" + m + ") \u2014 check the Netlify function log.";
+    if (/HTTP 40/.test(m))
+      return "The sync function rejected the request (" + m + ").";
+    if (/Failed to fetch|NetworkError|Load failed/i.test(m))
+      return "No connection to the site right now.";
+    return m || "Couldn't reach the shop data.";
+  };
+
   const cacheLocal = (d) => {
     try {
       localStorage.setItem("shared:shop-data", JSON.stringify(d));
@@ -956,7 +986,7 @@ function PizzaOpsManager() {
       // If merging surfaced local edits the server hasn't seen, send them up.
       if (mig.changed || !sameJSON(mig.data, doc.data)) queuePush();
     } catch (e) {
-      setSync({ state: "offline", at: Date.now(), from: "" });
+      setSync({ state: "offline", at: Date.now(), from: "", why: explain(e) });
     }
   };
 
@@ -999,7 +1029,7 @@ function PizzaOpsManager() {
     try {
       await attempt(3);
     } catch (e) {
-      setSync({ state: "offline", at: Date.now(), from: "" });
+      setSync({ state: "offline", at: Date.now(), from: "", why: explain(e) });
     }
     pushingRef.current = false;
     if (dirtyRef.current) queuePush();
@@ -1118,7 +1148,7 @@ function PizzaOpsManager() {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-center gap-2", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15 }), "Working offline \u2014 changes are saved on this device and will sync when the connection is back."), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "order" && /* @__PURE__ */ React.createElement(OrderTab, { data }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, null), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); } })));
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "order" && /* @__PURE__ */ React.createElement(OrderTab, { data }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); } })));
 }
 function AssistantAvatar({ state }) {
   const blobs = {
@@ -3319,11 +3349,68 @@ function LiveOpsTab({ data, persist }) {
     m === 0 ? "Off" : m < 60 ? `${m}s` : `${m / 60}m`
   ))), lastResult && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-4 rounded", style: { background: COLORS.card, border: `1px dashed ${COLORS.line}`, fontFamily: "JetBrains Mono", fontSize: 13, color: COLORS.crust } }, lastResult), liveOps.stationLog.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(SectionHeader, null, "Recent Checks"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, liveOps.stationLog.map((l) => /* @__PURE__ */ React.createElement("div", { key: l.id, className: "px-3 py-2 rounded text-xs", style: { background: COLORS.card, border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("div", { className: "mb-0.5 flex items-center gap-1.5" }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.tomato, fontWeight: 600 } }, l.station), /* @__PURE__ */ React.createElement("span", { style: { color: "#999" } }, "\xB7 ", l.time)), /* @__PURE__ */ React.createElement("div", { style: { color: COLORS.crust } }, l.note))))));
 }
-function GuidesTab() {
+function guideSrc(g) {
+  if (g.key) return MEDIA_URL + "?key=" + encodeURIComponent(g.key) + "&v=" + (g.v || 0);
+  return g.file || "";
+}
+
+function GuidesTab({ data, persist }) {
   const [open, setOpen] = useState(null);
   const [zoomed, setZoomed] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [busyId, setBusyId] = useState("");
+  const [err, setErr] = useState("");
+  const list = (data && data.guides && data.guides.length ? data.guides : GUIDES);
+
+  const saveGuides = (next) => {
+    const d = JSON.parse(JSON.stringify(data));
+    d.guides = next;
+    persist(d);
+  };
+
+  const uploadFor = async (g, file) => {
+    if (!file) return;
+    setBusyId(g.id);
+    setErr("");
+    try {
+      const b64 = await shrinkImage(file, 1800);
+      const key = (g.key || "guide-" + g.id + "-" + Date.now()).replace(/[^a-zA-Z0-9._-]/g, "");
+      const res = await fetch(MEDIA_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ key, data: b64, contentType: "image/jpeg" })
+      });
+      const out = await res.json();
+      if (!res.ok || out.error) throw new Error(out.error || "Upload failed");
+      saveGuides(list.map((x) => (x.id === g.id ? { ...x, key, v: Date.now() } : x)));
+    } catch (e) {
+      setErr(e.message || "Couldn't upload that photo.");
+    }
+    setBusyId("");
+  };
+
+  const addGuide = () => {
+    const title = window.prompt("What's this guide called?");
+    if (!title || !title.trim()) return;
+    const group = window.prompt("Which section? (Recipes, Line & Stations, Storage & Layout)", "Recipes") || "Recipes";
+    saveGuides(list.concat([{ id: uid(), title: title.trim(), sub: "", group: group.trim() || "Recipes", key: "", v: 0, file: "" }]));
+  };
+
+  const removeGuide = (g) => {
+    if (!window.confirm("Remove \u201C" + g.title + "\u201D from the guides?")) return;
+    saveGuides(list.filter((x) => x.id !== g.id));
+  };
+
+  const editText = (g) => {
+    const title = window.prompt("Title", g.title);
+    if (title === null) return;
+    const sub = window.prompt("Short description", g.sub || "");
+    if (sub === null) return;
+    saveGuides(list.map((x) => (x.id === g.id ? { ...x, title: title.trim() || x.title, sub: sub.trim() } : x)));
+  };
+
   const groups = [];
-  GUIDES.forEach((g) => {
+  list.forEach((g) => {
     let grp = groups.find((x) => x.name === g.group);
     if (!grp) {
       grp = { name: g.group, items: [] };
@@ -3331,34 +3418,29 @@ function GuidesTab() {
     }
     grp.items.push(g);
   });
-  return /* @__PURE__ */ React.createElement(
+
+  const tile = (g) => /* @__PURE__ */ React.createElement(
     "div",
-    null,
-    /* @__PURE__ */ React.createElement("p", { className: "text-xs mb-4", style: { fontFamily: "Inter", color: "#7a6a5c" } }, "Tap any guide to open it full screen. Tap the picture again to zoom in and drag around."),
-    groups.map((grp) => /* @__PURE__ */ React.createElement(
-      "div",
-      { key: grp.name, className: "mb-6" },
-      /* @__PURE__ */ React.createElement(
-        "h3",
-        { className: "text-sm mb-2 tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato, fontWeight: 600 } },
-        grp.name.toUpperCase()
-      ),
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "grid grid-cols-2 gap-3" },
-        grp.items.map((g) => /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            key: g.id,
-            onClick: () => {
-              setZoomed(false);
-              setOpen(g);
-            },
-            className: "text-left overflow-hidden",
-            style: { background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: "3px" }
-          },
-          /* @__PURE__ */ React.createElement("img", {
-            src: g.file,
+    {
+      key: g.id,
+      className: "rounded overflow-hidden",
+      style: { background: COLORS.card, border: `1px solid ${COLORS.line}` }
+    },
+    /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => {
+          if (guideSrc(g)) {
+            setOpen(g);
+            setZoomed(false);
+          }
+        },
+        className: "w-full block p-0",
+        style: { border: "none", background: "transparent" }
+      },
+      guideSrc(g)
+        ? /* @__PURE__ */ React.createElement("img", {
+            src: guideSrc(g),
             alt: g.title,
             loading: "lazy",
             className: "w-full",
@@ -3368,72 +3450,197 @@ function GuidesTab() {
               if (sib) sib.style.display = "flex";
             },
             style: { height: "150px", objectFit: "cover", objectPosition: "top", display: "block", background: "#e9e2d6" }
-          }),
+          })
+        : null,
+      /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          className: "w-full items-center justify-center text-center px-3",
+          style: {
+            height: "150px",
+            display: guideSrc(g) ? "none" : "flex",
+            background: "#EFE7D6",
+            color: "#8a7a6c",
+            fontFamily: "Inter",
+            fontSize: "13px",
+            lineHeight: 1.4
+          }
+        },
+        busyId === g.id ? "Uploading\u2026" : "No photo yet"
+      )
+    ),
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "px-3 py-2.5" },
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "text-base", style: { fontFamily: "Inter", fontWeight: 700, color: COLORS.crust, lineHeight: 1.2 } },
+        g.title
+      ),
+      g.sub
+        ? /* @__PURE__ */ React.createElement(
+            "div",
+            { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8a7a6c" } },
+            g.sub
+          )
+        : null,
+      editing
+        ? /* @__PURE__ */ React.createElement(
+            "div",
+            { className: "flex flex-wrap gap-1.5 mt-2.5" },
+            /* @__PURE__ */ React.createElement(
+              "label",
+              {
+                className: "text-xs px-3 py-2 rounded-full flex items-center gap-1.5",
+                style: { background: COLORS.tomato, color: COLORS.cream, fontFamily: "Inter", fontWeight: 600 }
+              },
+              /* @__PURE__ */ React.createElement(Camera, { size: 13 }),
+              g.key ? "Replace" : "Add photo",
+              /* @__PURE__ */ React.createElement("input", {
+                type: "file",
+                accept: "image/*",
+                capture: "environment",
+                style: { display: "none" },
+                onChange: (e) => {
+                  uploadFor(g, e.target.files && e.target.files[0]);
+                  e.target.value = "";
+                }
+              })
+            ),
+            /* @__PURE__ */ React.createElement(
+              "button",
+              {
+                onClick: () => editText(g),
+                className: "text-xs px-3 py-2 rounded-full",
+                style: { border: `1px solid ${COLORS.line}`, background: "transparent", color: COLORS.crust, fontFamily: "Inter" }
+              },
+              "Rename"
+            ),
+            /* @__PURE__ */ React.createElement(
+              "button",
+              {
+                onClick: () => removeGuide(g),
+                className: "text-xs px-3 py-2 rounded-full",
+                style: { border: `1px solid ${COLORS.line}`, background: "transparent", color: "#a0522d", fontFamily: "Inter" }
+              },
+              "Remove"
+            )
+          )
+        : null
+    )
+  );
+
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    null,
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "flex items-center justify-between gap-2 mb-3" },
+      /* @__PURE__ */ React.createElement(
+        "p",
+        { className: "text-xs flex-1", style: { fontFamily: "Inter", color: "#7a6a5c", lineHeight: 1.5 } },
+        editing
+          ? "Take a photo of any guide sheet and it shows up on every tablet."
+          : "Tap any guide to open it full screen. Tap the picture again to zoom in and drag around."
+      ),
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => setEditing(!editing),
+          className: "text-sm px-3.5 py-2 rounded-full flex-shrink-0",
+          style: {
+            fontFamily: "Inter",
+            border: `1px solid ${editing ? COLORS.tomato : COLORS.line}`,
+            background: editing ? COLORS.tomato : "transparent",
+            color: editing ? COLORS.cream : COLORS.crust
+          }
+        },
+        editing ? "Done" : "Edit"
+      )
+    ),
+    err
+      ? /* @__PURE__ */ React.createElement(
+          "div",
+          { className: "text-sm px-3 py-2.5 rounded mb-3", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } },
+          err
+        )
+      : null,
+    groups.map((grp) => /* @__PURE__ */ React.createElement(
+      "div",
+      { key: grp.name, className: "mb-6" },
+      /* @__PURE__ */ React.createElement(SectionHeader, null, grp.name),
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "grid grid-cols-2 gap-2" },
+        grp.items.map(tile)
+      )
+    )),
+    editing
+      ? /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: addGuide,
+            className: "w-full px-3 py-3 rounded",
+            style: { border: `1px dashed ${COLORS.basil}`, background: "transparent", color: COLORS.crust, fontFamily: "Inter", fontWeight: 600 }
+          },
+          "\uff0b Add a guide"
+        )
+      : null,
+    open
+      ? /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            className: "fixed inset-0 z-50",
+            style: { background: "rgba(20,12,8,.96)", overflow: "auto" },
+            onClick: () => setOpen(null)
+          },
           /* @__PURE__ */ React.createElement(
             "div",
-            {
-              className: "w-full items-center justify-center text-center px-2",
-              style: { height: "150px", display: "none", background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "JetBrains Mono", fontSize: "11px", lineHeight: 1.4, wordBreak: "break-all" }
-            },
-            "missing: " + g.file
+            { className: "sticky top-0 flex items-center justify-between px-4 py-3", style: { background: COLORS.crust } },
+            /* @__PURE__ */ React.createElement(
+              "span",
+              { className: "text-base", style: { fontFamily: "Oswald", color: COLORS.cream } },
+              open.title
+            ),
+            /* @__PURE__ */ React.createElement(
+              "button",
+              {
+                onClick: () => setOpen(null),
+                className: "px-4 py-2 text-sm rounded",
+                style: { background: COLORS.tomato, color: COLORS.cream, border: "none", fontFamily: "Inter", fontWeight: 600 }
+              },
+              "Close"
+            )
           ),
           /* @__PURE__ */ React.createElement(
             "div",
-            { className: "px-2.5 py-2" },
-            /* @__PURE__ */ React.createElement("div", { className: "text-sm leading-tight", style: { fontFamily: "Oswald", color: COLORS.crust, fontWeight: 600 } }, g.title),
-            /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5 leading-snug", style: { fontFamily: "Inter", color: "#8a7a6c" } }, g.sub)
+            { onClick: (e) => e.stopPropagation() },
+            /* @__PURE__ */ React.createElement("img", {
+              src: guideSrc(open),
+              alt: open.title,
+              onClick: () => setZoomed(!zoomed),
+              onError: (e) => {
+                e.target.style.display = "none";
+                const sib = e.target.nextSibling;
+                if (sib) sib.style.display = "block";
+              },
+              style: zoomed
+                ? { width: "200%", maxWidth: "none", display: "block" }
+                : { width: "100%", display: "block", margin: "0 auto" }
+            }),
+            /* @__PURE__ */ React.createElement(
+              "div",
+              { style: { display: "none", padding: "24px", textAlign: "center", fontFamily: "Inter", color: COLORS.cream } },
+              /* @__PURE__ */ React.createElement("div", { style: { fontSize: "15px", marginBottom: "8px" } }, "This guide photo didn\u2019t load."),
+              /* @__PURE__ */ React.createElement(
+                "div",
+                { style: { fontSize: "13px", color: "#b8a99a", marginTop: "8px", lineHeight: 1.5 } },
+                "Tap Edit on the Guides tab and add a photo \u2014 you can just take one with your phone."
+              )
+            )
           )
-        ))
-      )
-    )),
-    open && /* @__PURE__ */ React.createElement(
-      "div",
-      {
-        className: "fixed inset-0 z-50 flex flex-col",
-        style: { background: "rgba(20,14,10,0.96)" }
-      },
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "flex items-center justify-between px-4 py-3 flex-shrink-0" },
-        /* @__PURE__ */ React.createElement("div", { className: "text-base", style: { fontFamily: "Oswald", color: COLORS.cream, fontWeight: 600 } }, open.title),
-        /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            onClick: () => setOpen(null),
-            className: "px-4 py-2 text-sm",
-            style: { fontFamily: "Inter", fontWeight: 600, background: COLORS.tomato, color: COLORS.cream, borderRadius: "3px" }
-          },
-          "Close"
         )
-      ),
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "flex-1 overflow-auto px-2 pb-4", style: { WebkitOverflowScrolling: "touch" } },
-        /* @__PURE__ */ React.createElement("img", {
-          src: open.file,
-          alt: open.title,
-          onClick: () => setZoomed(!zoomed),
-          onError: (e) => {
-            e.target.style.display = "none";
-            const sib = e.target.nextSibling;
-            if (sib) sib.style.display = "block";
-          },
-          style: zoomed ? { width: "200%", maxWidth: "none", display: "block" } : { width: "100%", display: "block", margin: "0 auto" }
-        }),
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { style: { display: "none", padding: "24px", textAlign: "center", fontFamily: "Inter", color: COLORS.cream } },
-          /* @__PURE__ */ React.createElement("div", { style: { fontSize: "15px", marginBottom: "8px" } }, "This guide image didn\u2019t load."),
-          /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: "12px", color: "#e0a898", wordBreak: "break-all" } }, open.file),
-          /* @__PURE__ */ React.createElement("div", { style: { fontSize: "13px", color: "#b8a99a", marginTop: "12px", lineHeight: 1.5 } }, "That exact path needs to exist in the GitHub repo. Filenames are case-sensitive on Netlify, and .jpg / .JPG / .png are all different files.")
-        )
-      ),
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "text-center text-xs pb-3 flex-shrink-0", style: { fontFamily: "Inter", color: "#b8a99a" } },
-        zoomed ? "Tap picture to zoom out" : "Tap picture to zoom in"
-      )
-    )
+      : null
   );
 }
 function TasksTab({ data, persist }) {
