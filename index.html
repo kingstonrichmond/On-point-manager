@@ -77,6 +77,7 @@
   window.CHAT_ENDPOINT = "/.netlify/functions/chat";
   window.SYNC_URL = "/.netlify/functions/data";
   window.MEDIA_URL = "/.netlify/functions/media";
+  window.YOLINK_URL = "/.netlify/functions/yolink";
 </script>
 
 <script>
@@ -248,42 +249,125 @@ const DEFAULT_DATA = {
     ]
   },
   inventory: [
-    { id: "i1", item: "Block Whole Milk Mozzarella", qty: 40, unit: "lb", low: 20, vendor: "QFC", thomsenSku: "80736", thomsenUom: "Case", prices: { qfc: { amt: 2.19, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 111.61, unit: "case", date: null } } },
-    { id: "i2", item: "Liuzzi Fresh Mozzarella", qty: 10, unit: "lb", low: 10, vendor: "QFC", prices: { qfc: { amt: 4.89, unit: "lb", date: "2026-07-23" }, thomsen: null } },
-    { id: "i3", item: "Cheddar White Block", qty: 40, unit: "lb", low: 20, vendor: "QFC", thomsenSku: "80419", thomsenUom: "Case", prices: { qfc: { amt: 2.24, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 81.77, unit: "case", date: null } } },
-    { id: "i4", item: "Romano Grated (Cortona/Capu)", qty: 20, unit: "lb", low: 5, vendor: "QFC", thomsenSku: "123466", thomsenUom: "Case", prices: { qfc: { amt: 3.99, unit: "lb", date: "2026-07-23" }, thomsen: null } },
-    { id: "i5", item: "Provolone Slicing", qty: 10, unit: "lb", low: 10, vendor: "QFC", thomsenSku: "80740", thomsenUom: "Case", prices: { qfc: null, thomsen: null } },
-    { id: "i6", item: "Feta Crumble", qty: 5, unit: "lb", low: 5, vendor: "QFC", thomsenSku: "643457", thomsenUom: "Case", prices: { qfc: null, thomsen: null } },
-    { id: "i7", item: "Jumbo Wing Cut Chicken", qty: 40, unit: "lb", low: 15, vendor: "QFC", thomsenSku: "80811", thomsenUom: "Case", prices: { qfc: { amt: 1.89, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 63.6, unit: "case", date: null } } },
-    { id: "i8", item: "Chicken Tenders (Clipped)", qty: 40, unit: "lb", low: 15, vendor: "QFC", thomsenSku: "80808", thomsenUom: "Case", prices: { qfc: { amt: 1.89, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 86.48, unit: "case", date: null } } },
-    { id: "i9", item: "Ezzo Sliced Pepperoni (Cup & Char)", qty: 50, unit: "lb", low: 15, vendor: "QFC", prices: { qfc: { amt: 6.99, unit: "lb", date: "2026-07-23" }, thomsen: null } },
-    { id: "i10", item: 'Bacon Topping 3/8"', qty: 1, unit: "box", low: 1, vendor: "Thomsen", prices: { qfc: null, thomsen: { amt: 53.85, unit: "box", date: null } } },
-    { id: "i11", item: `GF Pizza Crust 12" (Udi's)`, qty: 1, unit: "box", low: 1, vendor: "QFC", thomsenSku: "565419", thomsenUom: "Case", prices: { qfc: { amt: 82.54, unit: "box", date: "2026-07-23" }, thomsen: { amt: 83, unit: "box", date: null } } },
-    { id: "i12", item: 'Pizza Boxes 16"', qty: 4, unit: "box", low: 2, vendor: "Thomsen", thomsenSku: "81812", thomsenUom: "Bundle", prices: { qfc: null, thomsen: null } },
-    { id: "i13", item: 'Pizza Boxes 12"', qty: 2, unit: "box", low: 2, vendor: "Thomsen", thomsenSku: "81856", thomsenUom: "Bundle", prices: { qfc: null, thomsen: { amt: 16.96, unit: "box", date: null } } },
-    { id: "i14", item: 'Pizza Boxes 18"', qty: 1, unit: "box", low: 1, vendor: "Thomsen", prices: { qfc: null, thomsen: null } },
-    { id: "i15", item: "Extra Virgin Olive Oil (3L)", qty: 1, unit: "box", low: 1, vendor: "QFC", thomsenSku: "70629", thomsenUom: "Case", prices: { qfc: null, thomsen: null } },
-    { id: "i16", item: "Poland Spring Water 40pk", qty: 2, unit: "box", low: 1, vendor: "Thomsen", thomsenSku: "81718", thomsenUom: "Case", prices: { qfc: null, thomsen: { amt: 9.2, unit: "box", date: null } } },
-    { id: "i17", item: "Romaine Hearts", qty: 1, unit: "case", low: 1, vendor: "QFC", prices: { qfc: null, thomsen: null } },
-    { id: "i18", item: "Green Bell Peppers", qty: 1, unit: "case", low: 1, vendor: "QFC", prices: { qfc: null, thomsen: null } },
-    { id: "i19", item: "Iceberg Lettuce", qty: 2, unit: "case", low: 1, vendor: "QFC", prices: { qfc: null, thomsen: null } },
-    { id: "i20", item: "Ricotta", qty: 1, unit: "case", low: 1, vendor: "QFC", thomsenSku: "81122", thomsenUom: "Case", prices: { qfc: { amt: 38.64, unit: "box", date: "2026-07-23" }, thomsen: { amt: 49.14, unit: "case (6 tubs)", date: null } } },
-    { id: "i21", item: "Milk", qty: 1, unit: "gal", low: 2, vendor: "QFC", prices: { qfc: null, thomsen: null } },
-    { id: "i22", item: "Shredded Mozzarella (bulk bags)", qty: 4, unit: "bag", low: 2, vendor: "QFC", prices: { qfc: null, thomsen: null } },
-    { id: "i23", item: "Sweet Italian Ground Sausage", qty: 3, unit: "bag", low: 2, vendor: "QFC", thomsenSku: "75490", thomsenUom: "Case", prices: { qfc: { amt: 4.29, unit: "lb", date: "2026-07-23" }, thomsen: { amt: 75.35, unit: "bag", date: null } } },
-    { id: "i24", item: "Deli Logs (Provolone/Mozz)", qty: 5, unit: "log", low: 3, vendor: "QFC", prices: { qfc: null, thomsen: null } },
-    { id: "i25", item: "Salami / Capicola (deli)", qty: 3, unit: "ea", low: 2, vendor: "Thomsen", prices: { qfc: null, thomsen: { amt: 34.9, unit: "ea", date: null } } },
-    { id: "i26", item: "Dressing & Sauce Jugs (ranch, italian, vinaigrette, bbq)", qty: 10, unit: "jug", low: 4, vendor: "Thomsen", prices: { qfc: null, thomsen: { amt: 69.01, unit: "jug", date: null } } },
-    { id: "i27", item: "Mayo", qty: 2, unit: "jar", low: 1, vendor: "QFC", prices: { qfc: null, thomsen: null } },
-    { id: "i29", item: "Tomato Magic Ground Tomatoes (Stanislaus)", qty: 5, unit: "box", low: 2, vendor: "QFC", thomsenSku: "81855", thomsenUom: "Case", prices: { qfc: { amt: 39.11, unit: "box", date: "2026-07-23" }, thomsen: null } },
-    { id: "i30", item: "Stanislaus 74/40 Tomato Fillets", qty: 1, unit: "box", low: 1, vendor: "QFC", thomsenSku: "34100", thomsenUom: "Case", prices: { qfc: { amt: 39.54, unit: "box", date: "2026-07-23" }, thomsen: null } },
-    { id: "i31", item: "GM All Trumps Flour (Unbleached/Bromated)", qty: 9, unit: "box", low: 4, vendor: "QFC", thomsenSku: "50121", thomsenUom: "Bag", prices: { qfc: { amt: 24, unit: "box", date: "2026-07-23" }, thomsen: null } },
-    { id: "i32", item: "Ken's Sweet Baby Ray's BBQ (Original)", qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 60.91, unit: "box", date: "2026-07-23" }, thomsen: null } },
-    { id: "i33", item: "Nitrile Gloves Black M (Powder Free)", qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 43, unit: "box", date: "2026-07-23" }, thomsen: null } },
-    { id: "i34", item: "Savaday Molded Fiber Trays 5.5x7.5", qty: 1, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 175.41, unit: "box", date: "2026-07-23" }, thomsen: null } },
-    { id: "i35", item: "Tyson Brandywine Breaded Tenders 70ct", qty: 5, unit: "box", low: 2, vendor: "QFC", thomsenSku: "72175", thomsenUom: "Case", prices: { qfc: { amt: 42.3, unit: "box", date: "2026-07-23" }, thomsen: null } },
-    { id: "i36", item: "Pierce Boneless Wing Dings", qty: 2, unit: "box", low: 1, vendor: "QFC", thomsenSku: "81067", thomsenUom: "Case", prices: { qfc: { amt: 48.81, unit: "box", date: "2026-07-23" }, thomsen: null } },
-    { id: "i38", item: 'Simplot Conquest Fries 3/8" (Clear Coat)', qty: 2, unit: "box", low: 1, vendor: "QFC", prices: { qfc: { amt: 42, unit: "box", date: "2026-07-23" }, thomsen: null } }
+    { id: "i1", item: "Mozzarella (Whole Milk Block)", qty: 0, unit: "lb", low: 20, vendor: "QFC", qfcSku: "721360", thomsenSku: "80736", names: { qfc: "Block Whole Milk Mozz 1950", thomsen: "Cheese Mozzarella W/M Loaf" }, prices: { qfc: { amt: 2.14, unit: "lb", date: "2026-07-30" }, thomsen: { amt: 110.48, unit: "case", date: "2026-07-23" } } },
+    { id: "i2", item: "Fresh Mozzarella", qty: 0, unit: "lb", low: 10, vendor: "QFC", qfcSku: "721305", names: { qfc: "Liuzzi Brick Oven Fresh Mozz", thomsen: null }, prices: { qfc: { amt: 4.89, unit: "lb", date: "2026-07-29" }, thomsen: null } },
+    { id: "i3", item: "White Cheddar Block", qty: 0, unit: "lb", low: 20, vendor: "QFC", qfcSku: "742100", thomsenSku: "80419", names: { qfc: "Cheddar White Block 1950", thomsen: "Cheese Cheddar White 1950" }, prices: { qfc: { amt: 2.21, unit: "lb", date: "2026-07-30" }, thomsen: { amt: 75.67, unit: "case", date: "2026-07-23" } } },
+    { id: "i4", item: "Grated Romano", qty: 0, unit: "lb", low: 5, vendor: "QFC", qfcSku: "740992", thomsenSku: "123466", names: { qfc: "Cort/Capu Romano Grated", thomsen: "Cheese Grated Romano Blend" }, prices: { qfc: { amt: 3.99, unit: "lb", date: "2026-07-29" }, thomsen: null } },
+    { id: "i5", item: "Provolone Loaf", qty: 0, unit: "lb", low: 10, vendor: "Thomsen", thomsenSku: "80740", names: { qfc: null, thomsen: "Cheese Provolone Loaf" }, prices: { qfc: null, thomsen: null } },
+    { id: "i6", item: "Feta Crumble", qty: 0, unit: "lb", low: 5, vendor: "QFC", qfcSku: "741923", thomsenSku: "643457", names: { qfc: "Feta Cheese Crumble", thomsen: "Cheese Feta Crumbled" }, prices: { qfc: { amt: 3.69, unit: "lb", date: "2026-07-27" }, thomsen: null } },
+    { id: "i20", item: "Ricotta", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "742600", thomsenSku: "81122", names: { qfc: "Ricotta Cheese Supreme 32oz", thomsen: "Cheese Ricotta Sopraffina (Grande)" }, prices: { qfc: { amt: 38.64, unit: "box", date: "2026-07-29" }, thomsen: { amt: 49.14, unit: "case", date: "2026-07-12" } } },
+    { id: "i22", item: "Shredded Mozzarella (bulk bags)", qty: 0, unit: "bag", low: 2, vendor: "", prices: { qfc: null, thomsen: null } },
+    { id: "i40", item: "Gorgonzola Crumble", qty: 0, unit: "lb", low: 2, vendor: "QFC", qfcSku: "741600", thomsenSku: "956583", names: { qfc: "Gorgonzola Chs Crumble Belgioioso", thomsen: "Cheese Gorgonzola Crumbled" }, prices: { qfc: { amt: 4.49, unit: "lb", date: "2026-07-30" }, thomsen: null } },
+    { id: "i41", item: "Salted Butter", qty: 0, unit: "lb", low: 5, vendor: "QFC", qfcSku: "901250", thomsenSku: "81192", names: { qfc: "Butter Solids Salted AA", thomsen: "Butter Solids Salted" }, prices: { qfc: { amt: 2.99, unit: "lb", date: "2026-07-27" }, thomsen: null } },
+    { id: "i7", item: "Chicken Wings (Cut Jumbo)", qty: 0, unit: "lb", low: 15, vendor: "QFC", qfcSku: "821280", thomsenSku: "80811", names: { qfc: "Chic Wing Cut Jumbo (Mountaire Amick)", thomsen: "Chicken Wings Cut Jumbo" }, prices: { qfc: { amt: 1.89, unit: "lb", date: "2026-07-30" }, thomsen: { amt: 67.08, unit: "case", date: "2026-07-23" } } },
+    { id: "i8", item: "Chicken Tenders (Clipped)", qty: 0, unit: "lb", low: 15, vendor: "QFC", qfcSku: "821190", thomsenSku: "80808", names: { qfc: "Chic Tender Clipped (Bachoco)", thomsen: "Chicken Tenderloin Jumbo Clipped" }, prices: { qfc: { amt: 1.89, unit: "lb", date: "2026-07-30" }, thomsen: { amt: 67.6, unit: "case", date: "2026-07-12" } } },
+    { id: "i9", item: "Pepperoni (Cup & Char)", qty: 0, unit: "lb", low: 15, vendor: "QFC", qfcSku: "641711", thomsenSku: "80770", names: { qfc: "Ezzo Sliced Pepperoni Cup & Char", thomsen: "Pepperoni Sliced Rosa Grande Cup & Char" }, prices: { qfc: { amt: 6.99, unit: "lb", date: "2026-07-27" }, thomsen: null } },
+    { id: "i10", item: "Bacon Topping", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "401020", thomsenSku: "45090", names: { qfc: "Bacon Topping 3/8 in (Hormel)", thomsen: "Topping Bacon 3/4 in" }, prices: { qfc: { amt: 85.95, unit: "box", date: "2026-07-30" }, thomsen: null } },
+    { id: "i23", item: "Sweet Italian Sausage (Ground)", qty: 0, unit: "lb", low: 5, vendor: "QFC", qfcSku: "651580-B", thomsenSku: "75490", names: { qfc: "Sausage Sweet Italian Ground", thomsen: "Sausage Coarse Grind Swt Ital" }, prices: { qfc: { amt: 4.29, unit: "lb", date: "2026-07-27" }, thomsen: { amt: 75, unit: "case", date: "2026-07-23" } } },
+    { id: "i43", item: "Genoa Salami", qty: 0, unit: "lb", low: 3, vendor: "QFC", qfcSku: "481300-B", thomsenSku: "80759", names: { qfc: "Salami A/C Carando Alpina", thomsen: "Salami Genoa A/C Deli Style" }, prices: { qfc: { amt: 7.33, unit: "lb", date: "2026-07-27" }, thomsen: null } },
+    { id: "i44", item: "Ham", qty: 0, unit: "lb", low: 3, vendor: "QFC", qfcSku: "521600", thomsenSku: "80855", names: { qfc: "Ham Chef Delite", thomsen: "Ham Tavern Chef Delight" }, prices: { qfc: { amt: 4.59, unit: "lb", date: "2026-07-27" }, thomsen: { amt: 44.7, unit: "ea", date: "2026-07-05" } } },
+    { id: "i45", item: "Turkey Breast", qty: 0, unit: "lb", low: 3, vendor: "QFC", qfcSku: "851020", thomsenSku: "80822", names: { qfc: "Turkey Brst Roast Harvest Gold", thomsen: "Turkey Oil Brown Skinless" }, prices: { qfc: { amt: 7.99, unit: "lb", date: "2026-07-27" }, thomsen: { amt: 46.32, unit: "ea", date: "2026-07-05" } } },
+    { id: "i46", item: "Capocollo", qty: 0, unit: "ea", low: 2, vendor: "Thomsen", thomsenSku: "80766", names: { qfc: null, thomsen: "Capocollo Cooked Hot" }, prices: { qfc: null, thomsen: { amt: 34.9, unit: "ea", date: "2026-06-07" } } },
+    { id: "i35", item: "Breaded Chicken Tenders", qty: 0, unit: "box", low: 2, vendor: "QFC", qfcSku: "842250", thomsenSku: "72175", names: { qfc: "Tyson Brandywine RTC Brd Tender 70ct", thomsen: "Chicken Tender RTC Brandywine" }, prices: { qfc: { amt: 42.3, unit: "box", date: "2026-07-30" }, thomsen: { amt: 45.13, unit: "case", date: "2026-07-23" } } },
+    { id: "i36", item: "Boneless Wings", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "841582", thomsenSku: "81067", names: { qfc: "Pierce Bnls Wing Ding", thomsen: "Chicken Breast Chunks Boneless Wingdings" }, prices: { qfc: { amt: 48.81, unit: "box", date: "2026-07-27" }, thomsen: { amt: 46.5, unit: "case", date: "2026-07-23" } } },
+    { id: "i38", item: "Fries 3/8 in", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "960109", names: { qfc: "Simplot Conquest Fry w/PL 3/8 in", thomsen: "Fries Coated Straight 3/8 in Edgewood" }, prices: { qfc: { amt: 42, unit: "box", date: "2026-07-29" }, thomsen: null } },
+    { id: "i47", item: "Onion Rings 5/8 in", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "950811", thomsenSku: "442867", names: { qfc: "Fry Fd Onion Ring Gourmet Brd 5/8 in", thomsen: "Onion Rings Battered 5/8 in" }, prices: { qfc: { amt: 27.93, unit: "box", date: "2026-07-29" }, thomsen: null } },
+    { id: "i48", item: "Mozzarella Sticks", qty: 0, unit: "lb", low: 10, vendor: "QFC", qfcSku: "923070", thomsenSku: "80795", names: { qfc: "Mozz Stick Breaded Ricci", thomsen: "Mozz Sticks Breaded" }, prices: { qfc: { amt: 4.37, unit: "lb", date: "2026-07-27" }, thomsen: { amt: 40.65, unit: "case", date: "2026-07-23" } } },
+    { id: "i49", item: "Breaded Eggplant", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "951230", thomsenSku: "80799", names: { qfc: "Dominex Pld Brd Rnd Eggplant", thomsen: "Eggplant Breaded Round" }, prices: { qfc: { amt: 40.73, unit: "box", date: "2026-07-27" }, thomsen: { amt: 35.23, unit: "case", date: "2026-07-23" } } },
+    { id: "i50", item: "Broccoli Florets", qty: 0, unit: "lb", low: 10, vendor: "QFC", qfcSku: "391940", thomsenSku: "70875", names: { qfc: "Broccoli Florets Regal Frz", thomsen: "Broccoli Florets IQF" }, prices: { qfc: { amt: 1.23, unit: "lb", date: "2026-07-27" }, thomsen: null } },
+    { id: "i51", item: "Chopped Spinach", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "394080", names: { qfc: "Frz Chop Spinach IQF Regal", thomsen: null }, prices: { qfc: { amt: 28.36, unit: "box", date: "2026-07-30" }, thomsen: null } },
+    { id: "i11", item: "GF Pizza Crust 12 in", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "926450", thomsenSku: "565419", names: { qfc: "Pizza Crust GF 12 in Udi's", thomsen: "Pizza Crust Gluten Free 12" }, prices: { qfc: { amt: 82.54, unit: "box", date: "2026-07-27" }, thomsen: { amt: 83, unit: "case", date: "2026-07-12" } } },
+    { id: "i52", item: "Hoffs Golden Cheesecake 10\"", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "925370", prices: { qfc: { amt: 68.64, unit: "box", date: "2026-07-15" }, thomsen: null } },
+    { id: "i29", item: "Ground Tomatoes (Tomato Magic)", qty: 0, unit: "box", low: 2, vendor: "QFC", qfcSku: "984220", thomsenSku: "81855", names: { qfc: "Tomato Magic Ground Tomatoes Stanislaus", thomsen: "Tomato Magic Grnd Pld in Puree" }, prices: { qfc: { amt: 39.11, unit: "box", date: "2026-07-30" }, thomsen: { amt: 37.19, unit: "case", date: "2026-07-23" } } },
+    { id: "i30", item: "Tomato Fillets 74/40", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "984200", thomsenSku: "34100", names: { qfc: "74-40 Tomato Fillets Stanislaus", thomsen: "Tomato Fillet 74/40 P-N-J" }, prices: { qfc: { amt: 39.54, unit: "box", date: "2026-07-15" }, thomsen: { amt: 36.23, unit: "case", date: "2026-07-23" } } },
+    { id: "i53", item: "Full Red Pizza Sauce", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "980260", thomsenSku: "34160", names: { qfc: "Full Red Pizza Sauce w/ Basil Stanislaus", thomsen: "Sauce Pizza Full Red w/ Basil" }, prices: { qfc: { amt: 43.02, unit: "box", date: "2026-07-27" }, thomsen: null } },
+    { id: "i54", item: "Ranch Dressing", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "896050", thomsenSku: "123555", names: { qfc: "Ken's Ranch Dressing 0789", thomsen: "Dressing Ranch" }, prices: { qfc: { amt: 64.99, unit: "box", date: "2026-07-29" }, thomsen: { amt: 69.01, unit: "case", date: "2026-07-23" } } },
+    { id: "i55", item: "Blue Cheese Dressing", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "894860", thomsenSku: "81602", names: { qfc: "Ken's Chunky Blue Cheese 865", thomsen: "Dressing Bleu Cheese Chunky" }, prices: { qfc: { amt: 87.59, unit: "box", date: "2026-07-29" }, thomsen: { amt: 88.81, unit: "case", date: "2026-07-12" } } },
+    { id: "i56", item: "Balsamic Vinaigrette", qty: 0, unit: "ea", low: 1, vendor: "QFC", qfcSku: "893130-B", thomsenSku: "46840", names: { qfc: "Ken's Balsamic Vinaigrette 0955", thomsen: "Dressing Balsamic Vinaigrette" }, prices: { qfc: { amt: 19.03, unit: "ea", date: "2026-07-27" }, thomsen: { amt: 18.66, unit: "ea", date: "2026-07-23" } } },
+    { id: "i57", item: "Greek Dressing", qty: 0, unit: "ea", low: 1, vendor: "QFC", qfcSku: "897710-B", thomsenSku: "123445", names: { qfc: "Cristies Greek Dressing", thomsen: "Dressing Greek" }, prices: { qfc: { amt: 19.74, unit: "ea", date: "2026-07-30" }, thomsen: null } },
+    { id: "i32", item: "Garlic Parm Wing Sauce", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "894560", thomsenSku: "68383", names: { qfc: "Ken's Swt Baby Ray Garlic Parm", thomsen: "Sauce Wing Garlic Parmesan" }, prices: { qfc: { amt: 50.65, unit: "box", date: "2026-07-30" }, thomsen: null } },
+    { id: "i58", item: "Frank's Red Hot (Original)", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "920140", thomsenSku: "268060", names: { qfc: "Frank's Orig Red Hot Sauce", thomsen: "Sauce Hot Redhot Gal" }, prices: { qfc: { amt: 68.86, unit: "box", date: "2026-07-29" }, thomsen: null } },
+    { id: "i59", item: "Frank's Red Hot (Xtra Hot)", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "920144", thomsenSku: "378265", names: { qfc: "Frank's Red Hot Xtra Hot", thomsen: "Sauce Hot Extra Hot" }, prices: { qfc: { amt: 88.15, unit: "box", date: "2026-07-29" }, thomsen: null } },
+    { id: "i27", item: "Mayonnaise", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "895470", names: { qfc: "Hellmann's Extra Heavy Mayo", thomsen: null }, prices: { qfc: { amt: 102.56, unit: "box", date: "2026-07-27" }, thomsen: null } },
+    { id: "i15", item: "Extra Virgin Olive Oil", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "941220", thomsenSku: "70629", names: { qfc: "Extra Virgin Olive Oil 3L Dolce Vita", thomsen: "Oil Olive Extra Virgin" }, prices: { qfc: { amt: 110.69, unit: "box", date: "2026-07-30" }, thomsen: { amt: 90.11, unit: "case", date: "2026-07-12" } } },
+    { id: "i60", item: "Fryer Oil", qty: 0, unit: "box", low: 2, vendor: "QFC", qfcSku: "940862", thomsenSku: "11102", names: { qfc: "Sunflower Canola Oil Hi Oleic", thomsen: "Oil Ultima Trio Can/Saff/Grape" }, prices: { qfc: { amt: 59.99, unit: "box", date: "2026-07-29" }, thomsen: { amt: 51.36, unit: "case", date: "2026-06-07" } } },
+    { id: "i61", item: "Red Wine Vinegar", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "941971", thomsenSku: "374317", names: { qfc: "Red Wine Vinegar 7% Dolce Vita", thomsen: "Vinegar Red Wine" }, prices: { qfc: { amt: 21.71, unit: "box", date: "2026-07-30" }, thomsen: null } },
+    { id: "i62", item: "Anchovies", qty: 0, unit: "ea", low: 1, vendor: "QFC", qfcSku: "935000-B", thomsenSku: "60775", names: { qfc: "Anchovy Savor Imports", thomsen: "Anchovy Fillets in Sun Oil" }, prices: { qfc: { amt: 15.8, unit: "ea", date: "2026-07-27" }, thomsen: { amt: 22.88, unit: "ea", date: "2026-06-07" } } },
+    { id: "i63", item: "Pepperoncini", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "926250", thomsenSku: "81727", names: { qfc: "Cosmo Pepperoncini", thomsen: "Pepperoncini" }, prices: { qfc: { amt: 26.17, unit: "box", date: "2026-07-27" }, thomsen: null } },
+    { id: "i64", item: "Pineapple Tidbits", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "920060", thomsenSku: "659474", names: { qfc: "Dole Pineapple Tidbits Sm Can", thomsen: "Pineapple Tidbits for Pizza LS" }, prices: { qfc: { amt: 54.23, unit: "box", date: "2026-07-15" }, thomsen: { amt: 61.65, unit: "case", date: "2026-07-23" } } },
+    { id: "i31", item: "All Trumps Flour", qty: 0, unit: "box", low: 4, vendor: "QFC", qfcSku: "920261", thomsenSku: "50121", names: { qfc: "GM All Trumps Flour 50121", thomsen: "Flour All Trumps Unbleached Gold Medal" }, prices: { qfc: { amt: 24, unit: "box", date: "2026-07-30" }, thomsen: { amt: 21.99, unit: "bag", date: "2026-07-23" } } },
+    { id: "i65", item: "Semolina Flour", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "921963", thomsenSku: "533742", names: { qfc: "Flour Semolina General Mills", thomsen: "Flour Semolina #1" }, prices: { qfc: { amt: 36.72, unit: "box", date: "2026-07-27" }, thomsen: { amt: 29.98, unit: "bag", date: "2026-07-12" } } },
+    { id: "i66", item: "Kosher Salt", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "872210", thomsenSku: "21550", names: { qfc: "Diamond Kosher Salt", thomsen: null }, prices: { qfc: { amt: 78.9, unit: "box", date: "2026-07-30" }, thomsen: null } },
+    { id: "i67", item: "Granulated Garlic", qty: 0, unit: "ea", low: 1, vendor: "QFC", qfcSku: "872600-B", thomsenSku: "323742", names: { qfc: "Garlic Granulated 6.5lb", thomsen: "Garlic Granulated LG" }, prices: { qfc: { amt: 52.98, unit: "ea", date: "2026-07-27" }, thomsen: null } },
+    { id: "i17", item: "Romaine Hearts", qty: 0, unit: "case", low: 1, vendor: "", prices: { qfc: null, thomsen: null } },
+    { id: "i18", item: "Green Bell Peppers", qty: 0, unit: "case", low: 1, vendor: "", prices: { qfc: null, thomsen: null } },
+    { id: "i19", item: "Iceberg Lettuce", qty: 0, unit: "case", low: 1, vendor: "", prices: { qfc: null, thomsen: null } },
+    { id: "i21", item: "Milk", qty: 0, unit: "gal", low: 2, vendor: "", prices: { qfc: null, thomsen: null } },
+    { id: "i16", item: "Poland Spring Water", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "986300", thomsenSku: "81718", names: { qfc: "Poland Spring Water 40 pack", thomsen: "Water Poland Spring 16.9 oz" }, prices: { qfc: { amt: 7.99, unit: "box", date: "2026-07-30" }, thomsen: { amt: 9.59, unit: "case", date: "2026-07-23" } } },
+    { id: "i13", item: "Pizza Boxes 12 in", qty: 0, unit: "box", low: 2, vendor: "QFC", qfcSku: "470790", thomsenSku: "81856", names: { qfc: "Box Pizza Corr 12 in White", thomsen: "Box Pizza Corr Kraft 12x12" }, prices: { qfc: { amt: 19.76, unit: "box", date: "2026-07-30" }, thomsen: { amt: 16.96, unit: "bundle", date: "2026-07-05" } } },
+    { id: "i68", item: "Pizza Boxes 14 in", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "470900", thomsenSku: "81852", names: { qfc: "Box Pizza Corr 14 in White", thomsen: "Box Pizza Corr Kraft 14x14" }, prices: { qfc: { amt: 23.2, unit: "box", date: "2026-07-27" }, thomsen: null } },
+    { id: "i12", item: "Pizza Boxes 16 in", qty: 0, unit: "box", low: 2, vendor: "QFC", qfcSku: "473810", thomsenSku: "81812", names: { qfc: "Box Pizza Corr 16 in White", thomsen: "Box Pizza Corr Kraft 16x16" }, prices: { qfc: { amt: 23.33, unit: "box", date: "2026-07-27" }, thomsen: null } },
+    { id: "i14", item: "Pizza Boxes 18\"", qty: 0, unit: "box", low: 1, vendor: "", prices: { qfc: null, thomsen: null } },
+    { id: "i34", item: "Hinged Fiber Container", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "470230", thomsenSku: "52675", names: { qfc: "Molded Fiber Hinge 9x9x3 Green Wave", thomsen: "Cont Hinged Fiber 8x8x3 1 Comp" }, prices: { qfc: { amt: 90.96, unit: "box", date: "2026-07-30" }, thomsen: null } },
+    { id: "i69", item: "Molded Fiber Hinge 9x6x3 (Empress)", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "470241", prices: { qfc: { amt: 62.58, unit: "box", date: "2026-07-15" }, thomsen: null } },
+    { id: "i70", item: "Fiber Plates 10 in", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "475660", thomsenSku: "81628", names: { qfc: "Plate Fiber 10 in Ovation", thomsen: "Plate 10 in Bagasse Fiber" }, prices: { qfc: { amt: 69.21, unit: "box", date: "2026-07-27" }, thomsen: { amt: 78.51, unit: "case", date: "2026-07-23" } } },
+    { id: "i71", item: "Paper Plates 9 in", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "472331", thomsenSku: "81605", names: { qfc: "Plate Paper 9 in White Uncoated", thomsen: "Plate Paper 9 in" }, prices: { qfc: { amt: 29.41, unit: "box", date: "2026-07-30" }, thomsen: { amt: 53, unit: "case", date: "2026-07-23" } } },
+    { id: "i72", item: "Foil Pan 9\" Round 46oz", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "472270", prices: { qfc: { amt: 126.99, unit: "box", date: "2026-07-27" }, thomsen: null } },
+    { id: "i73", item: "Lid Dome 9\" Round", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "474510", prices: { qfc: { amt: 43.78, unit: "box", date: "2026-07-27" }, thomsen: null } },
+    { id: "i74", item: "Souffle Cups 3.25oz", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "474700", thomsenSku: "70155", names: { qfc: "Cup Souffle 3.25oz Solo", thomsen: "Cup Souffle Plastic 3.25 oz" }, prices: { qfc: { amt: 60.04, unit: "box", date: "2026-07-27" }, thomsen: null } },
+    { id: "i75", item: "Souffle Lids", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "474480", thomsenSku: "70160", names: { qfc: "Lid Souffle 4oz Clr Solo", thomsen: "Lid Souffle 3.25-5.5 oz" }, prices: { qfc: { amt: 46.79, unit: "box", date: "2026-07-27" }, thomsen: null } },
+    { id: "i76", item: "Container 16oz Round Clear w/ Lid", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "472700", prices: { qfc: { amt: 41.59, unit: "box", date: "2026-07-30" }, thomsen: null } },
+    { id: "i77", item: "Dry Wax Wrap 15x20", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "474610", thomsenSku: "37225", names: { qfc: "Wrap Dry Wax 15x20 McNairn", thomsen: "Wrap Sub Wax Dry 15 x 20 in" }, prices: { qfc: { amt: 122.81, unit: "box", date: "2026-07-30" }, thomsen: { amt: 77.11, unit: "case", date: "2026-07-12" } } },
+    { id: "i78", item: "Dispenser Napkins", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "470500", thomsenSku: "81732", names: { qfc: "Napkin Kraft Xpressnap Tork", thomsen: "Napkin Disp Xpressnap Kraft" }, prices: { qfc: { amt: 84.53, unit: "box", date: "2026-07-27" }, thomsen: { amt: 48.48, unit: "case", date: "2026-06-07" } } },
+    { id: "i79", item: "Paper Towel Rolls", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "471060", thomsenSku: "81172", names: { qfc: "Towel Roll White SCA Tork 700", thomsen: "Towel White Roll Tork 7.7 in" }, prices: { qfc: { amt: 58.66, unit: "box", date: "2026-07-15" }, thomsen: { amt: 69.16, unit: "case", date: "2026-07-05" } } },
+    { id: "i80", item: "Toilet Paper", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "470890", thomsenSku: "81777", names: { qfc: "Toilet Paper Jumbo Mini Tork", thomsen: "Tissue Bath Jumbo Mini 2 Ply" }, prices: { qfc: { amt: 56.88, unit: "box", date: "2026-07-30" }, thomsen: { amt: 57.7, unit: "case", date: "2026-06-07" } } },
+    { id: "i81", item: "T-Shirt Bags", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "472280", thomsenSku: "603974", names: { qfc: "Bag Plastic Bio Green Habitat", thomsen: "Bag T Shirt Biodegradable" }, prices: { qfc: { amt: 23.48, unit: "box", date: "2026-07-27" }, thomsen: { amt: 29.14, unit: "case", date: "2026-07-23" } } },
+    { id: "i82", item: "Merchandise Bags 13x15", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "471450", thomsenSku: "81791", names: { qfc: "Bag Kraft Flat Merchandise 13x15", thomsen: "Bag Millinery 13 x 15" }, prices: { qfc: { amt: 86.02, unit: "box", date: "2026-07-30" }, thomsen: null } },
+    { id: "i83", item: "Bag Paper Brown Quart", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "472350", prices: { qfc: { amt: 20.46, unit: "box", date: "2026-07-30" }, thomsen: null } },
+    { id: "i33", item: "Gloves - Medium", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "470080", thomsenSku: "17180", names: { qfc: "Glove Medium Vinyl Powdered", thomsen: "Glove Vinyl Powder Medium" }, prices: { qfc: { amt: 35, unit: "box", date: "2026-07-27" }, thomsen: null } },
+    { id: "i84", item: "Gloves - Large", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "470070", thomsenSku: "17190", names: { qfc: "Glove Large Vinyl Powdered", thomsen: "Glove Vinyl Powder Large" }, prices: { qfc: { amt: 35, unit: "box", date: "2026-07-30" }, thomsen: null } },
+    { id: "i85", item: "Gloves - XLarge", qty: 0, unit: "box", low: 1, vendor: "QFC", qfcSku: "470060", thomsenSku: "17195", names: { qfc: "Glove XLarge Vinyl Powdered", thomsen: "Glove Vinyl Powder X Lrg" }, prices: { qfc: { amt: 35, unit: "box", date: "2026-07-27" }, thomsen: { amt: 26.99, unit: "case", date: "2026-07-12" } } },
+    { id: "i86", item: "Steel Scrubber", qty: 0, unit: "ea", low: 1, vendor: "QFC", qfcSku: "470940-B", thomsenSku: "81205", names: { qfc: "Stainless Steel Scrubber", thomsen: "Sponge Stainless Steel" }, prices: { qfc: { amt: 9.99, unit: "ea", date: "2026-07-27" }, thomsen: null } },
+    { id: "i87", item: "Bacon Layout Hickory 18/22", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "045097", prices: { qfc: null, thomsen: { amt: 53.85, unit: "case", date: "2026-07-23" } } },
+    { id: "i88", item: "Clorox Bleach 8.25%", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "564981", prices: { qfc: null, thomsen: { amt: 35.75, unit: "case", date: "2026-07-23" } } },
+    { id: "i89", item: "Kettle Chips Salt & Vinegar", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "692420", prices: { qfc: null, thomsen: { amt: 25.85, unit: "case", date: "2026-07-23" } } },
+    { id: "i90", item: "Kettle Chips Salt", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "692417", prices: { qfc: null, thomsen: { amt: 25.85, unit: "case", date: "2026-07-23" } } },
+    { id: "i91", item: "Kettle Chips Sweet Maui", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "692422", prices: { qfc: null, thomsen: { amt: 25.85, unit: "case", date: "2026-07-23" } } },
+    { id: "i92", item: "Glass Cleaner (Lazer)", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "82106", prices: { qfc: null, thomsen: { amt: 38.1, unit: "case", date: "2026-07-23" } } },
+    { id: "i93", item: "Cookie Dough Triple Chocolate Chip", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "536515", prices: { qfc: null, thomsen: { amt: 49.95, unit: "case", date: "2026-07-23" } } },
+    { id: "i94", item: "Croutons Homestyle Seasoned", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "07925", prices: { qfc: null, thomsen: { amt: 33.74, unit: "case", date: "2026-07-23" } } },
+    { id: "i95", item: "Degreaser (Break Thru Workhorse)", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "82103", prices: { qfc: null, thomsen: { amt: 48.71, unit: "case", date: "2026-07-23" } } },
+    { id: "i96", item: "Del's All Natural Lemonade", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "80515", prices: { qfc: null, thomsen: { amt: 19.7, unit: "case", date: "2026-07-23" } } },
+    { id: "i97", item: "Dawn Pot & Pan Detergent", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "570601", prices: { qfc: null, thomsen: { amt: 86.12, unit: "case", date: "2026-07-23" } } },
+    { id: "i98", item: "1000 Island Dressing", qty: 0, unit: "ea", low: 1, vendor: "Thomsen", thomsenSku: "85600", prices: { qfc: null, thomsen: { amt: 18.67, unit: "ea", date: "2026-07-23" } } },
+    { id: "i99", item: "Honey Mustard Dijon Dressing", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "80673", prices: { qfc: null, thomsen: { amt: 82.15, unit: "case", date: "2026-07-23" } } },
+    { id: "i100", item: "Danish & Bun Icing", qty: 0, unit: "pail", low: 1, vendor: "Thomsen", thomsenSku: "753642", prices: { qfc: null, thomsen: { amt: 47.39, unit: "pail", date: "2026-07-23" } } },
+    { id: "i101", item: "Apple Juice 16oz", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "610395", prices: { qfc: null, thomsen: { amt: 20.37, unit: "case", date: "2026-07-23" } } },
+    { id: "i102", item: "Cranberry Juice 16oz", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "610390", prices: { qfc: null, thomsen: { amt: 20.37, unit: "case", date: "2026-07-23" } } },
+    { id: "i103", item: "Liner Black Low-D 37x50 44gal", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "668314", prices: { qfc: null, thomsen: { amt: 37.39, unit: "case", date: "2026-07-23" } } },
+    { id: "i104", item: "Liner Hi-D Clear 38x60 60G", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "472447", prices: { qfc: null, thomsen: { amt: 44.63, unit: "case", date: "2026-07-23" } } },
+    { id: "i105", item: "Meatballs Beef Cooked 2oz (Angelo)", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "80873", prices: { qfc: null, thomsen: { amt: 49.3, unit: "case", date: "2026-07-23" } } },
+    { id: "i106", item: "Coffee Milk 14oz", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "743739", prices: { qfc: null, thomsen: { amt: 12.55, unit: "case", date: "2026-07-23" } } },
+    { id: "i107", item: "Kalamata Olives Pitted", qty: 0, unit: "ea", low: 1, vendor: "Thomsen", thomsenSku: "18690", prices: { qfc: null, thomsen: { amt: 23.47, unit: "ea", date: "2026-07-23" } } },
+    { id: "i108", item: "Wax Paper Senior EZ 10x10.75", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "81177", prices: { qfc: null, thomsen: { amt: 83.88, unit: "case", date: "2026-07-23" } } },
+    { id: "i109", item: "Sliced Jalapeno Peppers (gal)", qty: 0, unit: "ea", low: 1, vendor: "Thomsen", thomsenSku: "736328", prices: { qfc: null, thomsen: { amt: 9.99, unit: "ea", date: "2026-07-23" } } },
+    { id: "i110", item: "Kosher Dill Chip Pickles", qty: 0, unit: "pail", low: 1, vendor: "Thomsen", thomsenSku: "80467", prices: { qfc: null, thomsen: { amt: 36.59, unit: "pail", date: "2026-07-23" } } },
+    { id: "i112", item: "Register Roll 3\" 1-Ply", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "80039", prices: { qfc: null, thomsen: { amt: 57.94, unit: "case", date: "2026-07-23" } } },
+    { id: "i113", item: "Sweet Baby Ray's BBQ (Original)", qty: 0, unit: "case", low: 1, vendor: "Thomsen", qfcSku: "894170", thomsenSku: "17980", prices: { qfc: { amt: 60.91, unit: "box", date: "2026-07-23" }, thomsen: { amt: 59.68, unit: "case", date: "2026-07-23" } } },
+    { id: "i114", item: "Pesto Basil Sauce", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "362288", prices: { qfc: null, thomsen: { amt: 91.19, unit: "case", date: "2026-07-23" } } },
+    { id: "i115", item: "Sweet Red Chili Wing Sauce", qty: 0, unit: "ea", low: 1, vendor: "Thomsen", thomsenSku: "68387", prices: { qfc: null, thomsen: { amt: 22.35, unit: "ea", date: "2026-07-23" } } },
+    { id: "i116", item: "Teriyaki Wing Sauce", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "68388", prices: { qfc: null, thomsen: { amt: 48.17, unit: "case", date: "2026-07-23" } } },
+    { id: "i117", item: "Hand Soap Foaming (Simoniz)", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "80576", prices: { qfc: null, thomsen: { amt: 110.45, unit: "case", date: "2026-07-23" } } },
+    { id: "i118", item: "Soda — Blue Raspberry", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "90502", prices: { qfc: null, thomsen: { amt: 32.08, unit: "case", date: "2026-07-23" } } },
+    { id: "i119", item: "Coca-Cola 12oz", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "164487", prices: { qfc: null, thomsen: { amt: 11.15, unit: "case", date: "2026-07-23" } } },
+    { id: "i120", item: "Soda — Cream", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "90503", prices: { qfc: null, thomsen: { amt: 32.37, unit: "case", date: "2026-07-23" } } },
+    { id: "i121", item: "Soda — Lemon", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "90515", prices: { qfc: null, thomsen: { amt: 27.18, unit: "case", date: "2026-07-23" } } },
+    { id: "i122", item: "Soda — Lemon Lime", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "90511", prices: { qfc: null, thomsen: { amt: 31.73, unit: "case", date: "2026-07-23" } } },
+    { id: "i123", item: "Soda — Rhody Red", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "90516", prices: { qfc: null, thomsen: { amt: 32.36, unit: "case", date: "2026-07-23" } } },
+    { id: "i124", item: "Soda — Root Beer", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "90500", prices: { qfc: null, thomsen: { amt: 30.97, unit: "case", date: "2026-07-23" } } },
+    { id: "i125", item: "Soda — Sarsaparilla", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "90509", prices: { qfc: null, thomsen: { amt: 30.09, unit: "case", date: "2026-07-23" } } },
+    { id: "i126", item: "Soda — Strawberry", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "90517", prices: { qfc: null, thomsen: { amt: 30.97, unit: "case", date: "2026-07-23" } } },
+    { id: "i127", item: "Sweet Baby Ray's Hot Honey", qty: 0, unit: "case", low: 1, vendor: "Thomsen", thomsenSku: "23014", prices: { qfc: null, thomsen: { amt: 51.37, unit: "case", date: "2026-07-23" } } }
   ],
   storageMap: [
     { id: "sm1", area: "Back Room \u2014 Back Shelf (top)", items: "Mayonnaise, honey mustard, ranch, red wine vinegar, balsamic vinaigrette, BBQ sauce, Frank's RedHot, Frank's Extra Hot" },
@@ -362,10 +446,9 @@ const DEFAULT_DATA = {
   recipes: [
     { id: "r1", name: "Ricotta Mix", steps: "4 containers of ricotta cheese\n2 heavy pinches of crushed parsley\n1/4 souffl\xE9 of salt and pepper mix\n1 full souffl\xE9 of granulated garlic\n\nMix thoroughly." },
     { id: "r2", name: "Roma (Tomato Prep)", steps: "4 cans of 74/40 tomato strips\nStrain in bus tub for 10\u201315 minutes to remove excess water\nGently fold tomatoes over by hand in the strainer to preserve strips \u2014 do not crush\n1/4 souffl\xE9 of salt and pepper mix\n1/2 souffl\xE9 of sugar\n\nMix gently." },
-    { id: "r3", name: "Pizza Sauce", steps: "3 cases of Tomato Magic\n16 oz garlic oil\n1 cup salt and pepper mix\n\nMix well until fully combined." },
-    { id: "r4", name: "Dough", steps: "2 8-quart containers of cold water (second one just above handles)\nSmall amount of hot water (105\u2013110\xB0F) in a 2-quart container\nDissolve 28g yeast in hot water\n\nAdd to mixer bowl:\n\u2022 Both cold waters\n\u2022 1 scoop salt\n\u2022 1 scoop sugar\n\nAdd frothy yeast mixture to bowl\nAdd 1 bag of flour\nSet dough machine to speed #1\nKeep olive oil nearby\nAs dough begins to come together, pour 1/4 container of olive oil around bowl and hook\nMix 8 minutes total, or until dough pulls off hook and appears smooth and slightly wrinkled\nOptional: Add splash of cold water if dough feels too tight\nLower bowl and cover with apron to rest" },
-    { id: "r5", name: "Garlic Butter", steps: "4 lbs butter, melted and clarified\nEqual part garlic oil (approx. 4 lbs or equal volume)\n2 heavy pinches crushed parsley\n2 heavy pinches salt and pepper mix\n\nStir to combine." },
-    { id: "r6", name: "Buffalo Sauce", steps: "Equal parts Frank's RedHot and Frank's Extra Hot\nClarify melted butter by letting solids settle and pouring off top layer\nMix clarified butter into hot sauce mixture\nAdd 1 cup Romano cheese\nStir thoroughly." }
+    { id: "r3", name: "Pizza Sauce", steps: "3 cases Tomato Magic (18 cans total, 6 per case)\n1 full 12 oz cup salt & pepper mix\n1 quart cold water\n1.5 liters garlic oil\n\n1. Empty all 18 cans into the large mixing pot.\n2. In a separate container, mix 1 quart cold water with the full 12 oz cup of salt & pepper mix.\n3. Stir into a slurry.\n4. Pour the slurry into the tomatoes.\n5. Add 1.5 liters garlic oil.\n6. Stir thoroughly with the long stainless paddle until fully combined.\n7. Portion into containers, lid them, date-label and refrigerate.\n\nMix all the way to the bottom so the oil and seasoning are fully combined." },
+    { id: "r4", name: "Dough", steps: "0.25 L warm water (100\u2013110\u00B0F)\n28 g yeast\n6 L cold water\n7.5 L cold water\n1 full 12 oz cup salt\n1 x 50 lb bag flour (less 1 shallow 1/6 pan scoop)\nOlive oil (small amount)\n\n1. Bloom the yeast: 28 g yeast into 0.25 L warm water. Mix gently with your finger, let sit 5\u201310 min until frothy.\n2. Set the water, yeast and salt aside so nothing gets forgotten.\n3. Put 6 L and 7.5 L cold water into the empty mixer bowl. Use the hook attachment.\n4. Remove 1 shallow 1/6 pan scoop of flour from the bag, then add the rest to the bowl.\n5. Start on LEVEL 1 so the flour does not fly. Once it is mixing, pour in the bloomed yeast.\n6. Add 0.25 L cold water to the yeast container, swirl with your finger to get the leftover yeast, pour it in.\n7. Pour in the full 12 oz cup of salt while the dough is mixing.\n8. Mix about 8 minutes. Add a little olive oil around the outside of the dough. Turn the mixer off so it does not stick.\n\nMixer stays on Level 1. Cold water as cold as it gets. Removing the scoop of flour helps hydration." }, { id: "r5", name: "Garlic Butter", steps: "4 lbs butter, melted and clarified\nEqual part garlic oil (approx. 4 lbs or equal volume)\n2 heavy pinches crushed parsley\n2 heavy pinches salt and pepper mix\n\nStir to combine." },
+    { id: "r6", name: "Buffalo Sauce", steps: "1 gallon Frank's Original RedHot\n1 gallon Frank's Extra Hot RedHot\n4 lb butter\n1 full 12 oz cup romano cheese\n\n1. Melt 4 lb butter on low heat.\n2. Let it simmer 5\u201310 minutes max.\n3. Off the heat, ladle off most of the white foam and solids from the top. A little left behind is fine.\n4. Pour both gallons of Frank's into a 12-quart container.\n5. Pour in the melted butter, but STOP when you reach the watery liquid at the bottom \u2014 discard that.\n6. Whisk the hot sauce and butter together well so the butter is not sitting on top.\n7. Add the romano a little at a time, about 1/4 cup per addition, whisking after each, until the full 12 oz cup is mixed in.\n8. Pour the finished sauce back into the bottles or containers.\n\nGoal: smooth and well mixed, with no hot butter floating on top." }
   ],
   tasks: [
     { id: "t1", text: "Confirm salami re-ship from Quality Food Co", station: "Manager", assignee: "Manager", done: false },
@@ -616,11 +699,13 @@ const GUIDES = [
   { id: "g1", file: "/guides/pizza-sauce.jpg", title: "Pizza Sauce", sub: "3 cases Tomato Magic \u2014 full build", group: "Recipes" },
   { id: "g2", file: "/guides/dough-recipe.jpg", title: "Dough", sub: "Mixer steps, level 1, 8 minutes", group: "Recipes" },
   { id: "g3", file: "/guides/pizza-line-map.jpg", title: "Pizza Line Map", sub: "Where every topping goes back", group: "Line & Stations" },
+  { id: "g9", file: "/guides/buffalo-sauce.jpg", title: "Buffalo Sauce", sub: "2 gal Frank's, 4 lb butter, romano", group: "Recipes" },
   { id: "g4", file: "/guides/clean-dishes.jpg", title: "Clean Dishes \u2014 Top Shelf", sub: "Pan sizes and where they stack", group: "Line & Stations" },
   { id: "g5", file: "/guides/prep-walkin.jpg", title: "Prep Walk-In", sub: "Shelf-by-shelf layout", group: "Storage & Layout" },
   { id: "g6", file: "/guides/bulk-walkin.jpg", title: "Bulk Storage Walk-In", sub: "Cheese, dough rotation, FIFO", group: "Storage & Layout" },
   { id: "g7", file: "/guides/backroom-freezer.jpg", title: "Backroom Freezer", sub: "Top / middle / bottom shelf", group: "Storage & Layout" },
-  { id: "g8", file: "/guides/backroom-shelf.jpg", title: "Backroom Shelf", sub: "Condiments, oils, tomatoes", group: "Storage & Layout" }
+  { id: "g8", file: "/guides/backroom-shelf.jpg", title: "Backroom Shelf", sub: "Salt, sugar, yeast, peppers, dressing mix", group: "Storage & Layout" },
+  { id: "g10", file: "/guides/shelf-layout.jpg", title: "Dry Storage Shelf", sub: "Condiments, oils, canned tomatoes", group: "Storage & Layout" }
 ];
 // ---- multi-device sync helpers ----
 // Two tablets and a phone all edit the same document. Last-write-wins would let
@@ -704,6 +789,76 @@ function merge3(base, mine, theirs) {
 
 const SYNC_URL = (typeof window !== "undefined" && window.SYNC_URL) || "/.netlify/functions/data";
 const MEDIA_URL = (typeof window !== "undefined" && window.MEDIA_URL) || "/.netlify/functions/media";
+const YOLINK_URL = (typeof window !== "undefined" && window.YOLINK_URL) || "/.netlify/functions/yolink";
+const RECIPE_VERSION = 2;
+// The pizza sauce, dough and buffalo recipes in the app disagreed with the
+// printed wall guides. The guides are what the crew actually follows, so they
+// win. Only the three that changed get overwritten; anything else on a device
+// (including recipes added there) is left alone.
+function migrateRecipes(d) {
+  if (!d || typeof d !== "object") return { data: d, changed: false };
+  if ((d.recipeVersion || 0) >= RECIPE_VERSION) return { data: d, changed: false };
+  const seed = DEFAULT_DATA.recipes || [];
+  const have = Array.isArray(d.recipes) ? d.recipes : [];
+  const replace = { r3: 1, r4: 1, r6: 1 };
+  const out = have.map((r) => {
+    if (!replace[r.id]) return r;
+    const s = seed.find((x) => x.id === r.id);
+    return s ? JSON.parse(JSON.stringify(s)) : r;
+  });
+  seed.forEach((s) => { if (!out.some((r) => r.id === s.id)) out.push(JSON.parse(JSON.stringify(s))); });
+  d.recipes = out;
+  d.recipeVersion = RECIPE_VERSION;
+  return { data: d, changed: true };
+}
+
+const INVENTORY_VERSION = 5;
+// Same problem as the schedule: a device with saved data ignores DEFAULT_DATA
+// forever. This folds the rebuilt item list (invoice prices, item numbers, and
+// the lumped deli/dressing entries split into real items) into whatever a
+// tablet already has, WITHOUT touching counts anyone has taken.
+function migrateInventory(d) {
+  if (!d || typeof d !== "object") return { data: d, changed: false };
+  if ((d.inventoryVersion || 0) >= INVENTORY_VERSION) return { data: d, changed: false };
+  const seed = DEFAULT_DATA.inventory || [];
+  const have = Array.isArray(d.inventory) ? d.inventory : [];
+  const byId = {};
+  have.forEach((i) => { byId[i.id] = i; });
+
+  // These were catch-all rows ("Deli Logs", "Salami / Capicola",
+  // "Dressing & Sauce Jugs"); real items replace them.
+  const retired = { i24: 1, i25: 1, i26: 1, i28: 1, i37: 1, i39: 1 };
+
+  const out = [];
+  seed.forEach((s) => {
+    const cur = byId[s.id];
+    if (!cur) { out.push(JSON.parse(JSON.stringify(s))); return; }
+    const merged = JSON.parse(JSON.stringify(cur));
+    merged.item = s.item;                       // canonical name
+    if (s.qfcSku) merged.qfcSku = s.qfcSku;
+    if (s.thomsenSku) merged.thomsenSku = s.thomsenSku;
+    if (!merged.unit) merged.unit = s.unit;
+    if (typeof merged.low !== "number") merged.low = s.low;
+    if (!merged.vendor) merged.vendor = s.vendor;
+    if (!merged.prices) merged.prices = { qfc: null, thomsen: null };
+    // Take a seeded price only when it's newer than what's already on the device.
+    ["qfc", "thomsen"].forEach((v) => {
+      const sp = s.prices && s.prices[v], cp = merged.prices[v];
+      if (sp && (!cp || !cp.date || (sp.date && sp.date > cp.date))) merged.prices[v] = sp;
+    });
+    out.push(merged);
+  });
+  // Anything the user added themselves stays, unless it was one of the lumps.
+  have.forEach((i) => {
+    if (retired[i.id]) return;
+    if (!seed.some((s) => s.id === i.id)) out.push(i);
+  });
+
+  d.inventory = out;
+  d.inventoryVersion = INVENTORY_VERSION;
+  return { data: d, changed: true };
+}
+
 const SCHEDULE_VERSION = 2;
 // Saved data replaces DEFAULT_DATA outright, so a new seed alone never reaches
 // a tablet that already has data. Bump SCHEDULE_VERSION to push a schedule out.
@@ -976,7 +1131,10 @@ function PizzaOpsManager() {
       const merged = mine && baseRef.current
         ? merge3(baseRef.current, mine, doc.data)
         : doc.data;
-      const mig = migrateSchedule(merged);
+      const ms2 = migrateSchedule(merged);
+      const mi2 = migrateInventory(ms2.data);
+      const mr2 = migrateRecipes(mi2.data);
+      const mig = { data: mr2.data, changed: ms2.changed || mi2.changed || mr2.changed };
       revRef.current = doc.rev;
       baseRef.current = JSON.parse(JSON.stringify(doc.data));
       dataRef.current = mig.data;
@@ -1051,7 +1209,10 @@ function PizzaOpsManager() {
       try {
         const raw = localStorage.getItem("shared:shop-data");
         const saved = raw ? JSON.parse(raw) : DEFAULT_DATA;
-        const mig = migrateSchedule(saved);
+        const ms = migrateSchedule(saved);
+        const mi = migrateInventory(ms.data);
+        const mr = migrateRecipes(mi.data);
+        const mig = { data: mr.data, changed: ms.changed || mi.changed || mr.changed };
         dataRef.current = mig.data;
         setData(mig.data);
       } catch (e) {
@@ -1091,13 +1252,14 @@ function PizzaOpsManager() {
   const boardFlags = (((_a = data.prep) == null ? void 0 : _a.lowStock) || []).filter((i) => i.status === "low" || i.status === "86").length;
   const prepTodo = (((_a = data.prep) == null ? void 0 : _a.par) || []).filter((i) => Number(i.need) > 0 && !i.done).length;
   const belmontNeed = (((_a = data.prep) == null ? void 0 : _a.produce) || []).filter((i) => Number(i.need) > 0).length;
+  const foodOrderNeed = (data.inventory || []).filter((i) => Number(i.orderNeed) > 0).length;
   const tabs = [
     { id: "assistant", label: "Ask the Manager", icon: MessageSquare },
     { id: "schedule", label: "Schedule", icon: Users },
     { id: "staff", label: "Staff", icon: Users },
     { id: "inventory", label: "Inventory", icon: Package, badge: lowStockCount },
-    { id: "order", label: "Order", icon: ShoppingCart, badge: lowStockCount },
     { id: "preplist", label: "Prep List", icon: ClipboardList, badge: prepTodo },
+    { id: "foodorder", label: "Food Order", icon: ShoppingCart, badge: foodOrderNeed },
     { id: "belmont", label: "Belmont Order", icon: ShoppingCart, badge: belmontNeed },
     { id: "prep", label: "86 Board", icon: AlertTriangle, badge: boardFlags },
     { id: "recipes", label: "Recipes", icon: Pizza },
@@ -1148,7 +1310,7 @@ function PizzaOpsManager() {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "order" && /* @__PURE__ */ React.createElement(OrderTab, { data }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); } })));
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "foodorder" && /* @__PURE__ */ React.createElement(FoodOrderTab, { data, persist }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); } })));
 }
 function AssistantAvatar({ state }) {
   const blobs = {
@@ -1458,11 +1620,11 @@ Keep "reply" concise \u2014 a few sentences at most \u2014 so the whole response
 - {"type": "complete_task", "text_match": "substring of an existing task's text"}
 - {"type": "update_inventory", "item_match": "substring of an existing inventory item name", "qty": number}
 - {"type": "add_shift", "day": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "name": "...", "time": "..."}
-- {"type": "set_produce", "item_match": "romaine", "need": 2}  (put an item on the Belmont produce order; need 0 = all set, need null = not looked at yet}
+- {"type": "set_produce", "item_match": "romaine", "need": 2}  (put an item on the Belmont produce order; need 0 = all set, need null = not looked at yet)\n- {"type": "set_order", "item_match": "all trumps", "orderNeed": 4, "orderVendor": "QFC"}  (put an inventory item on the food order; orderNeed 0 = all set, null = clear it}
 - {"type": "flag_stock", "item": "...", "status": "ok|low|86"}
 - {"type": "set_queue", "size_match": "substring of an order queue size label, e.g. 'XL' or 'Medium'", "count": number}
 
-Some inventory items carry "thomsenSku" (the Thomsen order-guide item number) and "thomsenUom" (Thomsen's unit of measure) \u2014 use these when asked for an item number or how Thomsen sells it. Inventory items carry two vendor prices under "prices": qfc (Quality Food) and thomsen. When quoting or costing, use the one with the more recent "date"; if only one is dated, use that one; if neither is dated, use qfc, and fall back to thomsen only when qfc is null. Each price has its own "unit" \u2014 if the two vendors' units differ, say so rather than comparing them directly. "vendor" is who we actually order the item from, which is separate from price comparison.
+Inventory items also carry "orderNeed" (the FOOD ORDER list: null = not looked at, 0 = all set / none needed, N = that many are on the order) and "orderVendor" (which distributor we're buying that item from this time, "QFC" for Quality Food or "Thomsen"). When asked what's on the food order, list items with orderNeed > 0 grouped by vendor. Inventory items are ONE line per product, not one per brand \u2014 the two distributors often stock different brands of the same thing (e.g. ricotta is Grande at Thomsen and Supreme at Quality). "names" holds what each vendor calls it; use the vendor\u0027s own name when reading an order back. Never suggest adding a second row for a different brand of something already listed. Some inventory items carry "thomsenSku" (the Thomsen order-guide item number) and "thomsenUom" (Thomsen's unit of measure) \u2014 use these when asked for an item number or how Thomsen sells it. Inventory items carry two vendor prices under "prices": qfc (Quality Food) and thomsen. When quoting or costing, use the one with the more recent "date"; if only one is dated, use that one; if neither is dated, use qfc, and fall back to thomsen only when qfc is null. Each price has its own "unit" \u2014 if the two vendors' units differ, say so rather than comparing them directly. "vendor" is who we actually order the item from, which is separate from price comparison.
 
 If the user is just asking a question, return an empty actions array. Never invent inventory items, staff names, or tasks that aren't in the data when answering questions \u2014 only use actions to create new ones when explicitly asked.`;
     try {
@@ -1549,6 +1711,13 @@ If the user is just asking a question, return an empty actions array. Never inve
               r.done = false;
             }
             if (action.done !== void 0) r.done = !!action.done;
+            changed = true;
+          }
+        } else if (action.type === "set_order") {
+          const r = (next.inventory || []).find((r2) => r2.item.toLowerCase().includes((action.item_match || "").toLowerCase()));
+          if (r) {
+            if (action.orderNeed !== void 0) r.orderNeed = action.orderNeed === null ? null : Number(action.orderNeed);
+            if (action.orderVendor !== void 0) r.orderVendor = action.orderVendor;
             changed = true;
           }
         } else if (action.type === "set_produce") {
@@ -2349,13 +2518,24 @@ function InventoryTab({ data, persist }) {
 function itemCategory(name) {
   const n = (name || "").toLowerCase();
   const has = (arr) => arr.some((w) => n.indexOf(w) !== -1);
-  if (has(["box", "cup", "container", "foil", "glove", "napkin", "towel", "wrap", "bag", "parchment", "apron"])) return "Paper & Packaging";
-  if (has(["mozzarella", "cheddar", "romano", "provolone", "feta", "ricotta", "cheese", "parmesan", "asiago", "gorgonzola", "deli log"])) return "Cheese";
-  if (has(["chicken", "pepperoni", "bacon", "sausage", "salami", "capicola", "meatball", "ham", "turkey", "wing", "steak", "beef"])) return "Meat";
-  if (has(["romaine", "lettuce", "pepper", "onion", "tomato", "mushroom", "spinach", "broccoli", "celery", "cucumber", "basil", "parsley", "produce"])) return "Produce";
-  if (has(["dressing", "sauce", "mayo", "mustard", "vinegar", "oil", "dip"])) return "Sauces, Oils & Dressings";
-  if (has(["water", "soda", "milk", "juice", "drink", "cola", "seltzer"])) return "Beverages";
-  if (has(["flour", "yeast", "crust", "salt", "sugar", "spice", "can", "dough"])) return "Dry Goods";
+  // First match wins, so food buckets are checked before packaging — otherwise
+  // "Ezzo Pepperoni (Cup & Char)" lands in Paper because of the word "cup".
+  if (has(["bleach", "detergent", "degreaser", "sanitizer", "cleaner", "soap", "scrubber", "scouring", "clorox"])) return "Chemicals & Cleaning";
+  if (has(["fries", "eggplant", "mozz stick", "mozzarella stick", "onion ring", "cookie dough", "crust",
+           "cheesecake", "icing", "breaded"])) return "Frozen & Fryer";
+  if (has(["mozzarella", "cheddar", "romano", "provolone", "feta", "ricotta", "cheese", "parmesan", "asiago",
+           "gorgonzola", "deli log", "butter"])) return "Cheese & Dairy";
+  if (has(["chicken", "pepperoni", "bacon", "sausage", "salami", "capicola", "capocollo", "meatball", "ham",
+           "turkey", "wing", "steak", "beef", "tenderloin", "tender"])) return "Meat";
+  if (has(["romaine", "lettuce", "onion", "mushroom", "spinach", "broccoli", "celery", "cucumber", "parsley",
+           "produce", "jalapeno", "pepperoncini", "banana pepper", "bell pepper", "green pepper", "olive",
+           "pickle", "pineapple", "garlic"])) return "Produce & Pickled";
+  if (has(["dressing", "sauce", "mayo", "mustard", "vinegar", "vinaigrette", "oil", "dip", "hot honey",
+           "red hot", "bbq", "anchov", "pesto", "tomato"])) return "Sauces, Oils & Dressings";
+  if (has(["water", "soda", "milk", "juice", "drink", "cola", "seltzer", "lemonade", "coke", "del's", "dels"])) return "Beverages";
+  if (has(["flour", "yeast", "salt", "sugar", "spice", "semolina", "crouton", "chips", "kettle"])) return "Dry Goods";
+  if (has(["box", "cup", "container", "foil", "glove", "napkin", "towel", "wrap", "bag", "parchment", "apron",
+           "plate", "lid", "liner", "tissue", "toilet", "register roll", "fiber hinge", "wax paper", "tray"])) return "Paper & Packaging";
   return "Other";
 }
 // Effective unit cost: most recently dated price wins; otherwise QFC is the
@@ -2428,7 +2608,7 @@ function joinParts() {
     .trim();
 }
 
-const CATEGORY_ORDER = ["Cheese", "Meat", "Produce", "Sauces, Oils & Dressings", "Dry Goods", "Beverages", "Paper & Packaging", "Other"];
+const CATEGORY_ORDER = ["Cheese & Dairy", "Meat", "Produce & Pickled", "Frozen & Fryer", "Sauces, Oils & Dressings", "Dry Goods", "Beverages", "Paper & Packaging", "Chemicals & Cleaning", "Other"];
 
 function OrderTab({ data }) {
   const [qty, setQty] = useState({});
@@ -2743,6 +2923,378 @@ function RecipesTab({ data, persist }) {
 function SectionHeader({ children }) {
   return /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-2 mt-5 tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato } }, children);
 }
+// What a given vendor calls this item, when that differs from what we call it.
+// One line on the order sheet, but the rep still gets the exact product.
+function vendorProduct(i, vendor) {
+  const k = vendor === "Thomsen" ? "thomsen" : "qfc";
+  const n = i.names && i.names[k];
+  return n && n !== i.item ? n : "";
+}
+
+function FoodOrderTab({ data, persist }) {
+  const [view, setView] = useState("order");
+  const [q, setQ] = useState("");
+  const [copied, setCopied] = useState("");
+  const inv = (data && data.inventory) || [];
+
+  const patch = (id, changes) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const row = next.inventory.find((r) => r.id === id);
+    if (!row) return;
+    Object.assign(row, changes);
+    persist(next);
+  };
+  const reset = () => {
+    const next = JSON.parse(JSON.stringify(data));
+    next.inventory.forEach((r) => { r.orderNeed = null; });
+    persist(next);
+  };
+
+  const vendorOf = (i) => i.orderVendor || i.vendor || "QFC";
+  const skuOf = (i) => (vendorOf(i) === "Thomsen" ? i.thomsenSku : i.qfcSku) || "";
+  const onList = inv.filter((i) => Number(i.orderNeed) > 0);
+  const allSet = inv.filter((i) => i.orderNeed === 0).length;
+  const untouched = inv.filter((i) => i.orderNeed == null).length;
+
+  const copyFor = (vendor) => {
+    const rows = onList.filter((i) => vendorOf(i) === vendor);
+    if (!rows.length) return;
+    const vk = vendor === "Thomsen" ? "thomsen" : "qfc";
+    const text = rows
+      .map((i) => {
+        // Say it the way this vendor lists it, so the rep pulls the right product.
+        const theirName = (i.names && i.names[vk]) || i.item;
+        const also = theirName !== i.item ? "" : "";
+        return "\u2022 " + theirName + (skuOf(i) ? "  #" + skuOf(i) : "") + "  \u00d7 " + i.orderNeed + " " + (i.unit || "") + also;
+      })
+      .join("\n");
+    const header = "On Point Pizza \u2014 order for " + (vendor === "Thomsen" ? "Thomsen" : "Quality Food") + "\n\n";
+    if (navigator.clipboard) navigator.clipboard.writeText(header + text);
+    setCopied(vendor);
+    setTimeout(() => setCopied(""), 1800);
+  };
+
+  const match = (i) => !q.trim() || i.item.toLowerCase().includes(q.trim().toLowerCase());
+
+  // ---- the working order, split by who we're buying it from ----
+  const orderView = () => {
+    if (onList.length === 0) {
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } },
+        "Nothing on the order yet \u2014 go through \u201CSet Up List\u201D and mark what you need."
+      );
+    }
+    return ["QFC", "Thomsen"].map((vendor) => {
+      const rows = onList.filter((i) => vendorOf(i) === vendor);
+      if (!rows.length) return null;
+      const label = vendor === "Thomsen" ? "Thomsen" : "Quality Food";
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        { key: vendor, className: "mb-4" },
+        /* @__PURE__ */ React.createElement(
+          "div",
+          { className: "flex items-center justify-between gap-2 px-3 py-2.5 rounded-t", style: { background: COLORS.crust } },
+          /* @__PURE__ */ React.createElement(
+            "span",
+            { style: { fontFamily: "Oswald", fontSize: "18px", color: COLORS.cream } },
+            label + " \u00b7 " + rows.length
+          ),
+          /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: () => copyFor(vendor),
+              className: "text-sm px-3 py-1.5 rounded-full flex items-center gap-1.5",
+              style: { background: COLORS.basil, color: COLORS.cream, border: "none", fontFamily: "Inter", fontWeight: 600 }
+            },
+            /* @__PURE__ */ React.createElement(Copy, { size: 14 }),
+            copied === vendor ? "Copied" : "Copy"
+          )
+        ),
+        /* @__PURE__ */ React.createElement(
+          "div",
+          { className: "space-y-1.5 pt-1.5" },
+          rows.map((i) =>
+            /* @__PURE__ */ React.createElement(
+              "div",
+              {
+                key: i.id,
+                className: "flex items-center gap-3 px-3 py-3 rounded",
+                style: { background: COLORS.card, border: `1px solid ${COLORS.line}`, borderLeft: `5px solid ${COLORS.tomato}` }
+              },
+              /* @__PURE__ */ React.createElement(
+                "div",
+                { className: "flex-1 min-w-0" },
+                /* @__PURE__ */ React.createElement(
+                  "div",
+                  { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } },
+                  i.item
+                ),
+                /* @__PURE__ */ React.createElement(
+                  "div",
+                  { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#8a7a6c" } },
+                  (skuOf(i) ? "#" + skuOf(i) + " \u00b7 " : "") + (priceLabel(costOf(i)) || "no price on file")
+                ),
+                vendorProduct(i, vendorOf(i))
+                  ? /* @__PURE__ */ React.createElement(
+                      "div",
+                      { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#a0937f", fontStyle: "italic" } },
+                      vendorProduct(i, vendorOf(i))
+                    )
+                  : null
+              ),
+              /* @__PURE__ */ React.createElement(
+                "span",
+                {
+                  className: "text-lg px-2.5 py-0.5 rounded-full flex-shrink-0",
+                  style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.cream, background: COLORS.tomato }
+                },
+                "\u00d7" + i.orderNeed
+              ),
+              /* @__PURE__ */ React.createElement(
+                "button",
+                {
+                  onClick: () => patch(i.id, { orderNeed: null }),
+                  className: "px-2 py-2 flex-shrink-0",
+                  style: { border: "none", background: "transparent" }
+                },
+                /* @__PURE__ */ React.createElement(Trash2, { size: 15, color: "#999" })
+              )
+            )
+          )
+        )
+      );
+    });
+  };
+
+  // ---- go down every item and say what you need ----
+  const setupView = () => {
+    const shown = inv.filter(match);
+    const cats = [];
+    shown.forEach((i) => {
+      const c = itemCategory(i.item);
+      let g = cats.find((x) => x.name === c);
+      if (!g) { g = { name: c, items: [] }; cats.push(g); }
+      g.items.push(i);
+    });
+    cats.sort((a, b) => {
+      const ia = CATEGORY_ORDER.indexOf(a.name), ib = CATEGORY_ORDER.indexOf(b.name);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+    if (!shown.length) {
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } },
+        "No items match that search."
+      );
+    }
+    return cats.map((g) =>
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { key: g.name, className: "mb-5" },
+        /* @__PURE__ */ React.createElement(SectionHeader, null, g.name),
+        /* @__PURE__ */ React.createElement(
+          "div",
+          { className: "space-y-1.5" },
+          g.items.map((i) => {
+            const need = i.orderNeed;
+            const isSet = need === 0;
+            const on = Number(need) > 0;
+            const bothVendors = !!(i.qfcSku && i.thomsenSku);
+            return /* @__PURE__ */ React.createElement(
+              "div",
+              {
+                key: i.id,
+                className: "px-3 py-2.5 rounded",
+                style: {
+                  background: COLORS.card,
+                  border: `1px solid ${on ? COLORS.tomato : isSet ? COLORS.basil : COLORS.line}`,
+                  borderLeft: `5px solid ${on ? COLORS.tomato : isSet ? COLORS.basil : COLORS.line}`
+                }
+              },
+              /* @__PURE__ */ React.createElement(
+                "div",
+                { className: "flex items-start justify-between gap-2 mb-2" },
+                /* @__PURE__ */ React.createElement(
+                  "div",
+                  { className: "min-w-0" },
+                  /* @__PURE__ */ React.createElement(
+                    "div",
+                    { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } },
+                    i.item
+                  ),
+                  /* @__PURE__ */ React.createElement(
+                    "div",
+                    { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#8a7a6c" } },
+                    "on hand " + (i.qty != null ? i.qty : "?") + " " + (i.unit || "") +
+                      (priceLabel(costOf(i)) ? " \u00b7 " + priceLabel(costOf(i)) : "")
+                  ),
+                  on && vendorProduct(i, vendorOf(i))
+                    ? /* @__PURE__ */ React.createElement(
+                        "div",
+                        { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#a0937f", fontStyle: "italic" } },
+                        (vendorOf(i) === "Thomsen" ? "Thomsen: " : "Quality: ") + vendorProduct(i, vendorOf(i))
+                      )
+                    : null
+                ),
+                on
+                  ? /* @__PURE__ */ React.createElement(
+                      "span",
+                      { className: "text-sm flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.tomato } },
+                      "need " + need
+                    )
+                  : isSet
+                  ? /* @__PURE__ */ React.createElement(
+                      "span",
+                      { className: "text-sm flex-shrink-0", style: { fontFamily: "Inter", color: COLORS.basil } },
+                      "all set"
+                    )
+                  : null
+              ),
+              /* @__PURE__ */ React.createElement(
+                "div",
+                { className: "flex items-center gap-1.5 flex-wrap" },
+                /* @__PURE__ */ React.createElement(
+                  "button",
+                  {
+                    onClick: () => patch(i.id, { orderNeed: isSet ? null : 0 }),
+                    className: "text-sm px-3 py-2 rounded-full",
+                    style: {
+                      fontFamily: "Inter",
+                      border: `1px solid ${isSet ? COLORS.basil : COLORS.line}`,
+                      background: isSet ? COLORS.basil : "transparent",
+                      color: isSet ? COLORS.cream : COLORS.crust
+                    }
+                  },
+                  "All set"
+                ),
+                [1, 2, 3, 4].map((n) =>
+                  /* @__PURE__ */ React.createElement(
+                    "button",
+                    {
+                      key: n,
+                      onClick: () => patch(i.id, { orderNeed: need === n ? null : n }),
+                      className: "text-base px-3.5 py-2 rounded-full",
+                      style: {
+                        fontFamily: "JetBrains Mono",
+                        fontWeight: 700,
+                        border: `1px solid ${need === n ? COLORS.tomato : COLORS.line}`,
+                        background: need === n ? COLORS.tomato : "transparent",
+                        color: need === n ? COLORS.cream : COLORS.crust
+                      }
+                    },
+                    n
+                  )
+                ),
+                /* @__PURE__ */ React.createElement(
+                  "button",
+                  {
+                    onClick: () => patch(i.id, { orderNeed: (Number(need) || 0) + 1 }),
+                    className: "px-3 py-2 rounded-full flex items-center",
+                    style: { border: `1px solid ${COLORS.line}`, background: "transparent" }
+                  },
+                  /* @__PURE__ */ React.createElement(Plus, { size: 16, color: COLORS.crust })
+                ),
+                on && bothVendors
+                  ? /* @__PURE__ */ React.createElement(
+                      "div",
+                      { className: "flex items-center gap-1 ml-auto", title: "Quality: " + ((i.names && i.names.qfc) || i.item) + " / Thomsen: " + ((i.names && i.names.thomsen) || i.item) },
+                      ["QFC", "Thomsen"].map((v) =>
+                        /* @__PURE__ */ React.createElement(
+                          "button",
+                          {
+                            key: v,
+                            onClick: () => patch(i.id, { orderVendor: v }),
+                            className: "text-xs px-2.5 py-2 rounded-full",
+                            style: {
+                              fontFamily: "Inter",
+                              border: `1px solid ${vendorOf(i) === v ? COLORS.crust : COLORS.line}`,
+                              background: vendorOf(i) === v ? COLORS.crust : "transparent",
+                              color: vendorOf(i) === v ? COLORS.cream : "#8a7a6c"
+                            }
+                          },
+                          v === "QFC" ? "Quality" : "Thomsen"
+                        )
+                      )
+                    )
+                  : null
+              )
+            );
+          })
+        )
+      )
+    );
+  };
+
+  const views = [
+    { id: "order", label: "Order", n: onList.length },
+    { id: "setup", label: "Set Up List", n: inv.length }
+  ];
+
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    null,
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "flex items-center justify-between gap-2 px-3 py-3 rounded mb-3", style: { background: COLORS.crust } },
+      /* @__PURE__ */ React.createElement(
+        "div",
+        null,
+        /* @__PURE__ */ React.createElement(
+          "div",
+          { className: "text-2xl", style: { fontFamily: "Oswald", color: COLORS.cream, lineHeight: 1.1 } },
+          onList.length === 0 ? "Nothing to order" : onList.length + (onList.length === 1 ? " item to order" : " items to order")
+        ),
+        /* @__PURE__ */ React.createElement(
+          "div",
+          { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#c9bda8" } },
+          allSet + " marked all set \u00b7 " + untouched + " not looked at"
+        )
+      ),
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: reset,
+          className: "text-sm px-3 py-2 rounded-full flex-shrink-0",
+          style: { fontFamily: "Inter", border: "1px solid #6b5545", color: COLORS.cream, background: "transparent" }
+        },
+        "Reset"
+      )
+    ),
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "flex items-center gap-1.5 mb-2 flex-wrap" },
+      views.map((v) =>
+        /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            key: v.id,
+            onClick: () => setView(v.id),
+            className: "text-sm px-3.5 py-2 rounded-full",
+            style: {
+              fontFamily: "Inter",
+              border: `1px solid ${view === v.id ? COLORS.tomato : COLORS.line}`,
+              background: view === v.id ? COLORS.tomato : "transparent",
+              color: view === v.id ? COLORS.cream : COLORS.crust
+            }
+          },
+          v.label + " (" + v.n + ")"
+        )
+      )
+    ),
+    view === "setup"
+      ? /* @__PURE__ */ React.createElement("input", {
+          placeholder: "Search all items\u2026",
+          value: q,
+          onChange: (e) => setQ(e.target.value),
+          className: "w-full text-base px-3 py-2.5 rounded mb-3 outline-none",
+          style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
+        })
+      : null,
+    view === "order" ? orderView() : setupView()
+  );
+}
+
 function PrepListTab({ data, persist, listKey, mode }) {
   const key = listKey || "par";
   const isOrder = mode === "order";
@@ -3187,6 +3739,416 @@ function MenuTab({ data, persist }) {
     m.sandwiches.items.find((x) => x.id === s.id).price = v;
   }) })), /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: "#888" } }, s.ingredients)))), /* @__PURE__ */ React.createElement(SimpleList, { title: "Ice Cream Pints", rows: menu.iceCream, onChange: (id, v) => updateSimple("iceCream", id, v) }), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-4 -mt-3", style: { fontFamily: "Inter", color: "#888" } }, "Flavors: ", menu.iceCreamFlavors), /* @__PURE__ */ React.createElement(SimpleList, { title: "Chips / Cookies", rows: menu.chipsCookies, onChange: (id, v) => updateSimple("chipsCookies", id, v) }), /* @__PURE__ */ React.createElement(SimpleList, { title: "Drinks", rows: menu.drinks, onChange: (id, v) => updateSimple("drinks", id, v) }));
 }
+// Food-safe defaults. Coolers should hold below 41F (FDA), freezers at or
+// under 0F. Anything a few degrees past that is worth someone walking over.
+const TEMP_DEFAULTS = { cooler: { min: 33, max: 41 }, freezer: { min: -20, max: 5 } };
+
+function TempPanel({ data, persist }) {
+  const [sensors, setSensors] = useState([]);
+  const [at, setAt] = useState(null);
+  const [err, setErr] = useState("");
+  const [setup, setSetup] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const cfg = (data && data.tempSensors) || {};
+
+  const load = async (force) => {
+    setBusy(true);
+    try {
+      const res = await fetch(YOLINK_URL + (force ? "?force=1" : ""));
+      const out = await res.json();
+      if (out.error && !out.sensors) {
+        setErr(out.error);
+        setSetup(!!out.setup);
+        setSensors([]);
+      } else {
+        setErr(out.stale ? "Showing the last reading — " + (out.error || "couldn't refresh.") : "");
+        setSetup(false);
+        setSensors(out.sensors || []);
+        setAt(out.at || null);
+      }
+    } catch (e) {
+      setErr("Couldn't reach the temperature service.");
+    }
+    setBusy(false);
+  };
+
+  useEffect(() => {
+    load();
+    const id = setInterval(() => {
+      if (!document.hidden) load();
+    }, 120000);
+    return () => clearInterval(id);
+  }, []);
+
+  const kindOf = (s) => (cfg[s.id] && cfg[s.id].kind) || "cooler";
+  const rangeOf = (s) => {
+    const c = cfg[s.id] || {};
+    const d = TEMP_DEFAULTS[kindOf(s)] || TEMP_DEFAULTS.cooler;
+    return { min: typeof c.min === "number" ? c.min : d.min, max: typeof c.max === "number" ? c.max : d.max };
+  };
+  const setCfg = (id, patch) => {
+    const next = JSON.parse(JSON.stringify(data));
+    if (!next.tempSensors) next.tempSensors = {};
+    next.tempSensors[id] = { ...(next.tempSensors[id] || {}), ...patch };
+    persist(next);
+  };
+
+  const ago = (t) => {
+    if (!t) return "";
+    const s = Math.round((Date.now() - t) / 1000);
+    if (s < 60) return "just now";
+    const m = Math.round(s / 60);
+    if (m < 60) return m + "m ago";
+    return Math.round(m / 60) + "h ago";
+  };
+
+  const bad = sensors.filter((s) => {
+    if (typeof s.tempF !== "number") return false;
+    const r = rangeOf(s);
+    return s.tempF < r.min || s.tempF > r.max;
+  });
+
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    { className: "mb-6" },
+    /* @__PURE__ */ React.createElement(SectionHeader, null, "Walk-in Temps"),
+
+    setup
+      ? /* @__PURE__ */ React.createElement(
+          "div",
+          { className: "text-sm px-3 py-3 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}`, fontFamily: "Inter", color: "#7a6a5c", lineHeight: 1.6 } },
+          err
+        )
+      : null,
+
+    err && !setup
+      ? /* @__PURE__ */ React.createElement(
+          "div",
+          { className: "text-xs px-3 py-2 rounded mb-2", style: { background: "#FBEFD8", color: "#7a5a1c", fontFamily: "Inter" } },
+          err
+        )
+      : null,
+
+    bad.length > 0
+      ? /* @__PURE__ */ React.createElement(
+          "div",
+          { className: "px-3 py-3 rounded mb-2 flex items-start gap-2", style: { background: COLORS.tomato, color: COLORS.cream } },
+          /* @__PURE__ */ React.createElement(AlertTriangle, { size: 17, style: { flexShrink: 0, marginTop: 2 } }),
+          /* @__PURE__ */ React.createElement(
+            "div",
+            null,
+            /* @__PURE__ */ React.createElement(
+              "div",
+              { style: { fontFamily: "Oswald", fontSize: "18px", lineHeight: 1.15 } },
+              bad.length === 1 ? "Check the " + bad[0].name : bad.length + " units out of range"
+            ),
+            /* @__PURE__ */ React.createElement(
+              "div",
+              { className: "text-xs mt-0.5", style: { fontFamily: "Inter", opacity: .95 } },
+              bad.map((s) => s.name + " at " + s.tempF + "\u00b0").join(" \u00b7 ")
+            )
+          )
+        )
+      : null,
+
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "space-y-1.5" },
+      sensors.length === 0 && !setup && !busy
+        ? /* @__PURE__ */ React.createElement(
+            "div",
+            { className: "text-sm italic px-1 py-5 text-center", style: { fontFamily: "Inter", color: "#999" } },
+            "No temperature sensors found on the YoLink account."
+          )
+        : null,
+      sensors.map((s) => {
+        const r = rangeOf(s);
+        const t = s.tempF;
+        const out = typeof t === "number" && (t < r.min || t > r.max);
+        const dead = typeof t !== "number";
+        return /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: s.id,
+            className: "px-3 py-3 rounded",
+            style: {
+              background: out ? "#FDF0EC" : COLORS.card,
+              border: `1px solid ${out ? COLORS.tomato : COLORS.line}`,
+              borderLeft: `5px solid ${out ? COLORS.tomato : dead ? COLORS.line : COLORS.basil}`
+            }
+          },
+          /* @__PURE__ */ React.createElement(
+            "div",
+            { className: "flex items-center justify-between gap-3" },
+            /* @__PURE__ */ React.createElement(
+              "div",
+              { className: "min-w-0" },
+              /* @__PURE__ */ React.createElement(
+                "div",
+                { className: "text-base", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } },
+                s.name
+              ),
+              /* @__PURE__ */ React.createElement(
+                "div",
+                { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8a7a6c" } },
+                kindOf(s) === "freezer" ? "Freezer" : "Cooler",
+                " \u00b7 ok between ", r.min, "\u00b0 and ", r.max, "\u00b0",
+                s.humidity != null ? " \u00b7 " + s.humidity + "% RH" : "",
+                s.battery != null ? " \u00b7 batt " + s.battery + "/4" : ""
+              )
+            ),
+            /* @__PURE__ */ React.createElement(
+              "div",
+              { className: "text-right flex-shrink-0" },
+              /* @__PURE__ */ React.createElement(
+                "div",
+                {
+                  style: {
+                    fontFamily: "JetBrains Mono",
+                    fontWeight: 700,
+                    fontSize: "26px",
+                    lineHeight: 1,
+                    color: dead ? "#b0a294" : out ? COLORS.tomatoDark : COLORS.crust
+                  }
+                },
+                dead ? "\u2014" : t + "\u00b0"
+              )
+            )
+          ),
+          editing
+            ? /* @__PURE__ */ React.createElement(
+                "div",
+                { className: "flex flex-wrap items-center gap-1.5 mt-2.5 pt-2.5", style: { borderTop: `1px dashed ${COLORS.line}` } },
+                ["cooler", "freezer"].map((k) =>
+                  /* @__PURE__ */ React.createElement(
+                    "button",
+                    {
+                      key: k,
+                      onClick: () => setCfg(s.id, { kind: k, min: TEMP_DEFAULTS[k].min, max: TEMP_DEFAULTS[k].max }),
+                      className: "text-xs px-3 py-2 rounded-full",
+                      style: {
+                        fontFamily: "Inter",
+                        border: `1px solid ${kindOf(s) === k ? COLORS.tomato : COLORS.line}`,
+                        background: kindOf(s) === k ? COLORS.tomato : "transparent",
+                        color: kindOf(s) === k ? COLORS.cream : COLORS.crust
+                      }
+                    },
+                    k === "cooler" ? "Cooler" : "Freezer"
+                  )
+                ),
+                /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "ok"),
+                /* @__PURE__ */ React.createElement("input", {
+                  type: "number",
+                  value: r.min,
+                  onChange: (e) => setCfg(s.id, { min: Number(e.target.value) }),
+                  className: "w-16 text-sm px-2 py-2 rounded text-center",
+                  style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" }
+                }),
+                /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "to"),
+                /* @__PURE__ */ React.createElement("input", {
+                  type: "number",
+                  value: r.max,
+                  onChange: (e) => setCfg(s.id, { max: Number(e.target.value) }),
+                  className: "w-16 text-sm px-2 py-2 rounded text-center",
+                  style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" }
+                })
+              )
+            : null
+        );
+      })
+    ),
+
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "flex items-center gap-2 mt-2.5" },
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => load(true),
+          className: "text-sm px-3.5 py-2 rounded-full",
+          style: { border: `1px solid ${COLORS.line}`, background: "transparent", color: COLORS.crust, fontFamily: "Inter" }
+        },
+        busy ? "Checking\u2026" : "Refresh"
+      ),
+      sensors.length
+        ? /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: () => setEditing(!editing),
+              className: "text-sm px-3.5 py-2 rounded-full",
+              style: {
+                fontFamily: "Inter",
+                border: `1px solid ${editing ? COLORS.tomato : COLORS.line}`,
+                background: editing ? COLORS.tomato : "transparent",
+                color: editing ? COLORS.cream : COLORS.crust
+              }
+            },
+            editing ? "Done" : "Set ranges"
+          )
+        : null,
+      at
+        ? /* @__PURE__ */ React.createElement(
+            "span",
+            { className: "text-xs ml-auto", style: { fontFamily: "Inter", color: "#8a7a6c" } },
+            "Checked " + ago(at)
+          )
+        : null
+    )
+  );
+}
+
+function prettyCamName(key) {
+  return String(key || "")
+    .replace(/^cam-/, "")
+    .replace(/[-_]+/g, " ")
+    .replace(/(^|\s)([a-z])/g, (m, a, b) => a + b.toUpperCase());
+}
+
+function ShopCamPanel({ data, busyAnalyze, onAnalyze }) {
+  const [keys, setKeys] = useState([]);
+  const [tick, setTick] = useState(Date.now());
+  const [err, setErr] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [big, setBig] = useState(null);
+  const refreshSecs = 20;
+
+  const loadKeys = async () => {
+    try {
+      const res = await fetch(MEDIA_URL);
+      const out = await res.json();
+      if (out.error) throw new Error(out.error);
+      setKeys((out.keys || []).filter((k) => k.indexOf("cam-") === 0).sort());
+      setErr("");
+    } catch (e) {
+      setErr("Couldn't reach the camera feed service.");
+    }
+    setLoaded(true);
+  };
+
+  useEffect(() => {
+    loadKeys();
+    const idKeys = setInterval(() => {
+      if (!document.hidden) loadKeys();
+    }, 120000);
+    const idTick = setInterval(() => {
+      if (!document.hidden) setTick(Date.now());
+    }, refreshSecs * 1000);
+    return () => {
+      clearInterval(idKeys);
+      clearInterval(idTick);
+    };
+  }, []);
+
+  const src = (k) => MEDIA_URL + "?key=" + encodeURIComponent(k) + "&t=" + tick;
+
+  if (loaded && keys.length === 0 && !err) return null;
+
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    { className: "mb-6" },
+    /* @__PURE__ */ React.createElement(SectionHeader, null, "Shop Cameras"),
+    err
+      ? /* @__PURE__ */ React.createElement(
+          "div",
+          { className: "text-xs px-3 py-2 rounded mb-2", style: { background: "#FBEFD8", color: "#7a5a1c", fontFamily: "Inter" } },
+          err
+        )
+      : null,
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "grid grid-cols-2 gap-2" },
+      keys.map((k) =>
+        /* @__PURE__ */ React.createElement(
+          "div",
+          { key: k, className: "rounded overflow-hidden", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } },
+          /* @__PURE__ */ React.createElement(
+            "button",
+            { onClick: () => setBig(k), className: "w-full p-0", style: { border: "none", background: "transparent" } },
+            /* @__PURE__ */ React.createElement("img", {
+              src: src(k),
+              alt: prettyCamName(k),
+              className: "w-full",
+              onError: (e) => {
+                e.target.style.display = "none";
+                if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
+              },
+              style: { height: "120px", objectFit: "cover", display: "block", background: "#e9e2d6" }
+            }),
+            /* @__PURE__ */ React.createElement(
+              "div",
+              {
+                className: "w-full items-center justify-center text-center px-2",
+                style: { height: "120px", display: "none", background: "#EFE7D6", color: "#8a7a6c", fontFamily: "Inter", fontSize: "12px" }
+              },
+              "No frame yet"
+            )
+          ),
+          /* @__PURE__ */ React.createElement(
+            "div",
+            { className: "px-2.5 py-2 flex items-center justify-between gap-1" },
+            /* @__PURE__ */ React.createElement(
+              "span",
+              { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } },
+              prettyCamName(k)
+            ),
+            onAnalyze
+              ? /* @__PURE__ */ React.createElement(
+                  "button",
+                  {
+                    onClick: () => onAnalyze(k, prettyCamName(k)),
+                    disabled: busyAnalyze,
+                    className: "text-xs px-2.5 py-1.5 rounded-full flex-shrink-0",
+                    style: { border: `1px solid ${COLORS.line}`, background: "transparent", color: COLORS.crust, fontFamily: "Inter" }
+                  },
+                  busyAnalyze ? "\u2026" : "Check"
+                )
+              : null
+          )
+        )
+      )
+    ),
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "text-xs mt-2", style: { fontFamily: "Inter", color: "#8a7a6c" } },
+      "Refreshes every " + refreshSecs + "s from the front PC."
+    ),
+    big
+      ? /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            className: "fixed inset-0 z-50 flex flex-col",
+            style: { background: "rgba(20,12,8,.96)" },
+            onClick: () => setBig(null)
+          },
+          /* @__PURE__ */ React.createElement(
+            "div",
+            { className: "flex items-center justify-between px-4 py-3", style: { background: COLORS.crust } },
+            /* @__PURE__ */ React.createElement(
+              "span",
+              { className: "text-base", style: { fontFamily: "Oswald", color: COLORS.cream } },
+              prettyCamName(big)
+            ),
+            /* @__PURE__ */ React.createElement(
+              "button",
+              {
+                onClick: () => setBig(null),
+                className: "px-4 py-2 text-sm rounded",
+                style: { background: COLORS.tomato, color: COLORS.cream, border: "none", fontFamily: "Inter", fontWeight: 600 }
+              },
+              "Close"
+            )
+          ),
+          /* @__PURE__ */ React.createElement("img", {
+            src: src(big),
+            alt: prettyCamName(big),
+            style: { width: "100%", display: "block" }
+          })
+        )
+      : null
+  );
+}
+
 function LiveOpsTab({ data, persist }) {
   var _a;
   const liveOps = data.liveOps || { orderQueue: { sizes: [], updatedAt: "" }, stations: [], stationLog: [] };
@@ -3242,6 +4204,52 @@ function LiveOpsTab({ data, persist }) {
     stopCamera();
     if (intervalRef.current) clearInterval(intervalRef.current);
   }, []);
+  // Same check the tablet camera does, but against a frame the shop PC pushed up.
+  const analyzeShopCam = async (key, name) => {
+    setAnalyzing(true);
+    setLastResult("");
+    try {
+      const imgRes = await fetch(MEDIA_URL + "?key=" + encodeURIComponent(key) + "&t=" + Date.now());
+      if (!imgRes.ok) throw new Error("No frame for that camera yet.");
+      const blob = await imgRes.blob();
+      const b64 = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(",")[1]);
+        r.onerror = () => reject(new Error("Couldn't read the frame."));
+        r.readAsDataURL(blob);
+      });
+      const response = await fetch(window.CHAT_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 400,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } },
+              { type: "text", text: `This is a fixed camera in a pizza shop pointed at "${name}". In 2-3 short sentences, plain language: if it's a slice case, say which pies look low or empty and roughly how many slices are left; if it's the front counter, say how many people are waiting and whether anyone looks like they've been waiting a while; if it's a prep or line station, say how backed up or well-stocked it looks. Flag anything obviously wrong. If the photo is too dark, blurry or blocked to tell, just say so.` }
+            ]
+          }]
+        })
+      });
+      const raw = await response.text();
+      if (!response.ok) throw new Error("Server said " + response.status);
+      const out = JSON.parse(raw);
+      if (out.error) throw new Error(out.error.message || "API error");
+      const text = (out.content || []).map((c) => c.text || "").join("\n").trim();
+      setLastResult(text || "No read on that one.");
+      const next = JSON.parse(JSON.stringify(data));
+      if (!next.liveOps.stationLog) next.liveOps.stationLog = [];
+      next.liveOps.stationLog.unshift({ id: uid(), station: name, at: new Date().toISOString(), text: text });
+      next.liveOps.stationLog = next.liveOps.stationLog.slice(0, 30);
+      persist(next);
+    } catch (e) {
+      setLastResult("Couldn't check that camera: " + (e.message || "unknown error"));
+    }
+    setAnalyzing(false);
+  };
+
   const captureAndAnalyze = async () => {
     var _a2;
     if (!videoRef.current) return;
@@ -3308,7 +4316,7 @@ function LiveOpsTab({ data, persist }) {
       className: "w-16 text-right text-sm px-2 py-1 rounded",
       style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono", color: COLORS.crust }
     }
-  )))), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-5", style: { fontFamily: "Inter", color: "#888" } }, `Update these by hand for now \u2014 Clover order data isn't wired in yet. The assistant reads this to answer "what's queued up."`), /* @__PURE__ */ React.createElement(SectionHeader, null, "Station Check (camera)"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap items-center gap-1.5 mb-2" }, liveOps.stations.map((s) => /* @__PURE__ */ React.createElement(
+  )))), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-5", style: { fontFamily: "Inter", color: "#888" } }, `Update these by hand for now \u2014 Clover order data isn't wired in yet. The assistant reads this to answer "what's queued up."`), /* @__PURE__ */ React.createElement(ShopCamPanel, { data, busyAnalyze: analyzing, onAnalyze: analyzeShopCam }), /* @__PURE__ */ React.createElement(TempPanel, { data, persist }), /* @__PURE__ */ React.createElement(SectionHeader, null, "Station Check (camera)"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap items-center gap-1.5 mb-2" }, liveOps.stations.map((s) => /* @__PURE__ */ React.createElement(
     "button",
     {
       key: s.id,
