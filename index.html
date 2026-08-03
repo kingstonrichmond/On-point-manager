@@ -2123,6 +2123,110 @@ function TimeOffTab({ data, persist }) {
                     " Add")))));
 }
 // ===================== TIPS TAB =====================
+const DAY_SPAN = "11-4";
+const NIGHT_SPAN = "4-close";
+const CLOSE_CHOICES = [
+    { label: "8pm", h: 20 }, { label: "9pm", h: 21 }, { label: "10pm", h: 22 },
+    { label: "11pm", h: 23 }, { label: "12am", h: 24 }
+];
+// Trainees, people mostly off the line, anyone tipped separately — a partial
+// share. Whatever they don't take spreads over everyone else automatically,
+// because the pot is divided by total weight, not by headcount.
+const SHARES = [
+    { v: 1, label: "full" },
+    { v: 0.75, label: "\u00be" },
+    { v: 0.5, label: "\u00bd" },
+    { v: 0.25, label: "\u00bc" }
+];
+// Shop clock: staff write "4-7" or "11-close", never am/pm. In a shop that opens
+// late morning and closes at night, 8-11 means morning and everything else means
+// afternoon/evening, so that's the rule unless they actually type am/pm.
+function parseClock(tok, closeHour) {
+    const s = String(tok || "").trim().toLowerCase().replace(/[\s.]/g, "");
+    if (!s)
+        return null;
+    if (s === "close" || s === "cl" || s === "c")
+        return closeHour;
+    if (s === "open" || s === "op")
+        return 11;
+    const m = s.match(/^(\d{1,2})(?::?(\d{2}))?(am|pm|a|p)?$/);
+    if (!m)
+        return null;
+    let h = parseInt(m[1], 10);
+    if (h > 24)
+        return null;
+    const min = m[2] ? parseInt(m[2], 10) / 60 : 0;
+    const suf = m[3] ? m[3].charAt(0) : "";
+    if (suf === "a") {
+        if (h === 12)
+            h = 0;
+    }
+    else if (suf === "p") {
+        if (h !== 12)
+            h += 12;
+    }
+    else if (h >= 1 && h <= 7)
+        h += 12;
+    return h + min;
+}
+function parseSpan(str, closeHour) {
+    const s = String(str || "").trim();
+    if (!s)
+        return null;
+    const parts = s.replace(/\s+to\s+/gi, "-").split(/[-\u2013\u2014]/).map((x) => x.trim()).filter(Boolean);
+    if (parts.length < 2)
+        return null;
+    const a = parseClock(parts[0], closeHour);
+    const b = parseClock(parts[1], closeHour);
+    if (a == null || b == null)
+        return null;
+    let dur = b - a;
+    if (dur <= 0)
+        dur += 12;
+    if (dur > 16)
+        return null;
+    return { hours: Math.round(dur * 100) / 100 };
+}
+function hoursLabel(h) {
+    if (h == null)
+        return "?";
+    return (Math.round(h * 100) / 100) + "h";
+}
+function shareLabel(v) {
+    const s = SHARES.filter((x) => x.v === v)[0];
+    return s ? s.label : String(v);
+}
+// One row per person. weight = hours (when splitting by hours) x share.
+function computeSplit(crew, byHours, times, shares, defSpan, closeHour, pot) {
+    const rows = crew.map((n) => {
+        const raw = String((times && times[n]) || "").trim() || defSpan;
+        const sp = byHours ? parseSpan(raw, closeHour) : null;
+        const share = (shares && shares[n] != null) ? Number(shares[n]) : 1;
+        const hours = sp ? sp.hours : null;
+        return {
+            name: n, span: byHours ? raw : "", hours, share,
+            weight: (byHours ? (hours || 0) : 1) * share,
+            bad: byHours && !sp, exact: 0
+        };
+    });
+    const totalW = rows.reduce((s, r) => s + r.weight, 0);
+    const totalH = rows.reduce((s, r) => s + (r.hours || 0), 0);
+    rows.forEach((r) => { r.exact = totalW > 0 ? pot * r.weight / totalW : 0; });
+    return { rows, totalW, totalH, allFull: rows.every((r) => r.share === 1) };
+}
+function paidOf(r, paidMap) {
+    const v = paidMap && paidMap[r.name];
+    return v === undefined || v === "" ? Math.round(r.exact) : num(v);
+}
+// shared setter for the name-keyed maps (times / paying / shares)
+function setKeyed(setter, map, key, val, clearWhen) {
+    const next = Object.assign({}, map || {});
+    if (val === clearWhen)
+        delete next[key];
+    else
+        next[key] = val;
+    setter(next);
+}
 function CrewPicker({ names, crew, setCrew, extra, setExtra }) {
     const toggle = (n) => {
         if (crew.some((c) => normPerson(c) === normPerson(n))) {
@@ -2158,40 +2262,100 @@ function MoneyField({ label, value, onChange, hint }) {
         React.createElement("input", { inputMode: "decimal", placeholder: "0.00", value: value, onChange: (e) => onChange(e.target.value), className: "text-base px-2.5 py-2 rounded outline-none w-full", style: { border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }),
         hint ? React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: "#999" } }, hint) : null));
 }
-function PayoutRow({ each, paid, setPaid }) {
-    const exact = Number(each) || 0;
-    return (React.createElement("div", { className: "rounded p-2.5 mt-2", style: { background: COLORS.cream, border: "1px solid " + COLORS.line } },
-        React.createElement("div", { className: "flex items-center flex-wrap gap-2" },
-            React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", color: "#777" } }, "Exact"),
-            React.createElement("div", { className: "text-lg font-bold", style: { fontFamily: "JetBrains Mono", color: COLORS.crust } }, money(exact)),
-            React.createElement("div", { className: "text-sm ml-2", style: { fontFamily: "Inter", color: "#777" } }, "Paying each"),
-            React.createElement("input", { inputMode: "decimal", placeholder: String(Math.round(exact)), value: paid, onChange: (e) => setPaid(e.target.value), className: "text-lg px-2.5 py-1.5 rounded outline-none", style: { width: 96, border: "2px solid " + COLORS.tomato, fontFamily: "JetBrains Mono", fontWeight: 700 } }),
-            React.createElement("div", { className: "flex gap-1" },
-                React.createElement("button", { onClick: () => setPaid(String(Math.floor(exact))), className: "px-2.5 py-1.5 rounded text-xs", style: { background: COLORS.card, border: "1px solid " + COLORS.line, fontFamily: "Inter" } },
-                    "\u2193 ",
-                    Math.floor(exact)),
-                React.createElement("button", { onClick: () => setPaid(String(Math.round(exact))), className: "px-2.5 py-1.5 rounded text-xs", style: { background: COLORS.card, border: "1px solid " + COLORS.line, fontFamily: "Inter" } },
-                    "\u2248 ",
-                    Math.round(exact)),
-                React.createElement("button", { onClick: () => setPaid(String(Math.ceil(exact))), className: "px-2.5 py-1.5 rounded text-xs", style: { background: COLORS.card, border: "1px solid " + COLORS.line, fontFamily: "Inter" } },
-                    "\u2191 ",
-                    Math.ceil(exact))))));
+function ShareButton({ share, onCycle }) {
+    const idx = SHARES.map((s) => s.v).indexOf(share);
+    const full = share === 1;
+    return (React.createElement("button", { onClick: () => onCycle(SHARES[(idx < 0 ? 0 : idx + 1) % SHARES.length].v), className: "px-2 py-1 rounded text-xs mt-1", style: {
+            background: full ? COLORS.card : COLORS.parm,
+            color: COLORS.crust,
+            border: "1px solid " + (full ? COLORS.line : COLORS.parm),
+            fontFamily: "Inter",
+            fontWeight: full ? 400 : 700
+        } }, full ? "full share" : shareLabel(share) + " share"));
+}
+function PayoutTable({ split, pot, byHours, times, setTimes, shares, setShares, defSpan, paidMap, setPaidMap }) {
+    const totalPaid = split.rows.reduce((s, r) => s + paidOf(r, paidMap), 0);
+    const left = pot - totalPaid;
+    const cols = byHours ? "minmax(0,1.15fr) 0.95fr 0.8fr 0.85fr" : "minmax(0,1.6fr) 0.9fr 0.85fr";
+    if (!split.rows.length)
+        return null;
+    return (React.createElement("div", { className: "rounded mt-2", style: { background: COLORS.cream, border: "1px solid " + COLORS.line } },
+        React.createElement("div", { className: "grid gap-1.5 px-2.5 pt-2 pb-1 text-xs", style: { gridTemplateColumns: cols, fontFamily: "Inter", color: "#999" } },
+            React.createElement("div", null, "Who"),
+            byHours ? React.createElement("div", null, "Hours worked") : null,
+            React.createElement("div", null, "Exact"),
+            React.createElement("div", null, "Paying")),
+        split.rows.map((r) => (React.createElement("div", { key: r.name, className: "grid gap-1.5 px-2.5 py-1.5 items-start", style: { gridTemplateColumns: cols, borderTop: "1px solid " + COLORS.card } },
+            React.createElement("div", { style: { minWidth: 0 } },
+                React.createElement("div", { className: "text-sm truncate", style: { fontFamily: "Inter", color: COLORS.crust } }, r.name),
+                React.createElement(ShareButton, { share: r.share, onCycle: (v) => setKeyed(setShares, shares, r.name, v, 1) })),
+            byHours ? (React.createElement("div", null,
+                React.createElement("input", { placeholder: defSpan, value: (times && times[r.name]) || "", onChange: (e) => setKeyed(setTimes, times, r.name, e.target.value, ""), className: "text-sm px-1.5 py-1.5 rounded outline-none w-full", style: { border: "1px solid " + (r.bad ? COLORS.tomato : COLORS.line), fontFamily: "JetBrains Mono" } }),
+                React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "JetBrains Mono", color: r.bad ? COLORS.tomato : "#999" } }, r.bad ? "can't read" : hoursLabel(r.hours)))) : null,
+            React.createElement("div", { className: "text-sm pt-1.5", style: { fontFamily: "JetBrains Mono", color: "#777" } }, money(r.exact)),
+            React.createElement("input", { inputMode: "decimal", placeholder: String(Math.round(r.exact)), value: (paidMap && paidMap[r.name]) || "", onChange: (e) => setKeyed(setPaidMap, paidMap, r.name, e.target.value, ""), className: "text-base px-1.5 py-1.5 rounded outline-none w-full", style: { border: "2px solid " + COLORS.tomato, fontFamily: "JetBrains Mono", fontWeight: 700 } })))),
+        React.createElement("div", { className: "px-2.5 py-2 text-xs flex flex-wrap gap-x-4 gap-y-1", style: { borderTop: "1px solid " + COLORS.line, fontFamily: "Inter", color: "#777" } },
+            React.createElement("span", null,
+                "Pot ",
+                React.createElement("strong", { style: { fontFamily: "JetBrains Mono", color: COLORS.crust } }, money(pot))),
+            byHours ? React.createElement("span", null,
+                hoursLabel(split.totalH),
+                " total") : null,
+            React.createElement("span", null,
+                "Paying out ",
+                React.createElement("strong", { style: { fontFamily: "JetBrains Mono", color: COLORS.crust } }, money(totalPaid))),
+            React.createElement("span", { style: { color: Math.abs(left) < 0.005 ? "#777" : left < 0 ? COLORS.tomato : COLORS.basil } },
+                left < 0 ? "over by " : "left over ",
+                React.createElement("strong", { style: { fontFamily: "JetBrains Mono" } }, money(Math.abs(left)))))));
+}
+function SplitModeToggle({ byHours, setByHours, defSpan, split }) {
+    const simple = !byHours && split.allFull && split.rows.length > 0;
+    return (React.createElement("div", { className: "flex flex-wrap items-center gap-2 mt-3" },
+        React.createElement("button", { onClick: () => setByHours(false), className: "px-3 py-2 rounded text-sm", style: { background: byHours ? COLORS.cream : COLORS.crust, color: byHours ? COLORS.crust : COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "Inter" } }, "Even split"),
+        React.createElement("button", { onClick: () => setByHours(true), className: "px-3 py-2 rounded text-sm", style: { background: byHours ? COLORS.crust : COLORS.cream, color: byHours ? COLORS.cream : COLORS.crust, border: "1px solid " + COLORS.line, fontFamily: "Inter" } }, "By hours"),
+        byHours && (React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#999" } },
+            "blank = whole shift (",
+            defSpan,
+            ")")),
+        simple && (React.createElement("span", { className: "ml-auto text-sm", style: { fontFamily: "Inter", color: "#777" } },
+            React.createElement("strong", { style: { fontFamily: "JetBrains Mono", fontSize: 18, color: COLORS.crust } }, money(split.rows[0].exact)),
+            " each"))));
 }
 function tipEntryText(e) {
     const L = [];
     L.push(shortDate(e.date) + " — On Point tips");
-    if (e.day && (e.day.crew || []).length) {
-        L.push("DAY (" + e.day.crew.length + "): " + e.day.crew.join(", "));
-        L.push("  cash " + money(e.day.cash) + " + CC " + money(e.day.cc) + " = " + money(e.day.total) +
-            " ÷ " + e.day.crew.length + " = " + money(e.day.each) + "  ->  $" + e.day.paid + " each");
-    }
-    if (e.night && (e.night.crew || []).length) {
-        L.push("NIGHT (" + e.night.crew.length + "): " + e.night.crew.join(", "));
-        L.push("  CC all day " + money(e.night.ccAll) + " − day CC " + money(e.night.dayCC) +
-            " − delivery " + money(e.night.delivery) + " = " + money(e.night.cc));
-        L.push("  + cash " + money(e.night.cash) + " = " + money(e.night.total) +
-            " ÷ " + e.night.crew.length + " = " + money(e.night.each) + "  ->  $" + e.night.paid + " each");
-    }
+    const side = (tag, s) => {
+        if (!s || !(s.crew || []).length)
+            return;
+        L.push(tag + " (" + s.crew.length + ")" + (s.byHours ? " — split by hours" : "") + ": " + s.crew.join(", "));
+        if (tag === "DAY") {
+            L.push("  cash " + money(s.cash) + " + CC " + money(s.cc) + " = " + money(s.total));
+        }
+        else {
+            L.push("  CC all day " + money(s.ccAll) + " − day CC " + money(s.dayCC) +
+                " − delivery " + money(s.delivery) + " = " + money(s.cc));
+            L.push("  + cash " + money(s.cash) + " = " + money(s.total));
+        }
+        const rows = s.rows || [];
+        const plain = !s.byHours && rows.every((r) => (r.share == null || r.share === 1));
+        if (plain || !rows.length) {
+            L.push("  \u00f7 " + s.crew.length + " = " + money(s.each) + "  ->  $" + s.paid + " each");
+        }
+        else {
+            rows.forEach((r) => {
+                const bits = [];
+                if (s.byHours)
+                    bits.push(r.span + " (" + hoursLabel(r.hours) + ")");
+                if (r.share != null && r.share !== 1)
+                    bits.push(shareLabel(r.share) + " share");
+                L.push("    " + r.name + "  " + bits.join(", ") + "  " + money(r.exact) + "  ->  $" + r.paid);
+            });
+            const paid = rows.reduce((a, r) => a + (Number(r.paid) || 0), 0);
+            L.push("    paid out $" + paid + " of " + money(s.total));
+        }
+    };
+    side("DAY", e.day);
+    side("NIGHT", e.night);
     if (e.note)
         L.push("Note: " + e.note);
     return L.join("\n");
@@ -2202,63 +2366,102 @@ function TipsTab({ data, persist }) {
     const [dayExtra, setDayExtra] = useState("");
     const [dayCash, setDayCash] = useState("");
     const [dayCC, setDayCC] = useState("");
-    const [dayPaid, setDayPaid] = useState("");
+    const [dayByHours, setDayByHours] = useState(false);
+    const [dayTimes, setDayTimes] = useState({});
+    const [dayShares, setDayShares] = useState({});
+    const [dayPaidMap, setDayPaidMap] = useState({});
     const [nightCrew, setNightCrew] = useState([]);
     const [nightExtra, setNightExtra] = useState("");
     const [ccAll, setCcAll] = useState("");
     const [delivery, setDelivery] = useState("");
     const [nightCash, setNightCash] = useState("");
-    const [nightPaid, setNightPaid] = useState("");
+    const [nightByHours, setNightByHours] = useState(false);
+    const [nightTimes, setNightTimes] = useState({});
+    const [nightShares, setNightShares] = useState({});
+    const [nightPaidMap, setNightPaidMap] = useState({});
     const [note, setNote] = useState("");
     const [open, setOpen] = useState("");
     const [copied, setCopied] = useState("");
     const names = staffNameList(data);
     const log = (data.tips || []).slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    const closeHour = (data.tipSettings && data.tipSettings.close) || 21;
+    const setClose = (h) => {
+        const next = JSON.parse(JSON.stringify(data));
+        next.tipSettings = Object.assign({}, next.tipSettings || {}, { close: h });
+        persist(next);
+    };
     const dayTotal = num(dayCash) + num(dayCC);
-    const dayEach = dayCrew.length ? dayTotal / dayCrew.length : 0;
     const nightCC = num(ccAll) - num(dayCC) - num(delivery);
     const nightTotal = nightCC + num(nightCash);
+    const daySplit = computeSplit(dayCrew, dayByHours, dayTimes, dayShares, DAY_SPAN, closeHour, dayTotal);
+    const nightSplit = computeSplit(nightCrew, nightByHours, nightTimes, nightShares, NIGHT_SPAN, closeHour, nightTotal);
+    const dayEach = dayCrew.length ? dayTotal / dayCrew.length : 0;
     const nightEach = nightCrew.length ? nightTotal / nightCrew.length : 0;
     const loadDate = (iso) => {
         setDate(iso);
         const e = (data.tips || []).find((x) => x.date === iso);
         if (!e)
             return;
-        setDayCrew((e.day && e.day.crew) || []);
+        const restore = (s, setCrew, setBy, setT, setSh, setP) => {
+            setCrew((s && s.crew) || []);
+            setBy(!!(s && s.byHours));
+            const t = {}, sh = {}, p = {};
+            ((s && s.rows) || []).forEach((r) => {
+                if (r.span)
+                    t[r.name] = r.span;
+                if (r.share != null && r.share !== 1)
+                    sh[r.name] = r.share;
+                p[r.name] = String(r.paid);
+            });
+            setT(t);
+            setSh(sh);
+            setP(p);
+        };
+        restore(e.day, setDayCrew, setDayByHours, setDayTimes, setDayShares, setDayPaidMap);
+        restore(e.night, setNightCrew, setNightByHours, setNightTimes, setNightShares, setNightPaidMap);
         setDayCash(e.day ? String(e.day.cash) : "");
         setDayCC(e.day ? String(e.day.cc) : "");
-        setDayPaid(e.day ? String(e.day.paid) : "");
-        setNightCrew((e.night && e.night.crew) || []);
         setCcAll(e.night ? String(e.night.ccAll) : "");
         setDelivery(e.night ? String(e.night.delivery) : "");
         setNightCash(e.night ? String(e.night.cash) : "");
-        setNightPaid(e.night ? String(e.night.paid) : "");
         setNote(e.note || "");
     };
     const clearForm = () => {
         setDayCrew([]);
         setDayCash("");
         setDayCC("");
-        setDayPaid("");
+        setDayByHours(false);
+        setDayTimes({});
+        setDayShares({});
+        setDayPaidMap({});
         setNightCrew([]);
         setCcAll("");
         setDelivery("");
         setNightCash("");
-        setNightPaid("");
+        setNightByHours(false);
+        setNightTimes({});
+        setNightShares({});
+        setNightPaidMap({});
         setNote("");
     };
+    const packRows = (split, paidMap) => split.rows.map((r) => ({
+        name: r.name, span: r.span, hours: r.hours, share: r.share,
+        exact: Math.round(r.exact * 100) / 100, paid: paidOf(r, paidMap)
+    }));
     const save = () => {
         const entry = {
             id: uid(),
             date,
             day: {
                 crew: dayCrew, cash: num(dayCash), cc: num(dayCC), total: dayTotal, each: dayEach,
-                paid: dayPaid === "" ? Math.round(dayEach) : num(dayPaid)
+                paid: daySplit.rows.length ? paidOf(daySplit.rows[0], dayPaidMap) : 0,
+                byHours: dayByHours, rows: packRows(daySplit, dayPaidMap)
             },
             night: {
                 crew: nightCrew, ccAll: num(ccAll), dayCC: num(dayCC), delivery: num(delivery),
                 cc: nightCC, cash: num(nightCash), total: nightTotal, each: nightEach,
-                paid: nightPaid === "" ? Math.round(nightEach) : num(nightPaid)
+                paid: nightSplit.rows.length ? paidOf(nightSplit.rows[0], nightPaidMap) : 0,
+                byHours: nightByHours, rows: packRows(nightSplit, nightPaidMap)
             },
             note: note.trim(),
             savedBy: (typeof localStorage !== "undefined" && localStorage.getItem("opp:device")) || "",
@@ -2281,7 +2484,7 @@ function TipsTab({ data, persist }) {
             setCopied(key);
             setTimeout(() => setCopied(""), 1600);
         }
-        catch (e) { /* clipboard blocked — user can select the text */ }
+        catch (e) { /* clipboard blocked — the text is on screen to select */ }
     };
     const existing = (data.tips || []).some((x) => x.date === date);
     return (React.createElement("div", { className: "space-y-4" },
@@ -2290,6 +2493,9 @@ function TipsTab({ data, persist }) {
                 React.createElement("div", null,
                     React.createElement("div", { className: "text-xs mb-1", style: { fontFamily: "Inter", color: "#777" } }, "Business day"),
                     React.createElement("input", { type: "date", value: date, onChange: (e) => loadDate(e.target.value), className: "text-base px-2.5 py-2 rounded outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } })),
+                React.createElement("div", null,
+                    React.createElement("div", { className: "text-xs mb-1", style: { fontFamily: "Inter", color: "#777" } }, "\"Close\" means"),
+                    React.createElement("select", { value: closeHour, onChange: (e) => setClose(Number(e.target.value)), className: "text-base px-2.5 py-2 rounded outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", background: COLORS.cream } }, CLOSE_CHOICES.map((c) => React.createElement("option", { key: c.h, value: c.h }, c.label)))),
                 React.createElement("div", { className: "text-sm pb-2", style: { fontFamily: "Inter", color: existing ? COLORS.tomatoDark : "#999" } }, existing ? "Already logged — saving will replace it" : prettyDate(date)))),
         React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
             React.createElement("div", { className: "text-xs font-semibold tracking-widest mb-2", style: { fontFamily: "Oswald", color: COLORS.tomato } },
@@ -2304,7 +2510,8 @@ function TipsTab({ data, persist }) {
                 React.createElement("div", { className: "flex-1", style: { minWidth: 120 } },
                     React.createElement("div", { className: "text-xs mb-1", style: { fontFamily: "Inter", color: "#777" } }, "Day pot"),
                     React.createElement("div", { className: "text-base px-2.5 py-2 rounded", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }, money(dayTotal)))),
-            React.createElement(PayoutRow, { each: dayEach, paid: dayPaid, setPaid: setDayPaid })),
+            React.createElement(SplitModeToggle, { byHours: dayByHours, setByHours: setDayByHours, defSpan: DAY_SPAN, split: daySplit }),
+            React.createElement(PayoutTable, { split: daySplit, pot: dayTotal, byHours: dayByHours, times: dayTimes, setTimes: setDayTimes, shares: dayShares, setShares: setDayShares, defSpan: DAY_SPAN, paidMap: dayPaidMap, setPaidMap: setDayPaidMap })),
         React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
             React.createElement("div", { className: "text-xs font-semibold tracking-widest mb-2", style: { fontFamily: "Oswald", color: COLORS.tomato } },
                 "NIGHT SHIFT \u00B7 ",
@@ -2317,7 +2524,7 @@ function TipsTab({ data, persist }) {
                 React.createElement("div", { className: "flex-1", style: { minWidth: 120 } },
                     React.createElement("div", { className: "text-xs mb-1", style: { fontFamily: "Inter", color: "#777" } }, "\u2212 Day CC (from above)"),
                     React.createElement("div", { className: "text-base px-2.5 py-2 rounded", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }, money(num(dayCC)))),
-                React.createElement(MoneyField, { label: "\u2212 Delivery drivers", value: delivery, onChange: setDelivery, hint: "leave blank if no dels" }),
+                React.createElement(MoneyField, { label: "\u2212 Delivery (3rd party)", value: delivery, onChange: setDelivery, hint: "comes off before the split" }),
                 React.createElement(MoneyField, { label: "+ Night cash", value: nightCash, onChange: setNightCash })),
             React.createElement("div", { className: "mt-3 text-sm px-2.5 py-2 rounded", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono", color: COLORS.crust } },
                 money(num(ccAll)),
@@ -2331,7 +2538,8 @@ function TipsTab({ data, persist }) {
                 money(num(nightCash)),
                 " = ",
                 React.createElement("strong", null, money(nightTotal))),
-            React.createElement(PayoutRow, { each: nightEach, paid: nightPaid, setPaid: setNightPaid })),
+            React.createElement(SplitModeToggle, { byHours: nightByHours, setByHours: setNightByHours, defSpan: NIGHT_SPAN, split: nightSplit }),
+            React.createElement(PayoutTable, { split: nightSplit, pot: nightTotal, byHours: nightByHours, times: nightTimes, setTimes: setNightTimes, shares: nightShares, setShares: setNightShares, defSpan: NIGHT_SPAN, paidMap: nightPaidMap, setPaidMap: setNightPaidMap })),
         React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
             React.createElement("input", { placeholder: "Note for Val (who was off, anything unusual)", value: note, onChange: (e) => setNote(e.target.value), className: "text-sm px-2.5 py-2 rounded outline-none w-full mb-3", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
             React.createElement("div", { className: "flex flex-wrap gap-2" },
@@ -3488,370 +3696,350 @@ function vendorProduct(i, vendor) {
   return n && n !== i.item ? n : "";
 }
 
-function FoodOrderTab({ data, persist }) {
-  const [view, setView] = useState("order");
-  const [q, setQ] = useState("");
-  const [copied, setCopied] = useState("");
-  const inv = (data && data.inventory) || [];
-
-  const patch = (id, changes) => {
-    const next = JSON.parse(JSON.stringify(data));
-    const row = next.inventory.find((r) => r.id === id);
-    if (!row) return;
-    Object.assign(row, changes);
-    persist(next);
-  };
-  const reset = () => {
-    const next = JSON.parse(JSON.stringify(data));
-    next.inventory.forEach((r) => { r.orderNeed = null; });
-    persist(next);
-  };
-
-  const vendorOf = (i) => i.orderVendor || i.vendor || "QFC";
-  const skuOf = (i) => (vendorOf(i) === "Thomsen" ? i.thomsenSku : i.qfcSku) || "";
-  const onList = inv.filter((i) => Number(i.orderNeed) > 0);
-  const allSet = inv.filter((i) => i.orderNeed === 0).length;
-  const untouched = inv.filter((i) => i.orderNeed == null).length;
-
-  const copyFor = (vendor) => {
-    const rows = onList.filter((i) => vendorOf(i) === vendor);
-    if (!rows.length) return;
-    const vk = vendor === "Thomsen" ? "thomsen" : "qfc";
-    const text = rows
-      .map((i) => {
-        // Say it the way this vendor lists it, so the rep pulls the right product.
-        const theirName = (i.names && i.names[vk]) || i.item;
-        const also = theirName !== i.item ? "" : "";
-        return "\u2022 " + theirName + (skuOf(i) ? "  #" + skuOf(i) : "") + "  \u00d7 " + i.orderNeed + " " + (i.unit || "") + also;
-      })
-      .join("\n");
-    const header = "On Point Pizza \u2014 order for " + (vendor === "Thomsen" ? "Thomsen" : "Quality Food") + "\n\n";
-    if (navigator.clipboard) navigator.clipboard.writeText(header + text);
-    setCopied(vendor);
-    setTimeout(() => setCopied(""), 1800);
-  };
-
-  const match = (i) => !q.trim() || i.item.toLowerCase().includes(q.trim().toLowerCase());
-
-  // ---- the working order, split by who we're buying it from ----
-  const orderView = () => {
-    if (onList.length === 0) {
-      return /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } },
-        "Nothing on the order yet \u2014 go through \u201CSet Up List\u201D and mark what you need."
-      );
-    }
-    return ["QFC", "Thomsen"].map((vendor) => {
-      const rows = onList.filter((i) => vendorOf(i) === vendor);
-      if (!rows.length) return null;
-      const label = vendor === "Thomsen" ? "Thomsen" : "Quality Food";
-      return /* @__PURE__ */ React.createElement(
-        "div",
-        { key: vendor, className: "mb-4" },
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "flex items-center justify-between gap-2 px-3 py-2.5 rounded-t", style: { background: COLORS.crust } },
-          /* @__PURE__ */ React.createElement(
-            "span",
-            { style: { fontFamily: "Oswald", fontSize: "18px", color: COLORS.cream } },
-            label + " \u00b7 " + rows.length
-          ),
-          /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              onClick: () => copyFor(vendor),
-              className: "text-sm px-3 py-1.5 rounded-full flex items-center gap-1.5",
-              style: { background: COLORS.basil, color: COLORS.cream, border: "none", fontFamily: "Inter", fontWeight: 600 }
-            },
-            /* @__PURE__ */ React.createElement(Copy, { size: 14 }),
-            copied === vendor ? "Copied" : "Copy"
-          )
-        ),
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "space-y-1.5 pt-1.5" },
-          rows.map((i) =>
-            /* @__PURE__ */ React.createElement(
-              "div",
-              {
-                key: i.id,
-                className: "flex items-center gap-3 px-3 py-3 rounded",
-                style: { background: COLORS.card, border: `1px solid ${COLORS.line}`, borderLeft: `5px solid ${COLORS.tomato}` }
-              },
-              /* @__PURE__ */ React.createElement(
-                "div",
-                { className: "flex-1 min-w-0" },
-                /* @__PURE__ */ React.createElement(
-                  "div",
-                  { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } },
-                  i.item
-                ),
-                /* @__PURE__ */ React.createElement(
-                  "div",
-                  { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#8a7a6c" } },
-                  (skuOf(i) ? "#" + skuOf(i) + " \u00b7 " : "") + (priceLabel(costOf(i)) || "no price on file")
-                ),
-                vendorProduct(i, vendorOf(i))
-                  ? /* @__PURE__ */ React.createElement(
-                      "div",
-                      { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#a0937f", fontStyle: "italic" } },
-                      vendorProduct(i, vendorOf(i))
-                    )
-                  : null
-              ),
-              /* @__PURE__ */ React.createElement(
-                "span",
-                {
-                  className: "text-lg px-2.5 py-0.5 rounded-full flex-shrink-0",
-                  style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.cream, background: COLORS.tomato }
-                },
-                "\u00d7" + i.orderNeed
-              ),
-              /* @__PURE__ */ React.createElement(
-                "button",
-                {
-                  onClick: () => patch(i.id, { orderNeed: null }),
-                  className: "px-2 py-2 flex-shrink-0",
-                  style: { border: "none", background: "transparent" }
-                },
-                /* @__PURE__ */ React.createElement(Trash2, { size: 15, color: "#999" })
-              )
-            )
-          )
-        )
-      );
-    });
-  };
-
-  // ---- go down every item and say what you need ----
-  const setupView = () => {
-    const shown = inv.filter(match);
-    const cats = [];
-    shown.forEach((i) => {
-      const c = itemCategory(i.item);
-      let g = cats.find((x) => x.name === c);
-      if (!g) { g = { name: c, items: [] }; cats.push(g); }
-      g.items.push(i);
-    });
-    cats.sort((a, b) => {
-      const ia = CATEGORY_ORDER.indexOf(a.name), ib = CATEGORY_ORDER.indexOf(b.name);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-    });
-    if (!shown.length) {
-      return /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } },
-        "No items match that search."
-      );
-    }
-    return cats.map((g) =>
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { key: g.name, className: "mb-5" },
-        /* @__PURE__ */ React.createElement(SectionHeader, null, g.name),
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "space-y-1.5" },
-          g.items.map((i) => {
-            const need = i.orderNeed;
-            const isSet = need === 0;
-            const on = Number(need) > 0;
-            const bothVendors = !!(i.qfcSku && i.thomsenSku);
-            return /* @__PURE__ */ React.createElement(
-              "div",
-              {
-                key: i.id,
-                className: "px-3 py-2.5 rounded",
-                style: {
-                  background: COLORS.card,
-                  border: `1px solid ${on ? COLORS.tomato : isSet ? COLORS.basil : COLORS.line}`,
-                  borderLeft: `5px solid ${on ? COLORS.tomato : isSet ? COLORS.basil : COLORS.line}`
-                }
-              },
-              /* @__PURE__ */ React.createElement(
-                "div",
-                { className: "flex items-start justify-between gap-2 mb-2" },
-                /* @__PURE__ */ React.createElement(
-                  "div",
-                  { className: "min-w-0" },
-                  /* @__PURE__ */ React.createElement(
-                    "div",
-                    { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } },
-                    i.item
-                  ),
-                  /* @__PURE__ */ React.createElement(
-                    "div",
-                    { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#8a7a6c" } },
-                    "on hand " + (i.qty != null ? i.qty : "?") + " " + (i.unit || "") +
-                      (priceLabel(costOf(i)) ? " \u00b7 " + priceLabel(costOf(i)) : "")
-                  ),
-                  on && vendorProduct(i, vendorOf(i))
-                    ? /* @__PURE__ */ React.createElement(
-                        "div",
-                        { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#a0937f", fontStyle: "italic" } },
-                        (vendorOf(i) === "Thomsen" ? "Thomsen: " : "Quality: ") + vendorProduct(i, vendorOf(i))
-                      )
-                    : null
-                ),
-                on
-                  ? /* @__PURE__ */ React.createElement(
-                      "span",
-                      { className: "text-sm flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.tomato } },
-                      "need " + need
-                    )
-                  : isSet
-                  ? /* @__PURE__ */ React.createElement(
-                      "span",
-                      { className: "text-sm flex-shrink-0", style: { fontFamily: "Inter", color: COLORS.basil } },
-                      "all set"
-                    )
-                  : null
-              ),
-              /* @__PURE__ */ React.createElement(
-                "div",
-                { className: "flex items-center gap-1.5 flex-wrap" },
-                /* @__PURE__ */ React.createElement(
-                  "button",
-                  {
-                    onClick: () => patch(i.id, { orderNeed: isSet ? null : 0 }),
-                    className: "text-sm px-3 py-2 rounded-full",
-                    style: {
-                      fontFamily: "Inter",
-                      border: `1px solid ${isSet ? COLORS.basil : COLORS.line}`,
-                      background: isSet ? COLORS.basil : "transparent",
-                      color: isSet ? COLORS.cream : COLORS.crust
-                    }
-                  },
-                  "All set"
-                ),
-                [1, 2, 3, 4].map((n) =>
-                  /* @__PURE__ */ React.createElement(
-                    "button",
-                    {
-                      key: n,
-                      onClick: () => patch(i.id, { orderNeed: need === n ? null : n }),
-                      className: "text-base px-3.5 py-2 rounded-full",
-                      style: {
-                        fontFamily: "JetBrains Mono",
-                        fontWeight: 700,
-                        border: `1px solid ${need === n ? COLORS.tomato : COLORS.line}`,
-                        background: need === n ? COLORS.tomato : "transparent",
-                        color: need === n ? COLORS.cream : COLORS.crust
-                      }
-                    },
-                    n
-                  )
-                ),
-                /* @__PURE__ */ React.createElement(
-                  "button",
-                  {
-                    onClick: () => patch(i.id, { orderNeed: (Number(need) || 0) + 1 }),
-                    className: "px-3 py-2 rounded-full flex items-center",
-                    style: { border: `1px solid ${COLORS.line}`, background: "transparent" }
-                  },
-                  /* @__PURE__ */ React.createElement(Plus, { size: 16, color: COLORS.crust })
-                ),
-                on && bothVendors
-                  ? /* @__PURE__ */ React.createElement(
-                      "div",
-                      { className: "flex items-center gap-1 ml-auto", title: "Quality: " + ((i.names && i.names.qfc) || i.item) + " / Thomsen: " + ((i.names && i.names.thomsen) || i.item) },
-                      ["QFC", "Thomsen"].map((v) =>
-                        /* @__PURE__ */ React.createElement(
-                          "button",
-                          {
-                            key: v,
-                            onClick: () => patch(i.id, { orderVendor: v }),
-                            className: "text-xs px-2.5 py-2 rounded-full",
-                            style: {
-                              fontFamily: "Inter",
-                              border: `1px solid ${vendorOf(i) === v ? COLORS.crust : COLORS.line}`,
-                              background: vendorOf(i) === v ? COLORS.crust : "transparent",
-                              color: vendorOf(i) === v ? COLORS.cream : "#8a7a6c"
-                            }
-                          },
-                          v === "QFC" ? "Quality" : "Thomsen"
-                        )
-                      )
-                    )
-                  : null
-              )
-            );
-          })
-        )
-      )
-    );
-  };
-
-  const views = [
-    { id: "order", label: "Order", n: onList.length },
-    { id: "setup", label: "Set Up List", n: inv.length }
-  ];
-
-  return /* @__PURE__ */ React.createElement(
-    "div",
-    null,
-    /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "flex items-center justify-between gap-2 px-3 py-3 rounded mb-3", style: { background: COLORS.crust } },
-      /* @__PURE__ */ React.createElement(
-        "div",
-        null,
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "text-2xl", style: { fontFamily: "Oswald", color: COLORS.cream, lineHeight: 1.1 } },
-          onList.length === 0 ? "Nothing to order" : onList.length + (onList.length === 1 ? " item to order" : " items to order")
-        ),
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#c9bda8" } },
-          allSet + " marked all set \u00b7 " + untouched + " not looked at"
-        )
-      ),
-      /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          onClick: reset,
-          className: "text-sm px-3 py-2 rounded-full flex-shrink-0",
-          style: { fontFamily: "Inter", border: "1px solid #6b5545", color: COLORS.cream, background: "transparent" }
-        },
-        "Reset"
-      )
-    ),
-    /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "flex items-center gap-1.5 mb-2 flex-wrap" },
-      views.map((v) =>
-        /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            key: v.id,
-            onClick: () => setView(v.id),
-            className: "text-sm px-3.5 py-2 rounded-full",
-            style: {
-              fontFamily: "Inter",
-              border: `1px solid ${view === v.id ? COLORS.tomato : COLORS.line}`,
-              background: view === v.id ? COLORS.tomato : "transparent",
-              color: view === v.id ? COLORS.cream : COLORS.crust
-            }
-          },
-          v.label + " (" + v.n + ")"
-        )
-      )
-    ),
-    view === "setup"
-      ? /* @__PURE__ */ React.createElement("input", {
-          placeholder: "Search all items\u2026",
-          value: q,
-          onChange: (e) => setQ(e.target.value),
-          className: "w-full text-base px-3 py-2.5 rounded mb-3 outline-none",
-          style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
-        })
-      : null,
-    view === "order" ? orderView() : setupView()
-  );
+// ===================== FOOD ORDER TAB =====================
+// One line per product, never one per brand. The two distributors stock
+// different brands of the same thing (ricotta is Supreme at Quality, Grande at
+// Thomsen), so the sheet stays thin and the brand detail lives behind a tap.
+const VENDOR_LABEL = { QFC: "Quality Food", Thomsen: "Thomsen" };
+const VENDOR_SHORT = { QFC: "Quality", Thomsen: "Thomsen" };
+function normUnit(u) {
+    const s = String(u || "").toLowerCase().replace(/[^a-z]/g, "");
+    if (s === "cs" || s === "cse" || s === "case")
+        return "case";
+    if (s === "bx" || s === "box")
+        return "box";
+    if (s === "lbs" || s === "lb" || s === "pound" || s === "pounds")
+        return "lb";
+    if (s === "each" || s === "ea" || s === "ct" || s === "count")
+        return "ea";
+    if (s === "gal" || s === "gallon")
+        return "gal";
+    return s;
 }
-
+function vendorPriceOf(i, vk) {
+    const p = (i && i.prices) || {};
+    const v = p[vk];
+    return v && typeof v.amt === "number" ? v : null;
+}
+// How many of the item's base unit are in one of that vendor's priced units.
+// 1 when they already quote in our unit; otherwise it has to be entered once
+// (a Thomsen case of mozz is 48 lb — nothing on file can tell us that).
+function packOf(i, vk) {
+    const p = vendorPriceOf(i, vk);
+    if (!p)
+        return null;
+    if (normUnit(p.unit) === normUnit(i.unit))
+        return 1;
+    const n = i.pack && Number(i.pack[vk]);
+    return n > 0 ? n : null;
+}
+function perBase(i, vk) {
+    const p = vendorPriceOf(i, vk);
+    const k = packOf(i, vk);
+    return p && k ? p.amt / k : null;
+}
+function needsPack(i, vk) {
+    const p = vendorPriceOf(i, vk);
+    return !!p && normUnit(p.unit) !== normUnit(i.unit) && packOf(i, vk) == null;
+}
+function priceAge(p) {
+    if (!p || !p.date)
+        return "";
+    const parts = String(p.date).split("-");
+    if (parts.length !== 3)
+        return "";
+    return "as of " + MON3[Number(parts[1]) - 1] + " " + Number(parts[2]);
+}
+// Compare on price per base unit. That's free when both vendors quote the same
+// unit, and works across a per-lb vs per-case split once the pack size is known.
+function cheaperSide(i) {
+    const q = vendorPriceOf(i, "qfc"), t = vendorPriceOf(i, "thomsen");
+    if (!q || !t)
+        return { side: null, diff: 0, comparable: false, q, t, qb: null, tb: null };
+    const qb = perBase(i, "qfc"), tb = perBase(i, "thomsen");
+    if (qb == null || tb == null)
+        return { side: null, diff: 0, comparable: false, q, t, qb, tb };
+    return {
+        side: qb === tb ? "even" : (qb < tb ? "qfc" : "thomsen"),
+        diff: Math.abs(qb - tb),
+        comparable: true, q, t, qb, tb
+    };
+}
+function dualPriceLine(i) {
+    const q = vendorPriceOf(i, "qfc"), t = vendorPriceOf(i, "thomsen");
+    const bits = [];
+    if (q)
+        bits.push("Q $" + q.amt.toFixed(2) + "/" + (q.unit || "ea"));
+    if (t)
+        bits.push("T $" + t.amt.toFixed(2) + "/" + (t.unit || "ea"));
+    return bits.length ? bits.join("  \u00b7  ") : "no price on file";
+}
+function VendorPick({ i, vendorOf, patch, size }) {
+    const has = { QFC: !!(i.qfcSku || vendorPriceOf(i, "qfc")), Thomsen: !!(i.thomsenSku || vendorPriceOf(i, "thomsen")) };
+    if (!has.QFC && !has.Thomsen)
+        return null;
+    return (React.createElement("div", { className: "flex items-center gap-1" }, ["QFC", "Thomsen"].map((v) => (React.createElement("button", { key: v, onClick: () => patch(i.id, { orderVendor: v }), className: (size === "lg" ? "text-sm px-3.5 py-2" : "text-xs px-2.5 py-2") + " rounded-full", style: {
+            fontFamily: "Inter",
+            opacity: has[v] ? 1 : 0.45,
+            border: "1px solid " + (vendorOf(i) === v ? COLORS.crust : COLORS.line),
+            background: vendorOf(i) === v ? COLORS.crust : "transparent",
+            color: vendorOf(i) === v ? COLORS.cream : "#8a7a6c"
+        } }, VENDOR_SHORT[v])))));
+}
+// The "bigger field": both brands, both prices, the gap between them.
+function PackInput({ i, vk, patch }) {
+    const p = vendorPriceOf(i, vk);
+    const [val, setVal] = useState("");
+    const known = packOf(i, vk);
+    const save = () => {
+        const n = Number(String(val).replace(/[^0-9.]/g, ""));
+        if (!(n > 0))
+            return;
+        const pack = Object.assign({}, i.pack || {});
+        pack[vk] = n;
+        patch(i.id, { pack });
+        setVal("");
+    };
+    if (known != null) {
+        return (React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "JetBrains Mono", color: COLORS.basil } },
+            "= $" + (p.amt / known).toFixed(2) + "/" + (i.unit || "ea"),
+            React.createElement("button", { onClick: () => { const pk = Object.assign({}, i.pack || {}); delete pk[vk]; patch(i.id, { pack: pk }); }, className: "ml-2 underline", style: { fontFamily: "Inter", color: "#a0937f" } }, known === 1 ? "" : "(" + known + " " + (i.unit || "") + "/" + (p.unit || "unit") + ", edit)")));
+    }
+    return (React.createElement("div", { className: "flex items-center gap-1 mt-1.5" },
+        React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "1 " + (p.unit || "unit") + " ="),
+        React.createElement("input", { inputMode: "decimal", placeholder: "?", value: val, onChange: (e) => setVal(e.target.value), className: "text-sm px-1.5 py-1 rounded outline-none", style: { width: 52, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }),
+        React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8a7a6c" } }, i.unit || "ea"),
+        React.createElement("button", { onClick: save, className: "text-xs px-2 py-1 rounded", style: { background: COLORS.basil, color: COLORS.cream, border: "none", fontFamily: "Inter" } }, "Set")));
+}
+function PriceDetail({ i, vendorOf, patch }) {
+    const c = cheaperSide(i);
+    const col = (vk, key) => {
+        const p = vendorPriceOf(i, vk);
+        const brand = (i.names && i.names[vk]) || "";
+        const sku = vk === "qfc" ? i.qfcSku : i.thomsenSku;
+        const best = c.side === vk && c.comparable;
+        return (React.createElement("div", { key: key, className: "rounded p-2.5 flex-1", style: {
+                minWidth: 150,
+                background: COLORS.cream,
+                border: "1px solid " + (best ? COLORS.basil : COLORS.line),
+                borderLeft: "4px solid " + (best ? COLORS.basil : COLORS.line)
+            } },
+            React.createElement("div", { className: "text-xs font-semibold tracking-widest mb-1", style: { fontFamily: "Oswald", color: best ? COLORS.basil : "#8a7a6c" } },
+                VENDOR_LABEL[key],
+                best ? " \u2713" : ""),
+            React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", color: brand ? COLORS.crust : "#aaa" } }, brand || "not carried / no product on file"),
+            React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "JetBrains Mono", color: "#8a7a6c" } }, sku ? "#" + sku : "no item number"),
+            React.createElement("div", { className: "text-lg mt-1", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: p ? COLORS.crust : "#bbb" } },
+                p ? "$" + p.amt.toFixed(2) : "\u2014",
+                p ? React.createElement("span", { className: "text-sm", style: { fontWeight: 400, color: "#8a7a6c" } }, " /" + (p.unit || "ea")) : null),
+            p && priceAge(p) ? React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: "#a0937f" } }, priceAge(p)) : null,
+            p ? React.createElement(PackInput, { i: i, vk: vk, patch: patch }) : null));
+    };
+    const base = i.unit || "ea";
+    let verdict;
+    if (!c.q && !c.t)
+        verdict = "No price on file for either one yet.";
+    else if (!c.q || !c.t)
+        verdict = "Only one price on file \u2014 nothing to compare against yet.";
+    else if (!c.comparable) {
+        const miss = [];
+        if (needsPack(i, "qfc"))
+            miss.push("Quality prices by " + (c.q.unit || "?"));
+        if (needsPack(i, "thomsen"))
+            miss.push("Thomsen prices by " + (c.t.unit || "?"));
+        verdict = miss.join(" and ") + ", and we sell by the " + base +
+            ". Fill in how many " + base + " are in one, above, and I'll do the comparison.";
+    }
+    else if (c.side === "even")
+        verdict = "Same price either way \u2014 $" + c.qb.toFixed(2) + " per " + base + ".";
+    else {
+        const winner = c.side === "qfc" ? "QFC" : "Thomsen";
+        const bigUnit = c.side === "qfc" ? c.t : c.q;
+        const bigPack = packOf(i, c.side === "qfc" ? "thomsen" : "qfc");
+        const perOrder = bigPack && bigPack > 1
+            ? "  \u2014 about $" + (c.diff * bigPack).toFixed(2) + " on a " + bigPack + " " + base + " " + (bigUnit.unit || "unit")
+            : "";
+        verdict = VENDOR_SHORT[winner] + " is $" + c.diff.toFixed(2) + " cheaper per " + base +
+            " ($" + Math.min(c.qb, c.tb).toFixed(2) + " vs $" + Math.max(c.qb, c.tb).toFixed(2) + ")" + perOrder + ".";
+    }
+    return (React.createElement("div", { className: "mt-2 pt-2.5", style: { borderTop: "1px dashed " + COLORS.line } },
+        React.createElement("div", { className: "flex gap-2 flex-wrap" },
+            col("qfc", "QFC"),
+            col("thomsen", "Thomsen")),
+        React.createElement("div", { className: "text-sm mt-2 px-2.5 py-2 rounded", style: { background: COLORS.cream, fontFamily: "Inter", color: COLORS.crust } }, verdict),
+        React.createElement("div", { className: "flex items-center flex-wrap gap-2 mt-2" },
+            React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8a7a6c" } },
+                "On hand ",
+                i.qty != null ? i.qty : "?",
+                " ",
+                i.unit || "",
+                i.low != null ? " \u00b7 low at " + i.low : ""),
+            React.createElement("span", { className: "text-xs ml-auto", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "Buying from"),
+            React.createElement(VendorPick, { i: i, vendorOf: vendorOf, patch: patch, size: "lg" }))));
+}
+function FoodOrderTab({ data, persist }) {
+    const [view, setView] = useState("order");
+    const [q, setQ] = useState("");
+    const [copied, setCopied] = useState("");
+    const [openId, setOpenId] = useState("");
+    const inv = (data && data.inventory) || [];
+    const patch = (id, changes) => {
+        const next = JSON.parse(JSON.stringify(data));
+        const row = next.inventory.find((r) => r.id === id);
+        if (!row)
+            return;
+        Object.assign(row, changes);
+        persist(next);
+    };
+    const reset = () => {
+        const next = JSON.parse(JSON.stringify(data));
+        next.inventory.forEach((r) => { r.orderNeed = null; });
+        persist(next);
+    };
+    const vendorOf = (i) => i.orderVendor || i.vendor || "QFC";
+    const skuOf = (i) => (vendorOf(i) === "Thomsen" ? i.thomsenSku : i.qfcSku) || "";
+    const onList = inv.filter((i) => Number(i.orderNeed) > 0);
+    const allSet = inv.filter((i) => i.orderNeed === 0).length;
+    const untouched = inv.filter((i) => i.orderNeed == null).length;
+    const toggleOpen = (id) => setOpenId(openId === id ? "" : id);
+    // Both vendors priced but we can't line the units up yet — one pack size away
+    // from a real comparison.
+    const needsCompare = (i) => {
+        const c = cheaperSide(i);
+        return !!(c.q && c.t) && !c.comparable;
+    };
+    const packTodo = inv.filter(needsCompare).length;
+    // Thin export: our own name for the thing plus their item number, which is
+    // what actually pins the product. Their brand name only when there's no number.
+    const copyFor = (vendor) => {
+        const rows = onList.filter((i) => vendorOf(i) === vendor);
+        if (!rows.length)
+            return;
+        const vk = vendor === "Thomsen" ? "thomsen" : "qfc";
+        const text = rows.map((i) => {
+            const sku = skuOf(i);
+            const theirs = (i.names && i.names[vk]) || "";
+            const tail = sku ? "  #" + sku : (theirs && theirs !== i.item ? "  (" + theirs + ")" : "");
+            return "\u2022 " + i.item + tail + "  \u00d7 " + i.orderNeed + " " + (i.unit || "");
+        }).join("\n");
+        const header = "On Point Pizza \u2014 order for " + VENDOR_LABEL[vendor] + "\n\n";
+        if (navigator.clipboard)
+            navigator.clipboard.writeText(header + text);
+        setCopied(vendor);
+        setTimeout(() => setCopied(""), 1800);
+    };
+    const match = (i) => !q.trim() || i.item.toLowerCase().includes(q.trim().toLowerCase());
+    // ---- the working order, split by who we're buying it from ----
+    const orderView = () => {
+        if (onList.length === 0) {
+            return (React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } }, "Nothing on the order yet \u2014 go through \u201CSet Up List\u201D and mark what you need."));
+        }
+        return ["QFC", "Thomsen"].map((vendor) => {
+            const rows = onList.filter((i) => vendorOf(i) === vendor);
+            if (!rows.length)
+                return null;
+            return (React.createElement("div", { key: vendor, className: "mb-4" },
+                React.createElement("div", { className: "flex items-center justify-between gap-2 px-3 py-2.5 rounded-t", style: { background: COLORS.crust } },
+                    React.createElement("span", { style: { fontFamily: "Oswald", fontSize: "18px", color: COLORS.cream } }, VENDOR_LABEL[vendor] + " \u00b7 " + rows.length),
+                    React.createElement("button", { onClick: () => copyFor(vendor), className: "text-sm px-3 py-1.5 rounded-full flex items-center gap-1.5", style: { background: COLORS.basil, color: COLORS.cream, border: "none", fontFamily: "Inter", fontWeight: 600 } },
+                        React.createElement(Copy, { size: 14 }),
+                        copied === vendor ? "Copied" : "Copy")),
+                React.createElement("div", { className: "space-y-1.5 pt-1.5" }, rows.map((i) => (React.createElement("div", { key: i.id, className: "px-3 py-3 rounded", style: { background: COLORS.card, border: "1px solid " + COLORS.line, borderLeft: "5px solid " + COLORS.tomato } },
+                    React.createElement("div", { className: "flex items-center gap-3" },
+                        React.createElement("button", { onClick: () => toggleOpen(i.id), className: "flex-1 min-w-0 text-left" },
+                            React.createElement("div", { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } }, i.item),
+                            React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#8a7a6c" } },
+                                (skuOf(i) ? "#" + skuOf(i) + "  \u00b7  " : "") + dualPriceLine(i),
+                                React.createElement("span", { style: { color: COLORS.tomato } }, openId === i.id ? "  \u25b4" : "  \u25be"))),
+                        React.createElement("span", { className: "text-lg px-2.5 py-0.5 rounded-full flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.cream, background: COLORS.tomato } }, "\u00d7" + i.orderNeed),
+                        React.createElement("button", { onClick: () => patch(i.id, { orderNeed: null }), className: "px-2 py-2 flex-shrink-0", style: { border: "none", background: "transparent" } },
+                            React.createElement(Trash2, { size: 15, color: "#999" }))),
+                    openId === i.id ? React.createElement(PriceDetail, { i: i, vendorOf: vendorOf, patch: patch }) : null))))));
+        });
+    };
+    // ---- go down every item and say what you need ----
+    const setupView = () => {
+        const packMode = view === "packs";
+        const shown = inv.filter((i) => match(i) && (!packMode || needsCompare(i)));
+        const cats = [];
+        shown.forEach((i) => {
+            const c = itemCategory(i.item);
+            let g = cats.find((x) => x.name === c);
+            if (!g) {
+                g = { name: c, items: [] };
+                cats.push(g);
+            }
+            g.items.push(i);
+        });
+        cats.sort((a, b) => {
+            const ia = CATEGORY_ORDER.indexOf(a.name), ib = CATEGORY_ORDER.indexOf(b.name);
+            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
+        if (!shown.length) {
+            return (React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } }, packMode ? "Every item with two prices lines up \u2014 nothing left to fill in." : "No items match that search."));
+        }
+        return cats.map((g) => (React.createElement("div", { key: g.name, className: "mb-5" },
+            React.createElement(SectionHeader, null, g.name),
+            React.createElement("div", { className: "space-y-1.5" }, g.items.map((i) => {
+                const need = i.orderNeed;
+                const isSet = need === 0;
+                const on = Number(need) > 0;
+                const edge = on ? COLORS.tomato : isSet ? COLORS.basil : COLORS.line;
+                return (React.createElement("div", { key: i.id, className: "px-3 py-2.5 rounded", style: { background: COLORS.card, border: "1px solid " + edge, borderLeft: "5px solid " + edge } },
+                    React.createElement("div", { className: "flex items-start justify-between gap-2 mb-2" },
+                        React.createElement("button", { onClick: () => toggleOpen(i.id), className: "min-w-0 text-left flex-1" },
+                            React.createElement("div", { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } }, i.item),
+                            React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#8a7a6c" } },
+                                "on hand " + (i.qty != null ? i.qty : "?") + " " + (i.unit || "") + "  \u00b7  " + dualPriceLine(i),
+                                React.createElement("span", { style: { color: COLORS.tomato } }, openId === i.id ? "  \u25b4" : "  \u25be"))),
+                        on ? (React.createElement("span", { className: "text-sm flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.tomato } }, "need " + need)) : isSet ? (React.createElement("span", { className: "text-sm flex-shrink-0", style: { fontFamily: "Inter", color: COLORS.basil } }, "all set")) : null),
+                    React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap" },
+                        React.createElement("button", { onClick: () => patch(i.id, { orderNeed: isSet ? null : 0 }), className: "text-sm px-3 py-2 rounded-full", style: {
+                                fontFamily: "Inter",
+                                border: "1px solid " + (isSet ? COLORS.basil : COLORS.line),
+                                background: isSet ? COLORS.basil : "transparent",
+                                color: isSet ? COLORS.cream : COLORS.crust
+                            } }, "All set"),
+                        [1, 2, 3, 4].map((n) => (React.createElement("button", { key: n, onClick: () => patch(i.id, { orderNeed: need === n ? null : n }), className: "text-base px-3.5 py-2 rounded-full", style: {
+                                fontFamily: "JetBrains Mono",
+                                fontWeight: 700,
+                                border: "1px solid " + (need === n ? COLORS.tomato : COLORS.line),
+                                background: need === n ? COLORS.tomato : "transparent",
+                                color: need === n ? COLORS.cream : COLORS.crust
+                            } }, n))),
+                        React.createElement("button", { onClick: () => patch(i.id, { orderNeed: (Number(need) || 0) + 1 }), className: "px-3 py-2 rounded-full flex items-center", style: { border: "1px solid " + COLORS.line, background: "transparent" } },
+                            React.createElement(Plus, { size: 16, color: COLORS.crust })),
+                        on ? React.createElement("div", { className: "ml-auto" },
+                            React.createElement(VendorPick, { i: i, vendorOf: vendorOf, patch: patch })) : null),
+                    (packMode || openId === i.id) ? React.createElement(PriceDetail, { i: i, vendorOf: vendorOf, patch: patch }) : null));
+            })))));
+    };
+    const views = [
+        { id: "order", label: "Order", n: onList.length },
+        { id: "setup", label: "Set Up List", n: inv.length },
+        { id: "packs", label: "Pack sizes", n: packTodo }
+    ];
+    return (React.createElement("div", null,
+        React.createElement("div", { className: "flex items-center justify-between gap-2 px-3 py-3 rounded mb-3", style: { background: COLORS.crust } },
+            React.createElement("div", null,
+                React.createElement("div", { className: "text-2xl", style: { fontFamily: "Oswald", color: COLORS.cream, lineHeight: 1.1 } }, onList.length === 0 ? "Nothing to order" : onList.length + (onList.length === 1 ? " item to order" : " items to order")),
+                React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#c9bda8" } }, allSet + " marked all set \u00b7 " + untouched + " not looked at")),
+            React.createElement("button", { onClick: reset, className: "text-sm px-3 py-2 rounded-full flex-shrink-0", style: { fontFamily: "Inter", border: "1px solid #6b5545", color: COLORS.cream, background: "transparent" } }, "Reset")),
+        React.createElement("div", { className: "flex items-center gap-1.5 mb-2 flex-wrap" },
+            views.map((v) => (React.createElement("button", { key: v.id, onClick: () => setView(v.id), className: "text-sm px-3.5 py-2 rounded-full", style: {
+                    fontFamily: "Inter",
+                    border: "1px solid " + (view === v.id ? COLORS.tomato : COLORS.line),
+                    background: view === v.id ? COLORS.tomato : "transparent",
+                    color: view === v.id ? COLORS.cream : COLORS.crust
+                } }, v.label + " (" + v.n + ")"))),
+            React.createElement("span", { className: "text-xs ml-auto", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "tap an item for both prices")),
+        view === "packs" ? (React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "Inter", color: COLORS.crust } },
+            "These have a price from both vendors, but on different units \u2014 Quality usually quotes by the pound and Thomsen by the case. Enter how many ",
+            "of our unit",
+            " are in one of theirs and the comparison turns on for good.")) : null,
+        view !== "order" ? (React.createElement("input", { placeholder: "Search all items\u2026", value: q, onChange: (e) => setQ(e.target.value), className: "w-full text-base px-3 py-2.5 rounded mb-3 outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } })) : null,
+        view === "order" ? orderView() : setupView()));
+}
 function PrepListTab({ data, persist, listKey, mode }) {
   const key = listKey || "par";
   const isOrder = mode === "order";
