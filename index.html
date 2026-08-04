@@ -2197,7 +2197,9 @@ function shareLabel(v) {
     return s ? s.label : String(v);
 }
 // One row per person. weight = hours (when splitting by hours) x share.
-function computeSplit(crew, byHours, times, shares, defSpan, closeHour, pot) {
+// The pot arrives in two halves because the log wants each person's credit-card
+// slice on one line and their cash-included total right underneath it.
+function computeSplit(crew, byHours, times, shares, defSpan, closeHour, ccPot, cashPot) {
     const rows = crew.map((n) => {
         const raw = String((times && times[n]) || "").trim() || defSpan;
         const sp = byHours ? parseSpan(raw, closeHour) : null;
@@ -2211,8 +2213,16 @@ function computeSplit(crew, byHours, times, shares, defSpan, closeHour, pot) {
     });
     const totalW = rows.reduce((s, r) => s + r.weight, 0);
     const totalH = rows.reduce((s, r) => s + (r.hours || 0), 0);
-    rows.forEach((r) => { r.exact = totalW > 0 ? pot * r.weight / totalW : 0; });
-    return { rows, totalW, totalH, allFull: rows.every((r) => r.share === 1) };
+    const cc = Number(ccPot) || 0, cash = Number(cashPot) || 0;
+    rows.forEach((r) => {
+        const f = totalW > 0 ? r.weight / totalW : 0;
+        r.ccExact = cc * f;
+        r.exact = (cc + cash) * f;
+    });
+    return {
+        rows, totalW, totalH, ccPot: cc, cashPot: cash, pot: cc + cash,
+        allFull: rows.every((r) => r.share === 1)
+    };
 }
 function paidOf(r, paidMap) {
     const v = paidMap && paidMap[r.name];
@@ -2283,7 +2293,7 @@ function PayoutTable({ split, pot, byHours, times, setTimes, shares, setShares, 
         React.createElement("div", { className: "grid gap-1.5 px-2.5 pt-2 pb-1 text-xs", style: { gridTemplateColumns: cols, fontFamily: "Inter", color: "#999" } },
             React.createElement("div", null, "Who"),
             byHours ? React.createElement("div", null, "Hours worked") : null,
-            React.createElement("div", null, "Exact"),
+            React.createElement("div", null, "cc / total"),
             React.createElement("div", null, "Paying")),
         split.rows.map((r) => (React.createElement("div", { key: r.name, className: "grid gap-1.5 px-2.5 py-1.5 items-start", style: { gridTemplateColumns: cols, borderTop: "1px solid " + COLORS.card } },
             React.createElement("div", { style: { minWidth: 0 } },
@@ -2292,12 +2302,15 @@ function PayoutTable({ split, pot, byHours, times, setTimes, shares, setShares, 
             byHours ? (React.createElement("div", null,
                 React.createElement("input", { placeholder: defSpan, value: (times && times[r.name]) || "", onChange: (e) => setKeyed(setTimes, times, r.name, e.target.value, ""), className: "text-sm px-1.5 py-1.5 rounded outline-none w-full", style: { border: "1px solid " + (r.bad ? COLORS.tomato : COLORS.line), fontFamily: "JetBrains Mono" } }),
                 React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "JetBrains Mono", color: r.bad ? COLORS.tomato : "#999" } }, r.bad ? "can't read" : hoursLabel(r.hours)))) : null,
-            React.createElement("div", { className: "text-sm pt-1.5", style: { fontFamily: "JetBrains Mono", color: "#777" } }, money(r.exact)),
+            React.createElement("div", { className: "pt-1", style: { fontFamily: "JetBrains Mono" } },
+                React.createElement("div", { className: "text-xs", style: { color: "#a0937f" } }, "cc " + money(r.ccExact)),
+                React.createElement("div", { className: "text-sm", style: { color: COLORS.crust, fontWeight: 600 } }, money(r.exact))),
             React.createElement("input", { inputMode: "decimal", placeholder: String(Math.round(r.exact)), value: (paidMap && paidMap[r.name]) || "", onChange: (e) => setKeyed(setPaidMap, paidMap, r.name, e.target.value, ""), className: "text-base px-1.5 py-1.5 rounded outline-none w-full", style: { border: "2px solid " + COLORS.tomato, fontFamily: "JetBrains Mono", fontWeight: 700 } })))),
         React.createElement("div", { className: "px-2.5 py-2 text-xs flex flex-wrap gap-x-4 gap-y-1", style: { borderTop: "1px solid " + COLORS.line, fontFamily: "Inter", color: "#777" } },
             React.createElement("span", null,
                 "Pot ",
-                React.createElement("strong", { style: { fontFamily: "JetBrains Mono", color: COLORS.crust } }, money(pot))),
+                React.createElement("strong", { style: { fontFamily: "JetBrains Mono", color: COLORS.crust } }, money(pot)),
+                React.createElement("span", { style: { color: "#a0937f" } }, " (cc " + money(split.ccPot) + " + cash " + money(split.cashPot) + ")")),
             byHours ? React.createElement("span", null,
                 hoursLabel(split.totalH),
                 " total") : null,
@@ -2318,6 +2331,7 @@ function SplitModeToggle({ byHours, setByHours, defSpan, split }) {
             defSpan,
             ")")),
         simple && (React.createElement("span", { className: "ml-auto text-sm", style: { fontFamily: "Inter", color: "#777" } },
+            React.createElement("span", { style: { fontFamily: "JetBrains Mono", color: "#a0937f" } }, "cc " + money(split.rows[0].ccExact) + "  \u00b7  "),
             React.createElement("strong", { style: { fontFamily: "JetBrains Mono", fontSize: 18, color: COLORS.crust } }, money(split.rows[0].exact)),
             " each"))));
 }
@@ -2338,7 +2352,12 @@ function tipEntryText(e) {
         }
         const rows = s.rows || [];
         const plain = !s.byHours && rows.every((r) => (r.share == null || r.share === 1));
-        if (plain || !rows.length) {
+        if (plain && rows.length) {
+            const r0 = rows[0];
+            L.push("  \u00f7 " + s.crew.length + " = cc " + money(r0.ccExact != null ? r0.ccExact : 0) +
+                " each, " + money(r0.exact) + " each with cash  ->  $" + r0.paid + " each");
+        }
+        else if (!rows.length) {
             L.push("  \u00f7 " + s.crew.length + " = " + money(s.each) + "  ->  $" + s.paid + " each");
         }
         else {
@@ -2348,7 +2367,8 @@ function tipEntryText(e) {
                     bits.push(r.span + " (" + hoursLabel(r.hours) + ")");
                 if (r.share != null && r.share !== 1)
                     bits.push(shareLabel(r.share) + " share");
-                L.push("    " + r.name + "  " + bits.join(", ") + "  " + money(r.exact) + "  ->  $" + r.paid);
+                L.push("    " + r.name + "  " + (bits.length ? bits.join(", ") + "  " : "") +
+                    "cc " + money(r.ccExact != null ? r.ccExact : 0) + "  /  " + money(r.exact) + "  ->  $" + r.paid);
             });
             const paid = rows.reduce((a, r) => a + (Number(r.paid) || 0), 0);
             L.push("    paid out $" + paid + " of " + money(s.total));
@@ -2393,8 +2413,8 @@ function TipsTab({ data, persist }) {
     const dayTotal = num(dayCash) + num(dayCC);
     const nightCC = num(ccAll) - num(dayCC) - num(delivery);
     const nightTotal = nightCC + num(nightCash);
-    const daySplit = computeSplit(dayCrew, dayByHours, dayTimes, dayShares, DAY_SPAN, closeHour, dayTotal);
-    const nightSplit = computeSplit(nightCrew, nightByHours, nightTimes, nightShares, NIGHT_SPAN, closeHour, nightTotal);
+    const daySplit = computeSplit(dayCrew, dayByHours, dayTimes, dayShares, DAY_SPAN, closeHour, num(dayCC), num(dayCash));
+    const nightSplit = computeSplit(nightCrew, nightByHours, nightTimes, nightShares, NIGHT_SPAN, closeHour, nightCC, num(nightCash));
     const dayEach = dayCrew.length ? dayTotal / dayCrew.length : 0;
     const nightEach = nightCrew.length ? nightTotal / nightCrew.length : 0;
     const loadDate = (iso) => {
@@ -2446,7 +2466,9 @@ function TipsTab({ data, persist }) {
     };
     const packRows = (split, paidMap) => split.rows.map((r) => ({
         name: r.name, span: r.span, hours: r.hours, share: r.share,
-        exact: Math.round(r.exact * 100) / 100, paid: paidOf(r, paidMap)
+        ccExact: Math.round(r.ccExact * 100) / 100,
+        exact: Math.round(r.exact * 100) / 100,
+        paid: paidOf(r, paidMap)
     }));
     const save = () => {
         const entry = {
@@ -3882,6 +3904,7 @@ function FoodOrderTab({ data, persist }) {
     const [q, setQ] = useState("");
     const [copied, setCopied] = useState("");
     const [openId, setOpenId] = useState("");
+    const [numbersFor, setNumbersFor] = useState("none");
     const inv = (data && data.inventory) || [];
     const patch = (id, changes) => {
         const next = JSON.parse(JSON.stringify(data));
@@ -3909,53 +3932,96 @@ function FoodOrderTab({ data, persist }) {
         return !!(c.q && c.t) && !c.comparable;
     };
     const packTodo = inv.filter(needsCompare).length;
-    // Thin export: our own name for the thing plus their item number, which is
-    // what actually pins the product. Their brand name only when there's no number.
-    const copyFor = (vendor) => {
-        const rows = onList.filter((i) => vendorOf(i) === vendor);
-        if (!rows.length)
+    // One order, one copy. Which distributor it goes to is a call made at the
+    // moment of ordering, not something the sheet needs to decide.
+    const skuFor = (i, tag) => {
+        if (tag === "QFC")
+            return i.qfcSku || "";
+        if (tag === "Thomsen")
+            return i.thomsenSku || "";
+        return "";
+    };
+    const copyOrder = () => {
+        if (!onList.length)
             return;
-        const vk = vendor === "Thomsen" ? "thomsen" : "qfc";
-        const text = rows.map((i) => {
-            const sku = skuOf(i);
-            const theirs = (i.names && i.names[vk]) || "";
-            const tail = sku ? "  #" + sku : (theirs && theirs !== i.item ? "  (" + theirs + ")" : "");
-            return "\u2022 " + i.item + tail + "  \u00d7 " + i.orderNeed + " " + (i.unit || "");
-        }).join("\n");
-        const header = "On Point Pizza \u2014 order for " + VENDOR_LABEL[vendor] + "\n\n";
+        const cats = [];
+        onList.forEach((i) => {
+            const c = itemCategory(i.item);
+            let g = cats.find((x) => x.name === c);
+            if (!g) {
+                g = { name: c, items: [] };
+                cats.push(g);
+            }
+            g.items.push(i);
+        });
+        cats.sort((a2, b2) => {
+            const ia = CATEGORY_ORDER.indexOf(a2.name), ib = CATEGORY_ORDER.indexOf(b2.name);
+            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
+        const lines = [];
+        cats.forEach((g) => {
+            lines.push("");
+            lines.push(g.name.toUpperCase());
+            g.items.forEach((i) => {
+                const sku = skuFor(i, numbersFor);
+                lines.push("  \u2022 " + i.item + "  \u00d7 " + i.orderNeed + " " + (i.unit || "") + (sku ? "   #" + sku : ""));
+            });
+        });
+        const header = "On Point Pizza \u2014 order  \u00b7  " + onList.length +
+            (onList.length === 1 ? " item" : " items") +
+            (numbersFor === "none" ? "" : "  (" + VENDOR_LABEL[numbersFor] + " item numbers)");
         if (navigator.clipboard)
-            navigator.clipboard.writeText(header + text);
-        setCopied(vendor);
+            navigator.clipboard.writeText(header + "\n" + lines.join("\n").trim());
+        setCopied("order");
         setTimeout(() => setCopied(""), 1800);
     };
     const match = (i) => !q.trim() || i.item.toLowerCase().includes(q.trim().toLowerCase());
-    // ---- the working order, split by who we're buying it from ----
+    // ---- the working order: one list, whoever ends up filling it ----
     const orderView = () => {
         if (onList.length === 0) {
             return (React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } }, "Nothing on the order yet \u2014 go through \u201CSet Up List\u201D and mark what you need."));
         }
-        return ["QFC", "Thomsen"].map((vendor) => {
-            const rows = onList.filter((i) => vendorOf(i) === vendor);
-            if (!rows.length)
-                return null;
-            return (React.createElement("div", { key: vendor, className: "mb-4" },
-                React.createElement("div", { className: "flex items-center justify-between gap-2 px-3 py-2.5 rounded-t", style: { background: COLORS.crust } },
-                    React.createElement("span", { style: { fontFamily: "Oswald", fontSize: "18px", color: COLORS.cream } }, VENDOR_LABEL[vendor] + " \u00b7 " + rows.length),
-                    React.createElement("button", { onClick: () => copyFor(vendor), className: "text-sm px-3 py-1.5 rounded-full flex items-center gap-1.5", style: { background: COLORS.basil, color: COLORS.cream, border: "none", fontFamily: "Inter", fontWeight: 600 } },
+        const cats = [];
+        onList.forEach((i) => {
+            const c = itemCategory(i.item);
+            let g = cats.find((x) => x.name === c);
+            if (!g) {
+                g = { name: c, items: [] };
+                cats.push(g);
+            }
+            g.items.push(i);
+        });
+        cats.sort((a2, b2) => {
+            const ia = CATEGORY_ORDER.indexOf(a2.name), ib = CATEGORY_ORDER.indexOf(b2.name);
+            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
+        return (React.createElement("div", null,
+            React.createElement("div", { className: "flex items-center justify-between gap-2 px-3 py-2.5 rounded-t flex-wrap", style: { background: COLORS.crust } },
+                React.createElement("span", { style: { fontFamily: "Oswald", fontSize: "18px", color: COLORS.cream } }, "THE ORDER \u00b7 " + onList.length),
+                React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap" },
+                    React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#c9bda8" } }, "item #s"),
+                    [{ k: "none", l: "none" }, { k: "QFC", l: "Quality" }, { k: "Thomsen", l: "Thomsen" }].map((o) => (React.createElement("button", { key: o.k, onClick: () => setNumbersFor(o.k), className: "text-xs px-2.5 py-1.5 rounded-full", style: {
+                            fontFamily: "Inter",
+                            border: "1px solid " + (numbersFor === o.k ? COLORS.cream : "#6b5545"),
+                            background: numbersFor === o.k ? COLORS.cream : "transparent",
+                            color: numbersFor === o.k ? COLORS.crust : "#c9bda8"
+                        } }, o.l))),
+                    React.createElement("button", { onClick: copyOrder, className: "text-sm px-3 py-1.5 rounded-full flex items-center gap-1.5 ml-1", style: { background: COLORS.basil, color: COLORS.cream, border: "none", fontFamily: "Inter", fontWeight: 600 } },
                         React.createElement(Copy, { size: 14 }),
-                        copied === vendor ? "Copied" : "Copy")),
-                React.createElement("div", { className: "space-y-1.5 pt-1.5" }, rows.map((i) => (React.createElement("div", { key: i.id, className: "px-3 py-3 rounded", style: { background: COLORS.card, border: "1px solid " + COLORS.line, borderLeft: "5px solid " + COLORS.tomato } },
+                        copied === "order" ? "Copied" : "Copy order"))),
+            cats.map((g) => (React.createElement("div", { key: g.name, className: "mt-3" },
+                React.createElement(SectionHeader, null, g.name),
+                React.createElement("div", { className: "space-y-1.5" }, g.items.map((i) => (React.createElement("div", { key: i.id, className: "px-3 py-3 rounded", style: { background: COLORS.card, border: "1px solid " + COLORS.line, borderLeft: "5px solid " + COLORS.tomato } },
                     React.createElement("div", { className: "flex items-center gap-3" },
                         React.createElement("button", { onClick: () => toggleOpen(i.id), className: "flex-1 min-w-0 text-left" },
                             React.createElement("div", { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } }, i.item),
                             React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#8a7a6c" } },
-                                (skuOf(i) ? "#" + skuOf(i) + "  \u00b7  " : "") + dualPriceLine(i),
+                                (numbersFor !== "none" && skuFor(i, numbersFor) ? "#" + skuFor(i, numbersFor) + "  \u00b7  " : "") + dualPriceLine(i),
                                 React.createElement("span", { style: { color: COLORS.tomato } }, openId === i.id ? "  \u25b4" : "  \u25be"))),
                         React.createElement("span", { className: "text-lg px-2.5 py-0.5 rounded-full flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.cream, background: COLORS.tomato } }, "\u00d7" + i.orderNeed),
                         React.createElement("button", { onClick: () => patch(i.id, { orderNeed: null }), className: "px-2 py-2 flex-shrink-0", style: { border: "none", background: "transparent" } },
                             React.createElement(Trash2, { size: 15, color: "#999" }))),
-                    openId === i.id ? React.createElement(PriceDetail, { i: i, vendorOf: vendorOf, patch: patch }) : null))))));
-        });
+                    openId === i.id ? React.createElement(PriceDetail, { i: i, vendorOf: vendorOf, patch: patch }) : null)))))))));
     };
     // ---- go down every item and say what you need ----
     const setupView = () => {
