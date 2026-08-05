@@ -2224,6 +2224,18 @@ function computeSplit(crew, byHours, times, shares, defSpan, closeHour, ccPot, c
         allFull: rows.every((r) => r.share === 1)
     };
 }
+// Entries saved before the cc line existed have no ccExact on their rows. The
+// shift's cc and total are both stored, so the slice can be recovered rather
+// than shown as $0.00 forever.
+function ccOf(r, s) {
+    if (r && r.ccExact != null)
+        return r.ccExact;
+    const tot = s && Number(s.total);
+    const cc = s && Number(s.cc);
+    if (!tot || !isFinite(cc))
+        return 0;
+    return (Number(r.exact) || 0) * (cc / tot);
+}
 function paidOf(r, paidMap) {
     const v = paidMap && paidMap[r.name];
     return v === undefined || v === "" ? Math.round(r.exact) : num(v);
@@ -2306,6 +2318,7 @@ function PayoutTable({ split, pot, byHours, times, setTimes, shares, setShares, 
                 React.createElement("div", { className: "text-xs", style: { color: "#a0937f" } }, "cc " + money(r.ccExact)),
                 React.createElement("div", { className: "text-sm", style: { color: COLORS.crust, fontWeight: 600 } }, money(r.exact))),
             React.createElement("input", { inputMode: "decimal", placeholder: String(Math.round(r.exact)), value: (paidMap && paidMap[r.name]) || "", onChange: (e) => setKeyed(setPaidMap, paidMap, r.name, e.target.value, ""), className: "text-base px-1.5 py-1.5 rounded outline-none w-full", style: { border: "2px solid " + COLORS.tomato, fontFamily: "JetBrains Mono", fontWeight: 700 } })))),
+        split.pot > 0 && split.ccPot === 0 ? (React.createElement("div", { className: "px-2.5 py-1.5 text-xs", style: { borderTop: "1px solid " + COLORS.line, fontFamily: "Inter", color: COLORS.tomatoDark } }, "Nothing in the credit-card box for this shift, so the cc line reads $0.00. Cash-only night? Then that's right.")) : null,
         React.createElement("div", { className: "px-2.5 py-2 text-xs flex flex-wrap gap-x-4 gap-y-1", style: { borderTop: "1px solid " + COLORS.line, fontFamily: "Inter", color: "#777" } },
             React.createElement("span", null,
                 "Pot ",
@@ -2354,7 +2367,7 @@ function tipEntryText(e) {
         const plain = !s.byHours && rows.every((r) => (r.share == null || r.share === 1));
         if (plain && rows.length) {
             const r0 = rows[0];
-            L.push("  \u00f7 " + s.crew.length + " = cc " + money(r0.ccExact != null ? r0.ccExact : 0) +
+            L.push("  \u00f7 " + s.crew.length + " = cc " + money(ccOf(r0, s)) +
                 " each, " + money(r0.exact) + " each with cash  ->  $" + r0.paid + " each");
         }
         else if (!rows.length) {
@@ -2368,7 +2381,7 @@ function tipEntryText(e) {
                 if (r.share != null && r.share !== 1)
                     bits.push(shareLabel(r.share) + " share");
                 L.push("    " + r.name + "  " + (bits.length ? bits.join(", ") + "  " : "") +
-                    "cc " + money(r.ccExact != null ? r.ccExact : 0) + "  /  " + money(r.exact) + "  ->  $" + r.paid);
+                    "cc " + money(ccOf(r, s)) + "  /  " + money(r.exact) + "  ->  $" + r.paid);
             });
             const paid = rows.reduce((a, r) => a + (Number(r.paid) || 0), 0);
             L.push("    paid out $" + paid + " of " + money(s.total));
@@ -2402,6 +2415,7 @@ function TipsTab({ data, persist }) {
     const [note, setNote] = useState("");
     const [open, setOpen] = useState("");
     const [copied, setCopied] = useState("");
+    const [okReplace, setOkReplace] = useState(false);
     const names = staffNameList(data);
     const log = (data.tips || []).slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
     const closeHour = (data.tipSettings && data.tipSettings.close) || 21;
@@ -2419,6 +2433,7 @@ function TipsTab({ data, persist }) {
     const nightEach = nightCrew.length ? nightTotal / nightCrew.length : 0;
     const loadDate = (iso) => {
         setDate(iso);
+        setOkReplace(false);
         const e = (data.tips || []).find((x) => x.date === iso);
         if (!e)
             return;
@@ -2471,6 +2486,8 @@ function TipsTab({ data, persist }) {
         paid: paidOf(r, paidMap)
     }));
     const save = () => {
+        if (blocked)
+            return;
         const entry = {
             id: uid(),
             date,
@@ -2494,6 +2511,7 @@ function TipsTab({ data, persist }) {
         next.tips.push(entry);
         persist(next);
         clearForm();
+        setOkReplace(false);
     };
     const removeEntry = (id) => {
         const next = JSON.parse(JSON.stringify(data));
@@ -2509,6 +2527,11 @@ function TipsTab({ data, persist }) {
         catch (e) { /* clipboard blocked — the text is on screen to select */ }
     };
     const existing = (data.tips || []).some((x) => x.date === date);
+    // Two ways to lose a night's work with one tap: saving a blank form over a
+    // good one, or re-saving a date without meaning to. Both are now blocked.
+    const emptyForm = !dayCrew.length && !nightCrew.length &&
+        daySplit.pot === 0 && nightSplit.pot === 0;
+    const blocked = emptyForm || (existing && !okReplace);
     return (React.createElement("div", { className: "space-y-4" },
         React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
             React.createElement("div", { className: "flex flex-wrap items-end gap-3" },
@@ -2564,10 +2587,17 @@ function TipsTab({ data, persist }) {
             React.createElement(PayoutTable, { split: nightSplit, pot: nightTotal, byHours: nightByHours, times: nightTimes, setTimes: setNightTimes, shares: nightShares, setShares: setNightShares, defSpan: NIGHT_SPAN, paidMap: nightPaidMap, setPaidMap: setNightPaidMap })),
         React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
             React.createElement("input", { placeholder: "Note for Val (who was off, anything unusual)", value: note, onChange: (e) => setNote(e.target.value), className: "text-sm px-2.5 py-2 rounded outline-none w-full mb-3", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
+            existing ? (React.createElement("button", { onClick: () => setOkReplace(!okReplace), className: "flex items-start gap-2.5 w-full text-left px-2.5 py-2.5 rounded mb-2", style: { background: okReplace ? "#F4D9D2" : COLORS.cream, border: "1px solid " + COLORS.tomato } },
+                React.createElement("span", { className: "flex items-center justify-center rounded flex-shrink-0", style: { width: 22, height: 22, marginTop: 1, border: "2px solid " + COLORS.tomato, background: okReplace ? COLORS.tomato : "transparent" } }, okReplace ? React.createElement(Check, { size: 13, color: COLORS.cream }) : null),
+                React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } },
+                    prettyDate(date),
+                    " is already logged. Tick this to replace it \u2014 otherwise Save stays off."))) : null,
+            emptyForm ? (React.createElement("div", { className: "text-sm mb-2 px-2.5 py-2 rounded", style: { background: COLORS.cream, fontFamily: "Inter", color: "#8a7a6c" } }, "Nothing entered yet \u2014 pick who worked and put the money in first.")) : null,
             React.createElement("div", { className: "flex flex-wrap gap-2" },
-                React.createElement(TicketButton, { onClick: save, style: { padding: "10px 20px", fontSize: 15 } },
+                React.createElement(TicketButton, { onClick: save, color: blocked ? COLORS.line : undefined, style: { padding: "10px 20px", fontSize: 15, opacity: blocked ? 0.5 : 1, color: blocked ? "#8a7a6c" : undefined } },
                     React.createElement(Check, { size: 15 }),
-                    " Save the night"),
+                    " ",
+                    existing ? "Replace this night" : "Save the night"),
                 React.createElement(TicketButton, { onClick: clearForm, color: COLORS.line, style: { color: COLORS.crust } }, "Clear"))),
         React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
             React.createElement("div", { className: "flex items-center justify-between mb-2" },
@@ -4106,282 +4136,167 @@ function FoodOrderTab({ data, persist }) {
         view !== "order" ? (React.createElement("input", { placeholder: "Search all items\u2026", value: q, onChange: (e) => setQ(e.target.value), className: "w-full text-base px-3 py-2.5 rounded mb-3 outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } })) : null,
         view === "order" ? orderView() : setupView()));
 }
-function PrepListTab({ data, persist, listKey, mode }) {
-  const key = listKey || "par";
-  const isOrder = mode === "order";
-  const prep = data.prep || {};
-  const list = prep[key] || [];
-  const [view, setView] = useState("todo");
-  const [copied, setCopied] = useState(false);
-  const [q, setQ] = useState("");
-
-  const patch = (id, changes) => {
-    const next = JSON.parse(JSON.stringify(data));
-    const row = next.prep[key].find((r) => r.id === id);
-    if (!row) return;
-    Object.assign(row, changes);
-    persist(next);
-  };
-  const resetDay = () => {
-    const next = JSON.parse(JSON.stringify(data));
-    next.prep[key].forEach((r) => {
-      r.need = null;
-      r.done = false;
-    });
-    persist(next);
-  };
-
-  const onList = list.filter((r) => Number(r.need) > 0);
-  const todo = onList.filter((r) => !r.done);
-  const finished = onList.filter((r) => r.done);
-  const allSet = list.filter((r) => r.need === 0).length;
-
-  const match = (r) => !q.trim() || r.item.toLowerCase().includes(q.trim().toLowerCase());
-  const shown = (view === "todo" ? todo : view === "done" ? finished : list).filter(match);
-
-  const views = isOrder ? [
-    { id: "todo", label: "Order", n: todo.length },
-    { id: "setup", label: "Set Up List", n: list.length }
-  ] : [
-    { id: "todo", label: "To Prep", n: todo.length },
-    { id: "done", label: "Done", n: finished.length },
-    { id: "setup", label: "Set Up List", n: list.length }
-  ];
-  const copyOrder = () => {
-    const t = onList.map((r) => "\u2022 " + r.item + " \u00d7 " + r.need).join("\n");
-    if (!t) return;
-    if (navigator.clipboard) navigator.clipboard.writeText(t);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
-  };
-
-  // A row in the working list: one big tap target that crosses the item off.
-  const workRow = (r) => /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      key: r.id,
-      onClick: () => patch(r.id, { done: !r.done }),
-      className: "w-full flex items-center gap-3 px-3 py-3.5 rounded text-left",
-      style: {
-        background: r.done ? "#F1F4EE" : COLORS.card,
-        border: `1px solid ${r.done ? COLORS.basil : COLORS.line}`,
-        borderLeft: `5px solid ${r.done ? COLORS.basil : COLORS.tomato}`
-      }
-    },
-    /* @__PURE__ */ React.createElement(
-      "span",
-      {
-        className: "flex items-center justify-center rounded-full flex-shrink-0",
-        style: {
-          width: 26,
-          height: 26,
-          border: `2px solid ${r.done ? COLORS.basil : "#c9bda8"}`,
-          background: r.done ? COLORS.basil : "transparent"
-        }
-      },
-      r.done ? /* @__PURE__ */ React.createElement(Check, { size: 15, color: COLORS.cream }) : null
-    ),
-    /* @__PURE__ */ React.createElement(
-      "span",
-      {
-        className: "flex-1 text-base",
-        style: {
-          fontFamily: "Inter",
-          color: r.done ? "#8a9584" : COLORS.crust,
-          textDecoration: r.done ? "line-through" : "none"
-        }
-      },
-      r.item
-    ),
-    /* @__PURE__ */ React.createElement(
-      "span",
-      {
-        className: "text-lg px-2.5 py-0.5 rounded-full flex-shrink-0",
-        style: {
-          fontFamily: "JetBrains Mono",
-          fontWeight: 700,
-          color: r.done ? "#8a9584" : COLORS.cream,
-          background: r.done ? "transparent" : COLORS.tomato
-        }
-      },
-      "\u00d7" + r.need
-    )
-  );
-
-  // A row in setup: mark all-set, or dial in how many you need.
-  const setupRow = (r) => {
-    const need = r.need;
-    const isSet = need === 0;
-    const on = Number(need) > 0;
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      {
-        key: r.id,
-        className: "px-3 py-2.5 rounded",
-        style: {
-          background: COLORS.card,
-          border: `1px solid ${on ? COLORS.tomato : isSet ? COLORS.basil : COLORS.line}`,
-          borderLeft: `5px solid ${on ? COLORS.tomato : isSet ? COLORS.basil : COLORS.line}`
-        }
-      },
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "flex items-center justify-between gap-2 mb-2" },
-        /* @__PURE__ */ React.createElement(
-          "span",
-          { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } },
-          r.item
-        ),
-        on ? /* @__PURE__ */ React.createElement(
-          "span",
-          { className: "text-sm", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.tomato } },
-          "need " + need
-        ) : isSet ? /* @__PURE__ */ React.createElement(
-          "span",
-          { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.basil } },
-          "all set"
-        ) : null
-      ),
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "flex items-center gap-1.5 flex-wrap" },
-        /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            onClick: () => patch(r.id, { need: isSet ? null : 0, done: false }),
-            className: "text-sm px-3 py-2 rounded-full",
-            style: {
-              fontFamily: "Inter",
-              border: `1px solid ${isSet ? COLORS.basil : COLORS.line}`,
-              background: isSet ? COLORS.basil : "transparent",
-              color: isSet ? COLORS.cream : COLORS.crust
-            }
-          },
-          "All set"
-        ),
-        [1, 2, 3, 4].map((n) => /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            key: n,
-            onClick: () => patch(r.id, { need: need === n ? null : n, done: false }),
-            className: "text-base px-3.5 py-2 rounded-full",
-            style: {
-              fontFamily: "JetBrains Mono",
-              fontWeight: 700,
-              border: `1px solid ${need === n ? COLORS.tomato : COLORS.line}`,
-              background: need === n ? COLORS.tomato : "transparent",
-              color: need === n ? COLORS.cream : COLORS.crust
-            }
-          },
-          n
-        )),
-        /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            onClick: () => patch(r.id, { need: (Number(need) || 0) + 1, done: false }),
-            className: "px-3 py-2 rounded-full flex items-center",
-            style: { border: `1px solid ${COLORS.line}`, background: "transparent" }
-          },
-          /* @__PURE__ */ React.createElement(Plus, { size: 16, color: COLORS.crust })
-        ),
-        on ? /* @__PURE__ */ React.createElement(
-          "input",
-          {
-            type: "number",
-            value: need,
-            onChange: (e) => patch(r.id, { need: e.target.value === "" ? null : Number(e.target.value), done: false }),
-            className: "w-16 text-base px-2 py-2 rounded text-center",
-            style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" }
-          }
-        ) : null
-      )
-    );
-  };
-
-  return /* @__PURE__ */ React.createElement(
-    "div",
-    null,
-    /* @__PURE__ */ React.createElement(
-      "div",
-      {
-        className: "flex items-center justify-between gap-2 px-3 py-3 rounded mb-3",
-        style: { background: COLORS.crust }
-      },
-      /* @__PURE__ */ React.createElement(
-        "div",
-        null,
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "text-2xl", style: { fontFamily: "Oswald", color: COLORS.cream, lineHeight: 1.1 } },
-          todo.length === 0 ? (isOrder ? "Nothing to order" : "All caught up") : todo.length + (todo.length === 1 ? (isOrder ? " item to order" : " item to prep") : (isOrder ? " items to order" : " items to prep"))
-        ),
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#c9bda8" } },
-          isOrder ? allSet + " marked all set \u00b7 " + list.filter((r) => r.need == null).length + " not looked at" : finished.length + " done \u00b7 " + allSet + " marked all set"
-        )
-      ),
-      /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          onClick: resetDay,
-          className: "text-sm px-3 py-2 rounded-full flex-shrink-0",
-          style: { fontFamily: "Inter", border: "1px solid #6b5545", color: COLORS.cream, background: "transparent" }
-        },
-        isOrder ? "Reset" : "Reset day"
-      )
-    ),
-    /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "flex items-center gap-1.5 mb-2 flex-wrap" },
-      views.map((v) => /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          key: v.id,
-          onClick: () => setView(v.id),
-          className: "text-sm px-3.5 py-2 rounded-full",
-          style: {
-            fontFamily: "Inter",
-            border: `1px solid ${view === v.id ? COLORS.tomato : COLORS.line}`,
-            background: view === v.id ? COLORS.tomato : "transparent",
-            color: view === v.id ? COLORS.cream : COLORS.crust
-          }
-        },
-        v.label + " (" + v.n + ")"
-      ))
-    ),
-    isOrder && view === "todo" && onList.length > 0 ? /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        onClick: copyOrder,
-        className: "w-full flex items-center justify-center gap-2 px-3 py-3 rounded mb-2",
-        style: { background: COLORS.basil, color: COLORS.cream, fontFamily: "Inter", fontWeight: 600, border: "none" }
-      },
-      /* @__PURE__ */ React.createElement(Copy, { size: 16 }),
-      copied ? "Copied \u2014 paste it to Belmont" : "Copy order (" + onList.length + " items)"
-    ) : null,
-    view === "setup" ? /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        placeholder: "Search the list\u2026",
-        value: q,
-        onChange: (e) => setQ(e.target.value),
-        className: "w-full text-base px-3 py-2.5 rounded mb-2 outline-none",
-        style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
-      }
-    ) : null,
-    /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "space-y-1.5" },
-      shown.length === 0 ? /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } },
-        view === "todo" ? (isOrder ? "Nothing on the order yet \u2014 go through \u201CSet Up List\u201D and mark what you need." : "Nothing on the prep list yet \u2014 set it up in \u201CSet Up List\u201D, or tell the Manager (\u201Cput three doughs on there\u201D).") : view === "done" ? "Nothing crossed off yet." : "No items match that search."
-      ) : shown.map((r) => view === "setup" ? setupRow(r) : workRow(r))
-    )
-  );
+// ===================== PREP / ORDER LIST =====================
+const PREP_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const PREP_DAYS_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+function todayDow() {
+    return PREP_DAYS[new Date().getDay()];
 }
-
+// The list is always for the day it's being worked, so the header just says so
+// out loud — nobody has to wonder whose list they're looking at.
+function todayLong() {
+    const d = new Date();
+    return PREP_DAYS_LONG[d.getDay()] + ", " + MON3[d.getMonth()] + " " + d.getDate();
+}
+function PrepListTab({ data, persist, listKey, mode }) {
+    const key = listKey || "par";
+    const isOrder = mode === "order";
+    const prep = data.prep || {};
+    const list = prep[key] || [];
+    const [view, setView] = useState("todo");
+    const [copied, setCopied] = useState(false);
+    const [q, setQ] = useState("");
+    const [noteOpen, setNoteOpen] = useState("");
+    const [newItem, setNewItem] = useState("");
+    const [confirmDel, setConfirmDel] = useState("");
+    const patch = (id, changes) => {
+        const next = JSON.parse(JSON.stringify(data));
+        const row = next.prep[key].find((r) => r.id === id);
+        if (!row)
+            return;
+        Object.assign(row, changes);
+        persist(next);
+    };
+    const addItem = () => {
+        const name = newItem.trim();
+        if (!name)
+            return;
+        const next = JSON.parse(JSON.stringify(data));
+        next.prep = next.prep || {};
+        next.prep[key] = next.prep[key] || [];
+        if (!next.prep[key].some((r) => r.item.toLowerCase() === name.toLowerCase())) {
+            next.prep[key].push({ id: uid(), item: name, need: null, done: false, note: "" });
+        }
+        persist(next);
+        setNewItem("");
+    };
+    const removeItem = (id) => {
+        const next = JSON.parse(JSON.stringify(data));
+        next.prep[key] = (next.prep[key] || []).filter((r) => r.id !== id);
+        persist(next);
+        setConfirmDel("");
+    };
+    const resetDay = () => {
+        const next = JSON.parse(JSON.stringify(data));
+        next.prep[key].forEach((r) => { r.need = null; r.done = false; });
+        persist(next);
+    };
+    const onList = list.filter((r) => Number(r.need) > 0);
+    const todo = onList.filter((r) => !r.done);
+    const finished = onList.filter((r) => r.done);
+    const allSet = list.filter((r) => r.need === 0).length;
+    const match = (r) => !q.trim() || r.item.toLowerCase().includes(q.trim().toLowerCase());
+    const shown = (view === "todo" ? todo : view === "done" ? finished : list).filter(match);
+    const views = isOrder ? [
+        { id: "todo", label: "Order", n: todo.length },
+        { id: "setup", label: "Set Up List", n: list.length }
+    ] : [
+        { id: "todo", label: "To Prep", n: todo.length },
+        { id: "done", label: "Done", n: finished.length },
+        { id: "setup", label: "Set Up List", n: list.length }
+    ];
+    const copyOrder = () => {
+        const t = onList.map((r) => "\u2022 " + r.item + " \u00d7 " + r.need + (r.note ? "  (" + r.note + ")" : "")).join("\n");
+        if (!t)
+            return;
+        if (navigator.clipboard)
+            navigator.clipboard.writeText(t);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1800);
+    };
+    // A row in the working list: one big tap target that crosses the item off.
+    const workRow = (r) => (React.createElement("div", { key: r.id, className: "rounded", style: {
+            background: r.done ? "#F1F4EE" : COLORS.card,
+            border: "1px solid " + (r.done ? COLORS.basil : COLORS.line),
+            borderLeft: "5px solid " + (r.done ? COLORS.basil : COLORS.tomato)
+        } },
+        React.createElement("button", { onClick: () => patch(r.id, { done: !r.done }), className: "w-full flex items-center gap-3 px-3 py-3.5 text-left" },
+            React.createElement("span", { className: "flex items-center justify-center rounded-full flex-shrink-0", style: {
+                    width: 26, height: 26,
+                    border: "2px solid " + (r.done ? COLORS.basil : "#c9bda8"),
+                    background: r.done ? COLORS.basil : "transparent"
+                } }, r.done ? React.createElement(Check, { size: 15, color: COLORS.cream }) : null),
+            React.createElement("span", { className: "flex-1 min-w-0" },
+                React.createElement("span", { className: "block text-base", style: { fontFamily: "Inter", color: r.done ? "#8a9584" : COLORS.crust, textDecoration: r.done ? "line-through" : "none" } }, r.item),
+                r.note ? (React.createElement("span", { className: "block text-sm mt-0.5", style: { fontFamily: "Inter", color: r.done ? "#a3ab9d" : COLORS.tomatoDark } }, r.note)) : null),
+            React.createElement("span", { className: "text-lg px-2.5 py-0.5 rounded-full flex-shrink-0", style: {
+                    fontFamily: "JetBrains Mono", fontWeight: 700,
+                    color: r.done ? "#8a9584" : COLORS.cream,
+                    background: r.done ? "transparent" : COLORS.tomato
+                } }, "\u00d7" + r.need)),
+        noteOpen === r.id ? (React.createElement("div", { className: "px-3 pb-3" },
+            React.createElement("input", { autoFocus: true, placeholder: "Note \u2014 how much, which tub, anything to pass on", value: r.note || "", onChange: (e) => patch(r.id, { note: e.target.value }), className: "w-full text-sm px-2.5 py-2 rounded outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } }))) : (React.createElement("button", { onClick: () => setNoteOpen(r.id), className: "px-3 pb-2.5 text-xs", style: { fontFamily: "Inter", color: "#a0937f", background: "transparent", border: "none" } }, r.note ? "edit note" : "+ add a note"))));
+    // A row in setup: mark all-set, dial in a quantity, leave a note.
+    const setupRow = (r) => {
+        const need = r.need;
+        const isSet = need === 0;
+        const on = Number(need) > 0;
+        const edge = on ? COLORS.tomato : isSet ? COLORS.basil : COLORS.line;
+        return (React.createElement("div", { key: r.id, className: "px-3 py-2.5 rounded", style: { background: COLORS.card, border: "1px solid " + edge, borderLeft: "5px solid " + edge } },
+            React.createElement("div", { className: "flex items-center justify-between gap-2 mb-2" },
+                React.createElement("div", { className: "min-w-0" },
+                    React.createElement("div", { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } }, r.item)),
+                React.createElement("div", { className: "flex items-center gap-2 flex-shrink-0" },
+                    on ? (React.createElement("span", { className: "text-sm", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.tomato } }, "need " + need)) : isSet ? (React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.basil } }, "all set")) : null,
+                    confirmDel === r.id ? (React.createElement("button", { onClick: () => removeItem(r.id), className: "text-xs px-2.5 py-1.5 rounded", style: { background: COLORS.tomato, color: COLORS.cream, border: "none", fontFamily: "Inter" } }, "Remove?")) : (React.createElement("button", { onClick: () => { setConfirmDel(r.id); setTimeout(() => setConfirmDel(""), 4000); }, className: "px-1.5 py-1.5", style: { background: "transparent", border: "none" } },
+                        React.createElement(Trash2, { size: 14, color: "#c9bda8" }))))),
+            React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap mb-2" },
+                React.createElement("button", { onClick: () => patch(r.id, { need: isSet ? null : 0, done: false }), className: "text-sm px-3 py-2 rounded-full", style: {
+                        fontFamily: "Inter",
+                        border: "1px solid " + (isSet ? COLORS.basil : COLORS.line),
+                        background: isSet ? COLORS.basil : "transparent",
+                        color: isSet ? COLORS.cream : COLORS.crust
+                    } }, "All set"),
+                [1, 2, 3, 4].map((n) => (React.createElement("button", { key: n, onClick: () => patch(r.id, { need: need === n ? null : n, done: false }), className: "text-base px-3.5 py-2 rounded-full", style: {
+                        fontFamily: "JetBrains Mono", fontWeight: 700,
+                        border: "1px solid " + (need === n ? COLORS.tomato : COLORS.line),
+                        background: need === n ? COLORS.tomato : "transparent",
+                        color: need === n ? COLORS.cream : COLORS.crust
+                    } }, n))),
+                React.createElement("input", { inputMode: "numeric", placeholder: "#", value: on && need > 4 ? need : "", onChange: (e) => patch(r.id, { need: e.target.value === "" ? null : Number(e.target.value), done: false }), className: "w-14 text-base px-2 py-2 rounded text-center", style: { border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } })),
+            React.createElement("input", { placeholder: "Note \u2014 how much, which tub, anything to pass on", value: r.note || "", onChange: (e) => patch(r.id, { note: e.target.value }), className: "w-full text-sm px-2.5 py-2 rounded outline-none mb-2", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } })));
+    };
+    return (React.createElement("div", null,
+        React.createElement("div", { className: "flex items-center justify-between gap-2 px-3 py-3 rounded mb-3", style: { background: COLORS.crust } },
+            React.createElement("div", null,
+                React.createElement("div", { className: "text-xs tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato } }, (isOrder ? "ORDER FOR " : "TODAY'S LIST \u00b7 ") + todayLong().toUpperCase()),
+                React.createElement("div", { className: "text-2xl", style: { fontFamily: "Oswald", color: COLORS.cream, lineHeight: 1.1 } }, todo.length === 0
+                    ? (isOrder ? "Nothing to order" : "All caught up")
+                    : todo.length + (todo.length === 1 ? (isOrder ? " item to order" : " item to prep") : (isOrder ? " items to order" : " items to prep"))),
+                React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#c9bda8" } }, isOrder
+                    ? allSet + " marked all set \u00b7 " + list.filter((r) => r.need == null).length + " not looked at"
+                    : finished.length + " done \u00b7 " + allSet + " marked all set")),
+            React.createElement("button", { onClick: resetDay, className: "text-sm px-3 py-2 rounded-full flex-shrink-0", style: { fontFamily: "Inter", border: "1px solid #6b5545", color: COLORS.cream, background: "transparent" } }, isOrder ? "Reset" : "Reset day")),
+        React.createElement("div", { className: "flex items-center gap-1.5 mb-2 flex-wrap" }, views.map((v) => (React.createElement("button", { key: v.id, onClick: () => setView(v.id), className: "text-sm px-3.5 py-2 rounded-full", style: {
+                fontFamily: "Inter",
+                border: "1px solid " + (view === v.id ? COLORS.tomato : COLORS.line),
+                background: view === v.id ? COLORS.tomato : "transparent",
+                color: view === v.id ? COLORS.cream : COLORS.crust
+            } }, v.label + " (" + v.n + ")")))),
+        isOrder && view === "todo" && onList.length > 0 ? (React.createElement("button", { onClick: copyOrder, className: "w-full flex items-center justify-center gap-2 px-3 py-3 rounded mb-2", style: { background: COLORS.basil, color: COLORS.cream, fontFamily: "Inter", fontWeight: 600, border: "none" } },
+            React.createElement(Copy, { size: 16 }),
+            copied ? "Copied \u2014 paste it to Belmont" : "Copy order (" + onList.length + " items)")) : null,
+        view === "setup" ? (React.createElement("div", { className: "flex gap-2 mb-2" },
+            React.createElement("input", { placeholder: isOrder ? "Add something to order…" : "Add something to prep…", value: newItem, onChange: (e) => setNewItem(e.target.value), onKeyDown: (e) => { if (e.key === "Enter")
+                    addItem(); }, className: "flex-1 text-base px-3 py-2.5 rounded outline-none", style: { border: "1px solid " + COLORS.basil, fontFamily: "Inter" } }),
+            React.createElement("button", { onClick: addItem, className: "px-4 py-2.5 rounded flex items-center gap-1.5", style: { background: COLORS.basil, color: COLORS.cream, border: "none", fontFamily: "Inter", fontWeight: 600 } },
+                React.createElement(Plus, { size: 15 }),
+                " Add"))) : null,
+        view === "setup" ? (React.createElement("input", { placeholder: "Search the list\u2026", value: q, onChange: (e) => setQ(e.target.value), className: "w-full text-base px-3 py-2.5 rounded mb-2 outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } })) : null,
+        React.createElement("div", { className: "space-y-1.5" }, shown.length === 0 ? (React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } }, view === "todo"
+            ? (isOrder ? "Nothing marked to order." : "Nothing to prep yet.")
+            : view === "done" ? "Nothing crossed off yet." : "No items match that search.")) : (shown.map((r) => (view === "setup" ? setupRow(r) : workRow(r)))))));
+}
 function PrepParTab({ data, persist }) {
   const prep = data.prep || { lowStock: [] };
   const [newFlag, setNewFlag] = useState("");
