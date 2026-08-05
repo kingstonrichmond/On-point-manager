@@ -922,6 +922,207 @@ function migrateSchedule(d) {
   return { data: d, changed: true };
 }
 
+const WALK_STATIONS = [
+  { name: "Cheese & Flour", sub: "start here, they always need it" },
+  { name: "Back Room — Can Shelf", sub: "tomato, jars, oil, hot sauce" },
+  { name: "Back Room — Next Shelf", sub: "salt, dry goods" },
+  { name: "Back Room — Spices & Sauces", sub: "spice shelf, then the wing sauces" },
+  { name: "Back Freezer", sub: "" },
+  { name: "Second Freezer", sub: "the two-door — not mapped yet" },
+  { name: "Walk-In — Meats", sub: "" },
+  { name: "Walk-In — Cheeses", sub: "" },
+  { name: "Walk-In — Lunch Meats", sub: "" },
+  { name: "Walk-In — Produce", sub: "" },
+  { name: "Storage Unit", sub: "containers, plates, boxes, gloves" },
+  { name: "Chemical Cabinet", sub: "" },
+  { name: "Out Front", sub: "paper, chips, soda, drinks" },
+  { name: "Anything Else", sub: "not placed on the walk yet" }
+];
+const WALK_MAP = {
+  i1: "Cheese & Flour",
+  i3: "Cheese & Flour",
+  i22: "Cheese & Flour",
+  i31: "Cheese & Flour",
+  i29: "Back Room — Can Shelf",
+  i30: "Back Room — Can Shelf",
+  i53: "Back Room — Can Shelf",
+  i107: "Back Room — Can Shelf",
+  i64: "Back Room — Can Shelf",
+  i113: "Back Room — Can Shelf",
+  i99: "Back Room — Can Shelf",
+  i15: "Back Room — Can Shelf",
+  i58: "Back Room — Can Shelf",
+  i59: "Back Room — Can Shelf",
+  i62: "Back Room — Can Shelf",
+  i63: "Back Room — Can Shelf",
+  i109: "Back Room — Can Shelf",
+  i110: "Back Room — Can Shelf",
+  i66: "Back Room — Next Shelf",
+  i94: "Back Room — Next Shelf",
+  i100: "Back Room — Next Shelf",
+  i67: "Back Room — Spices & Sauces",
+  i32: "Back Room — Spices & Sauces",
+  i127: "Back Room — Spices & Sauces",
+  i116: "Back Room — Spices & Sauces",
+  i115: "Back Room — Spices & Sauces",
+  i65: "Back Room — Spices & Sauces",
+  i114: "Back Room — Spices & Sauces",
+  i54: "Back Room — Spices & Sauces",
+  i55: "Back Room — Spices & Sauces",
+  i56: "Back Room — Spices & Sauces",
+  i57: "Back Room — Spices & Sauces",
+  i98: "Back Room — Spices & Sauces",
+  i27: "Back Room — Spices & Sauces",
+  i61: "Back Room — Spices & Sauces",
+  i60: "Back Room — Spices & Sauces",
+  i35: "Back Freezer",
+  i93: "Back Freezer",
+  i48: "Back Freezer",
+  i11: "Back Freezer",
+  i36: "Back Freezer",
+  i47: "Back Freezer",
+  i49: "Back Freezer",
+  i38: "Back Freezer",
+  i51: "Second Freezer",
+  i50: "Second Freezer",
+  i52: "Second Freezer",
+  i8: "Walk-In — Meats",
+  i7: "Walk-In — Meats",
+  i23: "Walk-In — Meats",
+  i105: "Walk-In — Meats",
+  i10: "Walk-In — Meats",
+  i87: "Walk-In — Meats",
+  i9: "Walk-In — Meats",
+  i6: "Walk-In — Cheeses",
+  i4: "Walk-In — Cheeses",
+  i40: "Walk-In — Cheeses",
+  i2: "Walk-In — Cheeses",
+  i20: "Walk-In — Cheeses",
+  i41: "Walk-In — Cheeses",
+  i21: "Walk-In — Cheeses",
+  i44: "Walk-In — Lunch Meats",
+  i45: "Walk-In — Lunch Meats",
+  i46: "Walk-In — Lunch Meats",
+  i43: "Walk-In — Lunch Meats",
+  i5: "Walk-In — Lunch Meats",
+  i17: "Walk-In — Produce",
+  i18: "Walk-In — Produce",
+  i19: "Walk-In — Produce",
+  i34: "Storage Unit",
+  i69: "Storage Unit",
+  i33: "Storage Unit",
+  i84: "Storage Unit",
+  i85: "Storage Unit",
+  i71: "Storage Unit",
+  i70: "Storage Unit",
+  i78: "Storage Unit",
+  i74: "Storage Unit",
+  i75: "Storage Unit",
+  i76: "Storage Unit",
+  i13: "Storage Unit",
+  i68: "Storage Unit",
+  i12: "Storage Unit",
+  i14: "Storage Unit",
+  i77: "Storage Unit",
+  i72: "Storage Unit",
+  i73: "Storage Unit",
+  i103: "Storage Unit",
+  i104: "Storage Unit",
+  i97: "Chemical Cabinet",
+  i95: "Chemical Cabinet",
+  i92: "Chemical Cabinet",
+  i117: "Chemical Cabinet",
+  i88: "Chemical Cabinet",
+  i86: "Chemical Cabinet",
+  i79: "Out Front",
+  i80: "Out Front",
+  i81: "Out Front",
+  i82: "Out Front",
+  i83: "Out Front",
+  i108: "Out Front",
+  i89: "Out Front",
+  i90: "Out Front",
+  i91: "Out Front",
+  i16: "Out Front",
+  i118: "Out Front",
+  i119: "Out Front",
+  i120: "Out Front",
+  i121: "Out Front",
+  i122: "Out Front",
+  i123: "Out Front",
+  i124: "Out Front",
+  i125: "Out Front",
+  i126: "Out Front",
+  i96: "Out Front",
+  i106: "Out Front",
+  i101: "Out Front",
+  i102: "Out Front",
+  i112: "Out Front"
+};
+const WALK_VERSION = 1;
+// The stops come from his spoken walk-through of the building. Only fills in
+// rows that don't already have a stop, so anything he moves by hand stays put.
+function migrateWalk(d) {
+  if (!d || typeof d !== "object") return { data: d, changed: false };
+  if ((d.walkVersion || 0) >= WALK_VERSION) return { data: d, changed: false };
+  (d.inventory || []).forEach((r) => {
+    if (!r.station && WALK_MAP[r.id]) r.station = WALK_MAP[r.id];
+  });
+  d.walkVersion = WALK_VERSION;
+  return { data: d, changed: true };
+}
+const PRICE_DROP_QFC = {"984200": {"amt": 39.54,"unit": "box","date": "2026-07-15","name": "74-40 Tomato Fillets 20611 Stanislaus"},"920140": {"amt": 68.86,"unit": "box","date": "2026-07-15","name": "Frank's Orig Red Hot Sauce 410556011"},"920261": {"amt": 24.0,"unit": "box","date": "2026-07-15","name": "GM All Trumps Flour 50121 Unb/Br/Mt Enriched"},"920144": {"amt": 86.84,"unit": "box","date": "2026-07-15","name": "Frank's Red Hot Xtra Hot 417519601"},"920060": {"amt": 54.23,"unit": "box","date": "2026-07-15","name": "Dole Pineapple Tidbits SM Can"},"471060": {"amt": 58.66,"unit": "box","date": "2026-07-15","name": "Towel Roll White SCA Tork 700 7.7\"x700'"},"470241": {"amt": 62.58,"unit": "box","date": "2026-07-15","name": "Molded Fiber Hinge 9x6x3 1CP Empress Earth"},"925370": {"amt": 68.64,"unit": "box","date": "2026-07-15","name": "Hoffs Golden Cheesecake 10\" 1164"},"923070": {"amt": 4.37,"unit": "lb","date": "2026-07-15","name": "Mozz Stick Breaded Ricci"},"394080": {"amt": 28.36,"unit": "box","date": "2026-07-30","name": "Frz Chop Spinach IQF Regal 158870"},"842250": {"amt": 42.3,"unit": "box","date": "2026-07-30","name": "Tyson Brandywine RTC Brd Tender 70CT/CS"},"841582": {"amt": 48.81,"unit": "box","date": "2026-07-15","name": "Pierce Bnls Wing Ding 111125"},"872210": {"amt": 78.9,"unit": "box","date": "2026-07-30","name": "Diamond Kosher Salt 11035933"},"470070": {"amt": 35.0,"unit": "box","date": "2026-07-30","name": "Glove Large Vinyl Powdered Companions Essential"},"472350": {"amt": 20.46,"unit": "box","date": "2026-07-30","name": "Bag Paper Brown Quart Liquor Vic Bay"},"472331": {"amt": 29.41,"unit": "box","date": "2026-07-30","name": "Plate Paper 9\" White Uncoated AJM 10100"},"470230": {"amt": 90.96,"unit": "box","date": "2026-07-30","name": "Molded Fiber Hinge 9x9x3 1COMP Green Wave Ovation"},"474610": {"amt": 122.81,"unit": "box","date": "2026-07-30","name": "Wrap Dry Wax 15x20 McNairn 107059"},"470790": {"amt": 19.76,"unit": "box","date": "2026-07-30","name": "Box Pizza Corr 12\" White"},"472700": {"amt": 41.59,"unit": "box","date": "2026-07-30","name": "Container 16oz Round Clr Combo Pactiv Deli/Soup w/Lid"},"471450": {"amt": 86.02,"unit": "box","date": "2026-07-30","name": "Bag Kraft Flat Merchandise 13x15 30#"},"401020": {"amt": 85.95,"unit": "box","date": "2026-07-30","name": "Bacon Topping 3/8 Hormel 04544"},"821280": {"amt": 1.89,"unit": "lb","date": "2026-07-27","name": "Chic Wing Cut Jumbo Hor 10153 Mountaire Amick"},"821190": {"amt": 1.89,"unit": "lb","date": "2026-07-27","name": "Chic Tender Clipped Bachoco"},"741923": {"amt": 3.69,"unit": "lb","date": "2026-07-27","name": "Feta Cheese Crumble 73145BF"},"894860": {"amt": 87.59,"unit": "box","date": "2026-07-27","name": "Kens Chunky Blue Cheese 865"},"721305": {"amt": 4.89,"unit": "lb","date": "2026-07-27","name": "Liuzzi Brick Oven Frsh Mozz 00168"},"851020": {"amt": 7.99,"unit": "lb","date": "2026-07-27","name": "Turkey Brst Roast Harvest Gold Oven Roasted"},"721360": {"amt": 2.19,"unit": "lb","date": "2026-07-27","name": "Block Whole Milk Mozz 1950"},"901250": {"amt": 2.99,"unit": "lb","date": "2026-07-27","name": "Butter Solids Salted AA"},"742600": {"amt": 38.64,"unit": "box","date": "2026-07-27","name": "Ricotta Cheese Supreme 32oz Whole Milk 94332"},"481300-B": {"amt": 7.33,"unit": "lb","date": "2026-07-27","name": "Salami A/C Carando Alpina"},"521600": {"amt": 4.59,"unit": "lb","date": "2026-07-27","name": "Ham Chef Delite TM 2977"}};
+const PRICE_DROP_THOMSEN = {"80039": {"amt": 57.94,"unit": "case","date": "2026-08-02","name": "Register Roll 3\" 1 Ply 300165"},"753642": {"amt": 47.39,"unit": "pail","date": "2026-08-02","name": "Icing Danish & Bun RTU"},"743739": {"amt": 12.55,"unit": "case","date": "2026-08-02","name": "Milk Coffee Milk 14 oz"},"90509": {"amt": 30.09,"unit": "case","date": "2026-08-02","name": "Soda Sarsaparilla"},"90516": {"amt": 32.36,"unit": "case","date": "2026-08-02","name": "Soda Rhody Red"},"90500": {"amt": 30.97,"unit": "case","date": "2026-08-02","name": "Soda Root Beer"},"80515": {"amt": 19.7,"unit": "case","date": "2026-08-02","name": "Del's All Natural Lemonade"},"570601": {"amt": 86.12,"unit": "case","date": "2026-08-02","name": "Detergent Dawn Pot & Pan Gal"},"81852": {"amt": 21.2,"unit": "bundle","date": "2026-08-02","name": "Box Pizza Corr Kraft 14\"x14\""},"81791": {"amt": 79.31,"unit": "bundle","date": "2026-08-02","name": "Bag Millinery 13 x 15"},"17195": {"amt": 34.01,"unit": "case","date": "2026-08-02","name": "Glove Vinyl Powder X Lrg"},"81605": {"amt": 53.0,"unit": "case","date": "2026-08-02","name": "Plate Paper 9\""},"81812": {"amt": 23.23,"unit": "bundle","date": "2026-08-02","name": "Box Pizza Corr Kraft 16\"x16\""},"603974": {"amt": 29.14,"unit": "case","date": "2026-08-02","name": "Bag T Shirt Biodegradable"},"643457": {"amt": 65.91,"unit": "case","date": "2026-08-02","name": "Cheese Feta Crumbled"},"81192": {"amt": 104.04,"unit": "case","date": "2026-08-02","name": "Butter Solids Salted"},"956583": {"amt": 20.28,"unit": "ea","date": "2026-08-02","name": "Cheese Gorgonzola Crumbled"},"80467": {"amt": 38.35,"unit": "pail","date": "2026-08-02","name": "Pickle Kosher Dill Chip Crnkle"},"80855": {"amt": 44.7,"unit": "ea","date": "2026-08-02","name": "Ham Tavern Chef Delight"},"81122": {"amt": 49.14,"unit": "case","date": "2026-08-02","name": "Cheese Ricotta Sopraffina"},"80811": {"amt": 69.26,"unit": "case","date": "2026-08-02","name": "Chicken Wings Cut Jumbo"},"80736": {"amt": 103.15,"unit": "case","date": "2026-08-02","name": "Cheese Mozzarella W/M Loaf"},"80419": {"amt": 74.04,"unit": "case","date": "2026-08-02","name": "Cheese Cheddar White 1950"},"362288": {"amt": 91.19,"unit": "case","date": "2026-08-02","name": "Sauce Pesto Basil"},"70875": {"amt": 29.31,"unit": "case","date": "2026-08-02","name": "Broccoli Florets IQF"},"565419": {"amt": 83.0,"unit": "case","date": "2026-08-02","name": "Pizza Crust Gluten Free 12"},"536515": {"amt": 49.95,"unit": "case","date": "2026-08-02","name": "Cookie Dough Triple Choc Chip"},"75490": {"amt": 75.0,"unit": "case","date": "2026-08-02","name": "Sausage Coarse Grind Swt Ital"},"80795": {"amt": 40.65,"unit": "case","date": "2026-08-02","name": "Mozz Sticks Breaded"},"80799": {"amt": 35.23,"unit": "case","date": "2026-08-02","name": "Eggplant Breaded Round"},"72175": {"amt": 45.13,"unit": "case","date": "2026-08-02","name": "Chicken Tender RTC Brandywine"},"81067": {"amt": 46.5,"unit": "case","date": "2026-08-02","name": "Chicken Breast Chunks Boneless Wingdings"},"68387": {"amt": 22.35,"unit": "ea","date": "2026-08-02","name": "Sauce Wing Sweet Red Chili"},"34160": {"amt": 41.38,"unit": "case","date": "2026-08-02","name": "Sauce Pizza Full Red w/Basil"},"692420": {"amt": 25.85,"unit": "case","date": "2026-08-02","name": "Chips Kettle Salt&Vin"},"81855": {"amt": 37.19,"unit": "case","date": "2026-08-02","name": "Tomato Magic Grnd Pld in Puree"},"34100": {"amt": 36.39,"unit": "case","date": "2026-08-02","name": "Tomato Fillet 74/40 P-N-J"},"50121": {"amt": 23.05,"unit": "bag","date": "2026-08-02","name": "Flour All Trumps Unbleached Gold Medal"}};
+const PACK_DROP = {"i35": {"thomsen": 1}, "i36": {"thomsen": 1}, "i30": {"thomsen": 1}, "i31": {"thomsen": 1}, "i1": {"thomsen": 48}, "i6": {"thomsen": 20}, "i7": {"thomsen": 40}, "i41": {"thomsen": 36}, "i48": {"thomsen": 10}};
+const PRICES_VERSION = 2;
+// Prices lifted off three Quality invoices (7/15, 7/27, 7/30) and the Thomsen
+// Pepper order of 8/2. Only overwrites a vendor's price when this one is newer,
+// so a scanned invoice done since then still wins.
+function migratePrices(d) {
+  if (!d || typeof d !== "object") return { data: d, changed: false };
+  if ((d.pricesVersion || 0) >= PRICES_VERSION) return { data: d, changed: false };
+  const apply = (r, sku, drop, side) => {
+    const hit = sku && drop[sku];
+    if (!hit) return;
+    r.prices = r.prices || {};
+    const cur = r.prices[side];
+    if (!cur || !cur.date || String(cur.date) <= hit.date) {
+      r.prices[side] = { amt: hit.amt, unit: hit.unit, date: hit.date };
+    }
+    r.names = r.names || {};
+    if (hit.name) r.names[side] = hit.name;
+  };
+  (d.inventory || []).forEach((r) => {
+    apply(r, r.qfcSku, PRICE_DROP_QFC, "qfc");
+    apply(r, r.thomsenSku, PRICE_DROP_THOMSEN, "thomsen");
+    const pk = PACK_DROP[r.id];
+    if (pk) {
+      r.pack = r.pack || {};
+      Object.keys(pk).forEach((side) => { if (!(r.pack[side] > 0)) r.pack[side] = pk[side]; });
+    }
+  });
+  d.pricesVersion = PRICES_VERSION;
+  return { data: d, changed: true };
+}
+const NEW_ITEM_DROP = [{"id": "i128", "item": "Mustard", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Back Room \u2014 Next Shelf", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i129", "item": "Sugar", "qty": 0, "unit": "bag", "low": 1, "vendor": "Thomsen", "station": "Back Room \u2014 Next Shelf", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i130", "item": "Italian Dressing Mix", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Back Room \u2014 Next Shelf", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i131", "item": "Yeast", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Back Room \u2014 Next Shelf", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i132", "item": "Ice Cream", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Second Freezer", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i133", "item": "Brick Cheese", "qty": 0, "unit": "lb", "low": 5, "vendor": "Thomsen", "station": "Walk-In \u2014 Cheeses", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i134", "item": "Molded Fiber Tray 5x7", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Storage Unit", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i135", "item": "Clear Plastic Cups 12 oz", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Storage Unit", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i136", "item": "Souffle Cups 2 oz", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Storage Unit", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i137", "item": "Souffle Lids 2 oz", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Storage Unit", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i138", "item": "Foil Sheets", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Storage Unit", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i139", "item": "Parchment Paper", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Storage Unit", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i140", "item": "Sanitizer", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Chemical Cabinet", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i141", "item": "Ketchup Packets", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Out Front", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i142", "item": "Mayo Packets", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Out Front", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i143", "item": "Soda \u2014 Cola", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Out Front", "names": {"qfc": null, "thomsen": "Soda Cola"}, "prices": {"qfc": null, "thomsen": {"amt": 33.94, "unit": "case", "date": "2026-08-02"}}, "thomsenSku": "90513"}];
+const NEWITEMS_VERSION = 1;
+// Added from his walk-through. Anything he has already created by hand with the
+// same name is left alone, so this never doubles a row up.
+function migrateNewItems(d) {
+  if (!d || typeof d !== "object") return { data: d, changed: false };
+  if ((d.newItemsVersion || 0) >= NEWITEMS_VERSION) return { data: d, changed: false };
+  d.inventory = d.inventory || [];
+  const have = {};
+  d.inventory.forEach((r) => { have[String(r.item).toLowerCase().replace(/[^a-z0-9]/g, "")] = true; });
+  NEW_ITEM_DROP.forEach((n) => {
+    const k = String(n.item).toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!have[k] && !d.inventory.some((r) => r.id === n.id)) {
+      d.inventory.push(JSON.parse(JSON.stringify(n)));
+    }
+  });
+  d.newItemsVersion = NEWITEMS_VERSION;
+  return { data: d, changed: true };
+}
 const TIMEOFF_VERSION = 1;
 // Devices that already have saved data never see DEFAULT_DATA, so the time-off
 // requests transcribed off the paper calendar have to be pushed in the same way
@@ -930,7 +1131,12 @@ const TIMEOFF_VERSION = 1;
 function migrateTimeOff(d) {
   if (!d || typeof d !== "object") return { data: DEFAULT_DATA, changed: false };
   if (!Array.isArray(d.tips)) d.tips = [];
-  if ((d.timeOffVersion || 0) >= TIMEOFF_VERSION) return { data: d, changed: false };
+  if ((d.timeOffVersion || 0) >= TIMEOFF_VERSION) {
+    const w0 = migrateWalk(d);
+    const p0 = migratePrices(w0.data);
+    const n0 = migrateNewItems(p0.data);
+    return { data: n0.data, changed: w0.changed || p0.changed || n0.changed };
+  }
   const have = Array.isArray(d.timeOff) ? d.timeOff : [];
   const key = (r) => String(r.date) + "|" + String(r.name || "").toLowerCase().replace(/[^a-z]/g, "");
   const seen = {};
@@ -940,7 +1146,10 @@ function migrateTimeOff(d) {
   });
   d.timeOff = have;
   d.timeOffVersion = TIMEOFF_VERSION;
-  return { data: d, changed: true };
+  const w = migrateWalk(d);
+  migratePrices(w.data);
+  migrateNewItems(w.data);
+  return { data: w.data, changed: true };
 }
 
 function uid() {
@@ -2394,25 +2603,53 @@ function tipEntryText(e) {
     return L.join("\n");
 }
 function TipsTab({ data, persist }) {
-    const [date, setDate] = useState(todayISO());
-    const [dayCrew, setDayCrew] = useState([]);
+    // The half-finished sheet lives in the shared data, not in component state.
+    // Day tips get entered mid-afternoon and the night side hours later, often on
+    // a different tablet — switching tabs used to throw the whole thing away.
+    const draft = data.tipDraft || {};
+    const put = (changes) => {
+        const next = JSON.parse(JSON.stringify(data));
+        next.tipDraft = Object.assign({}, next.tipDraft || {}, changes);
+        persist(next);
+    };
+    const field = (key, fallback) => (draft[key] === undefined ? fallback : draft[key]);
+    const date = field("date", todayISO());
+    const dayCrew = field("dayCrew", []);
+    const dayCash = field("dayCash", "");
+    const dayCC = field("dayCC", "");
+    const dayByHours = field("dayByHours", false);
+    const dayTimes = field("dayTimes", {});
+    const dayShares = field("dayShares", {});
+    const dayPaidMap = field("dayPaidMap", {});
+    const nightCrew = field("nightCrew", []);
+    const ccAll = field("ccAll", "");
+    const delivery = field("delivery", "");
+    const nightCash = field("nightCash", "");
+    const nightByHours = field("nightByHours", false);
+    const nightTimes = field("nightTimes", {});
+    const nightShares = field("nightShares", {});
+    const nightPaidMap = field("nightPaidMap", {});
+    const note = field("note", "");
+    const setDate = (v) => put({ date: v });
+    const setDayCrew = (v) => put({ dayCrew: v });
+    const setDayCash = (v) => put({ dayCash: v });
+    const setDayCC = (v) => put({ dayCC: v });
+    const setDayByHours = (v) => put({ dayByHours: v });
+    const setDayTimes = (v) => put({ dayTimes: v });
+    const setDayShares = (v) => put({ dayShares: v });
+    const setDayPaidMap = (v) => put({ dayPaidMap: v });
+    const setNightCrew = (v) => put({ nightCrew: v });
+    const setCcAll = (v) => put({ ccAll: v });
+    const setDelivery = (v) => put({ delivery: v });
+    const setNightCash = (v) => put({ nightCash: v });
+    const setNightByHours = (v) => put({ nightByHours: v });
+    const setNightTimes = (v) => put({ nightTimes: v });
+    const setNightShares = (v) => put({ nightShares: v });
+    const setNightPaidMap = (v) => put({ nightPaidMap: v });
+    const setNote = (v) => put({ note: v });
+    // purely local: nothing worth carrying between sessions
     const [dayExtra, setDayExtra] = useState("");
-    const [dayCash, setDayCash] = useState("");
-    const [dayCC, setDayCC] = useState("");
-    const [dayByHours, setDayByHours] = useState(false);
-    const [dayTimes, setDayTimes] = useState({});
-    const [dayShares, setDayShares] = useState({});
-    const [dayPaidMap, setDayPaidMap] = useState({});
-    const [nightCrew, setNightCrew] = useState([]);
     const [nightExtra, setNightExtra] = useState("");
-    const [ccAll, setCcAll] = useState("");
-    const [delivery, setDelivery] = useState("");
-    const [nightCash, setNightCash] = useState("");
-    const [nightByHours, setNightByHours] = useState(false);
-    const [nightTimes, setNightTimes] = useState({});
-    const [nightShares, setNightShares] = useState({});
-    const [nightPaidMap, setNightPaidMap] = useState({});
-    const [note, setNote] = useState("");
     const [open, setOpen] = useState("");
     const [copied, setCopied] = useState("");
     const [okReplace, setOkReplace] = useState(false);
@@ -2432,53 +2669,44 @@ function TipsTab({ data, persist }) {
     const dayEach = dayCrew.length ? dayTotal / dayCrew.length : 0;
     const nightEach = nightCrew.length ? nightTotal / nightCrew.length : 0;
     const loadDate = (iso) => {
-        setDate(iso);
         setOkReplace(false);
         const e = (data.tips || []).find((x) => x.date === iso);
-        if (!e)
+        if (!e) {
+            put({ date: iso });
             return;
-        const restore = (s, setCrew, setBy, setT, setSh, setP) => {
-            setCrew((s && s.crew) || []);
-            setBy(!!(s && s.byHours));
-            const t = {}, sh = {}, p = {};
-            ((s && s.rows) || []).forEach((r) => {
+        }
+        const unpack = (sd, prefix) => {
+            const t = {}, sh = {}, pm = {};
+            ((sd && sd.rows) || []).forEach((r) => {
                 if (r.span)
                     t[r.name] = r.span;
                 if (r.share != null && r.share !== 1)
                     sh[r.name] = r.share;
-                p[r.name] = String(r.paid);
+                pm[r.name] = String(r.paid);
             });
-            setT(t);
-            setSh(sh);
-            setP(p);
+            const o = {};
+            o[prefix + "Crew"] = (sd && sd.crew) || [];
+            o[prefix + "ByHours"] = !!(sd && sd.byHours);
+            o[prefix + "Times"] = t;
+            o[prefix + "Shares"] = sh;
+            o[prefix + "PaidMap"] = pm;
+            return o;
         };
-        restore(e.day, setDayCrew, setDayByHours, setDayTimes, setDayShares, setDayPaidMap);
-        restore(e.night, setNightCrew, setNightByHours, setNightTimes, setNightShares, setNightPaidMap);
-        setDayCash(e.day ? String(e.day.cash) : "");
-        setDayCC(e.day ? String(e.day.cc) : "");
-        setCcAll(e.night ? String(e.night.ccAll) : "");
-        setDelivery(e.night ? String(e.night.delivery) : "");
-        setNightCash(e.night ? String(e.night.cash) : "");
-        setNote(e.note || "");
+        put(Object.assign({ date: iso, note: e.note || "" }, unpack(e.day, "day"), unpack(e.night, "night"), {
+            dayCash: e.day ? String(e.day.cash) : "",
+            dayCC: e.day ? String(e.day.cc) : "",
+            ccAll: e.night ? String(e.night.ccAll) : "",
+            delivery: e.night ? String(e.night.delivery) : "",
+            nightCash: e.night ? String(e.night.cash) : ""
+        }));
     };
-    const clearForm = () => {
-        setDayCrew([]);
-        setDayCash("");
-        setDayCC("");
-        setDayByHours(false);
-        setDayTimes({});
-        setDayShares({});
-        setDayPaidMap({});
-        setNightCrew([]);
-        setCcAll("");
-        setDelivery("");
-        setNightCash("");
-        setNightByHours(false);
-        setNightTimes({});
-        setNightShares({});
-        setNightPaidMap({});
-        setNote("");
-    };
+    const blankDraft = (keepDate) => ({
+        date: keepDate || todayISO(),
+        dayCrew: [], dayCash: "", dayCC: "", dayByHours: false, dayTimes: {}, dayShares: {}, dayPaidMap: {},
+        nightCrew: [], ccAll: "", delivery: "", nightCash: "", nightByHours: false,
+        nightTimes: {}, nightShares: {}, nightPaidMap: {}, note: ""
+    });
+    const clearForm = () => { put(blankDraft(date)); setOkReplace(false); };
     const packRows = (split, paidMap) => split.rows.map((r) => ({
         name: r.name, span: r.span, hours: r.hours, share: r.share,
         ccExact: Math.round(r.ccExact * 100) / 100,
@@ -2509,8 +2737,8 @@ function TipsTab({ data, persist }) {
         const next = JSON.parse(JSON.stringify(data));
         next.tips = (next.tips || []).filter((x) => x.date !== date);
         next.tips.push(entry);
+        next.tipDraft = blankDraft(date);
         persist(next);
-        clearForm();
         setOkReplace(false);
     };
     const removeEntry = (id) => {
@@ -2541,7 +2769,8 @@ function TipsTab({ data, persist }) {
                 React.createElement("div", null,
                     React.createElement("div", { className: "text-xs mb-1", style: { fontFamily: "Inter", color: "#777" } }, "\"Close\" means"),
                     React.createElement("select", { value: closeHour, onChange: (e) => setClose(Number(e.target.value)), className: "text-base px-2.5 py-2 rounded outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", background: COLORS.cream } }, CLOSE_CHOICES.map((c) => React.createElement("option", { key: c.h, value: c.h }, c.label)))),
-                React.createElement("div", { className: "text-sm pb-2", style: { fontFamily: "Inter", color: existing ? COLORS.tomatoDark : "#999" } }, existing ? "Already logged — saving will replace it" : prettyDate(date)))),
+                React.createElement("div", { className: "text-sm pb-2", style: { fontFamily: "Inter", color: existing ? COLORS.tomatoDark : "#999" } }, existing ? "Already logged — saving will replace it" : prettyDate(date)),
+                !existing && !emptyForm ? (React.createElement("div", { className: "text-sm pb-2 ml-auto", style: { fontFamily: "Inter", color: COLORS.basil } }, "Held \u2014 comes back when you do, on any tablet")) : null)),
         React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
             React.createElement("div", { className: "text-xs font-semibold tracking-widest mb-2", style: { fontFamily: "Oswald", color: COLORS.tomato } },
                 "DAY SHIFT \u00B7 ",
@@ -3754,6 +3983,27 @@ function vendorProduct(i, vendor) {
 // Thomsen), so the sheet stays thin and the brand detail lives behind a tap.
 const VENDOR_LABEL = { QFC: "Quality Food", Thomsen: "Thomsen" };
 const VENDOR_SHORT = { QFC: "Quality", Thomsen: "Thomsen" };
+// The sheet follows the route he actually walks, not the food-category buckets.
+// WALK_STATIONS is injected above; anything without a stop falls to the end.
+function stationOf(i) {
+    const st = i && i.station;
+    if (st && WALK_STATIONS.some((w) => w.name === st))
+        return st;
+    return "Anything Else";
+}
+function groupByStation(items) {
+    const groups = WALK_STATIONS.map((w) => ({ name: w.name, sub: w.sub, items: [] }));
+    const byName = {};
+    groups.forEach((g) => { byName[g.name] = g; });
+    items.forEach((i) => { byName[stationOf(i)].items.push(i); });
+    return groups.filter((g) => g.items.length);
+}
+function StationHeader({ g }) {
+    return (React.createElement("div", { className: "flex items-baseline gap-2 px-1 pt-3 pb-1.5" },
+        React.createElement("span", { className: "text-sm font-semibold tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato } }, g.name.toUpperCase()),
+        g.sub ? React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#a0937f" } }, g.sub) : null,
+        React.createElement("span", { className: "text-xs ml-auto", style: { fontFamily: "JetBrains Mono", color: "#c0b49c" } }, g.items.length)));
+}
 function normUnit(u) {
     const s = String(u || "").toLowerCase().replace(/[^a-z]/g, "");
     if (s === "cs" || s === "cse" || s === "case")
@@ -3927,7 +4177,10 @@ function PriceDetail({ i, vendorOf, patch }) {
                 i.unit || "",
                 i.low != null ? " \u00b7 low at " + i.low : ""),
             React.createElement("span", { className: "text-xs ml-auto", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "Buying from"),
-            React.createElement(VendorPick, { i: i, vendorOf: vendorOf, patch: patch, size: "lg" }))));
+            React.createElement(VendorPick, { i: i, vendorOf: vendorOf, patch: patch, size: "lg" })),
+        React.createElement("div", { className: "flex items-center gap-2 mt-2" },
+            React.createElement("span", { className: "text-xs flex-shrink-0", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "Where it lives"),
+            React.createElement("select", { value: stationOf(i), onChange: (e) => patch(i.id, { station: e.target.value }), className: "text-sm px-2 py-1.5 rounded outline-none flex-1", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", background: COLORS.cream } }, WALK_STATIONS.map((w) => React.createElement("option", { key: w.name, value: w.name }, w.name))))));
 }
 function FoodOrderTab({ data, persist }) {
     const [view, setView] = useState("order");
@@ -3974,22 +4227,8 @@ function FoodOrderTab({ data, persist }) {
     const copyOrder = () => {
         if (!onList.length)
             return;
-        const cats = [];
-        onList.forEach((i) => {
-            const c = itemCategory(i.item);
-            let g = cats.find((x) => x.name === c);
-            if (!g) {
-                g = { name: c, items: [] };
-                cats.push(g);
-            }
-            g.items.push(i);
-        });
-        cats.sort((a2, b2) => {
-            const ia = CATEGORY_ORDER.indexOf(a2.name), ib = CATEGORY_ORDER.indexOf(b2.name);
-            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-        });
         const lines = [];
-        cats.forEach((g) => {
+        groupByStation(onList).forEach((g) => {
             lines.push("");
             lines.push(g.name.toUpperCase());
             g.items.forEach((i) => {
@@ -4011,20 +4250,7 @@ function FoodOrderTab({ data, persist }) {
         if (onList.length === 0) {
             return (React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } }, "Nothing on the order yet \u2014 go through \u201CSet Up List\u201D and mark what you need."));
         }
-        const cats = [];
-        onList.forEach((i) => {
-            const c = itemCategory(i.item);
-            let g = cats.find((x) => x.name === c);
-            if (!g) {
-                g = { name: c, items: [] };
-                cats.push(g);
-            }
-            g.items.push(i);
-        });
-        cats.sort((a2, b2) => {
-            const ia = CATEGORY_ORDER.indexOf(a2.name), ib = CATEGORY_ORDER.indexOf(b2.name);
-            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-        });
+        const cats = groupByStation(onList);
         return (React.createElement("div", null,
             React.createElement("div", { className: "flex items-center justify-between gap-2 px-3 py-2.5 rounded-t flex-wrap", style: { background: COLORS.crust } },
                 React.createElement("span", { style: { fontFamily: "Oswald", fontSize: "18px", color: COLORS.cream } }, "THE ORDER \u00b7 " + onList.length),
@@ -4039,8 +4265,8 @@ function FoodOrderTab({ data, persist }) {
                     React.createElement("button", { onClick: copyOrder, className: "text-sm px-3 py-1.5 rounded-full flex items-center gap-1.5 ml-1", style: { background: COLORS.basil, color: COLORS.cream, border: "none", fontFamily: "Inter", fontWeight: 600 } },
                         React.createElement(Copy, { size: 14 }),
                         copied === "order" ? "Copied" : "Copy order"))),
-            cats.map((g) => (React.createElement("div", { key: g.name, className: "mt-3" },
-                React.createElement(SectionHeader, null, g.name),
+            cats.map((g) => (React.createElement("div", { key: g.name },
+                React.createElement(StationHeader, { g: g }),
                 React.createElement("div", { className: "space-y-1.5" }, g.items.map((i) => (React.createElement("div", { key: i.id, className: "px-3 py-3 rounded", style: { background: COLORS.card, border: "1px solid " + COLORS.line, borderLeft: "5px solid " + COLORS.tomato } },
                     React.createElement("div", { className: "flex items-center gap-3" },
                         React.createElement("button", { onClick: () => toggleOpen(i.id), className: "flex-1 min-w-0 text-left" },
@@ -4057,25 +4283,12 @@ function FoodOrderTab({ data, persist }) {
     const setupView = () => {
         const packMode = view === "packs";
         const shown = inv.filter((i) => match(i) && (!packMode || needsCompare(i)));
-        const cats = [];
-        shown.forEach((i) => {
-            const c = itemCategory(i.item);
-            let g = cats.find((x) => x.name === c);
-            if (!g) {
-                g = { name: c, items: [] };
-                cats.push(g);
-            }
-            g.items.push(i);
-        });
-        cats.sort((a, b) => {
-            const ia = CATEGORY_ORDER.indexOf(a.name), ib = CATEGORY_ORDER.indexOf(b.name);
-            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-        });
+        const cats = groupByStation(shown);
         if (!shown.length) {
             return (React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } }, packMode ? "Every item with two prices lines up \u2014 nothing left to fill in." : "No items match that search."));
         }
-        return cats.map((g) => (React.createElement("div", { key: g.name, className: "mb-5" },
-            React.createElement(SectionHeader, null, g.name),
+        return cats.map((g) => (React.createElement("div", { key: g.name, className: "mb-4" },
+            React.createElement(StationHeader, { g: g }),
             React.createElement("div", { className: "space-y-1.5" }, g.items.map((i) => {
                 const need = i.orderNeed;
                 const isSet = need === 0;
