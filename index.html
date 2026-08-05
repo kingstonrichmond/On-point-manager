@@ -4195,14 +4195,13 @@ function PrepListTab({ data, persist, listKey, mode }) {
     const todo = onList.filter((r) => !r.done);
     const finished = onList.filter((r) => r.done);
     const allSet = list.filter((r) => r.need === 0).length;
+    // Crossing something off shouldn't make the sheet jump. Done items stay put,
+    // struck through, the way they would on paper.
+    const working = onList;
     const match = (r) => !q.trim() || r.item.toLowerCase().includes(q.trim().toLowerCase());
-    const shown = (view === "todo" ? todo : view === "done" ? finished : list).filter(match);
-    const views = isOrder ? [
-        { id: "todo", label: "Order", n: todo.length },
-        { id: "setup", label: "Set Up List", n: list.length }
-    ] : [
-        { id: "todo", label: "To Prep", n: todo.length },
-        { id: "done", label: "Done", n: finished.length },
+    const shown = (view === "todo" ? working : view === "done" ? finished : list).filter(match);
+    const views = [
+        { id: "todo", label: isOrder ? "Order" : "To Prep", n: todo.length },
         { id: "setup", label: "Set Up List", n: list.length }
     ];
     const copyOrder = () => {
@@ -4214,28 +4213,30 @@ function PrepListTab({ data, persist, listKey, mode }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1800);
     };
-    // A row in the working list: one big tap target that crosses the item off.
-    const workRow = (r) => (React.createElement("div", { key: r.id, className: "rounded", style: {
-            background: r.done ? "#F1F4EE" : COLORS.card,
-            border: "1px solid " + (r.done ? COLORS.basil : COLORS.line),
-            borderLeft: "5px solid " + (r.done ? COLORS.basil : COLORS.tomato)
+    // The working list is meant to read like the paper sheet: tight rows, banded
+    // like a spreadsheet, quantity right next to the name the way you'd write it.
+    const workRow = (r, idx) => (React.createElement("div", { key: r.id, className: "flex items-center gap-2", style: {
+            background: r.done ? "#EEF2EA" : (idx % 2 ? COLORS.cream : COLORS.card),
+            borderBottom: "1px solid " + COLORS.line
         } },
-        React.createElement("button", { onClick: () => patch(r.id, { done: !r.done }), className: "w-full flex items-center gap-3 px-3 py-3.5 text-left" },
-            React.createElement("span", { className: "flex items-center justify-center rounded-full flex-shrink-0", style: {
-                    width: 26, height: 26,
-                    border: "2px solid " + (r.done ? COLORS.basil : "#c9bda8"),
+        React.createElement("button", { onClick: () => patch(r.id, { done: !r.done }), className: "flex-1 min-w-0 flex items-baseline gap-1.5 text-left px-2.5 py-1.5", style: { background: "transparent", border: "none" } },
+            React.createElement("span", { className: "flex items-center justify-center rounded flex-shrink-0", style: {
+                    width: 15, height: 15, alignSelf: "center",
+                    border: "1.5px solid " + (r.done ? COLORS.basil : "#c9bda8"),
                     background: r.done ? COLORS.basil : "transparent"
-                } }, r.done ? React.createElement(Check, { size: 15, color: COLORS.cream }) : null),
-            React.createElement("span", { className: "flex-1 min-w-0" },
-                React.createElement("span", { className: "block text-base", style: { fontFamily: "Inter", color: r.done ? "#8a9584" : COLORS.crust, textDecoration: r.done ? "line-through" : "none" } }, r.item),
-                r.note ? (React.createElement("span", { className: "block text-sm mt-0.5", style: { fontFamily: "Inter", color: r.done ? "#a3ab9d" : COLORS.tomatoDark } }, r.note)) : null),
-            React.createElement("span", { className: "text-lg px-2.5 py-0.5 rounded-full flex-shrink-0", style: {
-                    fontFamily: "JetBrains Mono", fontWeight: 700,
-                    color: r.done ? "#8a9584" : COLORS.cream,
-                    background: r.done ? "transparent" : COLORS.tomato
-                } }, "\u00d7" + r.need)),
-        noteOpen === r.id ? (React.createElement("div", { className: "px-3 pb-3" },
-            React.createElement("input", { autoFocus: true, placeholder: "Note \u2014 how much, which tub, anything to pass on", value: r.note || "", onChange: (e) => patch(r.id, { note: e.target.value }), className: "w-full text-sm px-2.5 py-2 rounded outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } }))) : (React.createElement("button", { onClick: () => setNoteOpen(r.id), className: "px-3 pb-2.5 text-xs", style: { fontFamily: "Inter", color: "#a0937f", background: "transparent", border: "none" } }, r.note ? "edit note" : "+ add a note"))));
+                } }, r.done ? React.createElement(Check, { size: 10, color: COLORS.cream }) : null),
+            React.createElement("span", { className: "text-sm truncate", style: {
+                    fontFamily: "Inter",
+                    color: r.done ? "#98a292" : COLORS.crust,
+                    textDecoration: r.done ? "line-through" : "none"
+                } },
+                r.item,
+                React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: r.done ? "#98a292" : COLORS.tomato } }, "  \u00d7" + r.need),
+                r.note ? (React.createElement("span", { style: { color: r.done ? "#aab3a4" : "#8a7a6c", fontStyle: "italic" } }, "  \u2014 " + r.note)) : null)),
+        React.createElement("button", { onClick: () => setNoteOpen(noteOpen === r.id ? "" : r.id), className: "px-2 py-1.5 flex-shrink-0", style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 11, color: "#bfb39b" } }, r.note ? "edit" : "note")));
+    const noteEditor = (r) => (React.createElement("div", { key: r.id + "-note", className: "px-2.5 py-2", style: { background: COLORS.cream, borderBottom: "1px solid " + COLORS.line } },
+        React.createElement("input", { autoFocus: true, placeholder: "Note for " + r.item + " \u2014 how much, which tub, anything to pass on", value: r.note || "", onChange: (e) => patch(r.id, { note: e.target.value }), onKeyDown: (e) => { if (e.key === "Enter")
+                setNoteOpen(""); }, className: "w-full text-sm px-2.5 py-2 rounded outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } })));
     // A row in setup: mark all-set, dial in a quantity, leave a note.
     const setupRow = (r) => {
         const need = r.need;
@@ -4293,9 +4294,9 @@ function PrepListTab({ data, persist, listKey, mode }) {
                 React.createElement(Plus, { size: 15 }),
                 " Add"))) : null,
         view === "setup" ? (React.createElement("input", { placeholder: "Search the list\u2026", value: q, onChange: (e) => setQ(e.target.value), className: "w-full text-base px-3 py-2.5 rounded mb-2 outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } })) : null,
-        React.createElement("div", { className: "space-y-1.5" }, shown.length === 0 ? (React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } }, view === "todo"
-            ? (isOrder ? "Nothing marked to order." : "Nothing to prep yet.")
-            : view === "done" ? "Nothing crossed off yet." : "No items match that search.")) : (shown.map((r) => (view === "setup" ? setupRow(r) : workRow(r)))))));
+        shown.length === 0 ? (React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#999" } }, view === "todo"
+            ? (isOrder ? "Nothing marked to order." : "Nothing to prep yet \u2014 set quantities in Set Up List.")
+            : "No items match that search.")) : view === "setup" ? (React.createElement("div", { className: "space-y-1.5" }, shown.map((r) => setupRow(r)))) : (React.createElement("div", { className: "rounded overflow-hidden", style: { border: "1px solid " + COLORS.line } }, shown.map((r, idx) => (noteOpen === r.id ? [workRow(r, idx), noteEditor(r)] : workRow(r, idx)))))));
 }
 function PrepParTab({ data, persist }) {
   const prep = data.prep || { lowStock: [] };
