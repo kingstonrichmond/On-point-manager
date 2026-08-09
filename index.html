@@ -159,6 +159,9 @@ const Calendar = makeIcon(
 const DollarSign = makeIcon(
   /* @__PURE__ */ React.createElement("path", { d: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" })
 );
+const Clock = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "9" }), /* @__PURE__ */ React.createElement("path", { d: "M12 7v5l3.5 2" }))
+);
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DEFAULT_DATA = {
   scheduleVersion: 2,
@@ -1333,6 +1336,13 @@ function PizzaOpsManager() {
   var _a;
   const [data, setData] = useState(null);
   const [tab, setTab] = useState("assistant");
+  const [timers, setTimers] = useState(loadTimers);
+  const [timerNow, setTimerNow] = useState(Date.now());
+  useEffect(() => {
+    const h = setInterval(() => setTimerNow(Date.now()), 250);
+    return () => clearInterval(h);
+  }, []);
+  useEffect(() => { saveTimers(timers); }, [timers]);
   const [loaded, setLoaded] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [sync, setSync] = useState({ state: "starting", at: null, from: "" });
@@ -1583,7 +1593,7 @@ function PizzaOpsManager() {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "timeoff" && /* @__PURE__ */ React.createElement(TimeOffTab, { data, persist }), tab === "tips" && /* @__PURE__ */ React.createElement(TipsTab, { data, persist }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "foodorder" && /* @__PURE__ */ React.createElement(FoodOrderTab, { data, persist }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); } })));
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "timeoff" && /* @__PURE__ */ React.createElement(TimeOffTab, { data, persist }), tab === "tips" && /* @__PURE__ */ React.createElement(TipsTab, { data, persist }), tab === "timers" && /* @__PURE__ */ React.createElement(TimersTab, { data, persist, timers, setTimers, now: timerNow }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "foodorder" && /* @__PURE__ */ React.createElement(FoodOrderTab, { data, persist }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); } })), /* @__PURE__ */ React.createElement(TimerOverlay, { timers, setTimers, now: timerNow }));
 }
 function AssistantAvatar({ state }) {
   const blobs = {
@@ -2929,6 +2939,243 @@ function ScheduleTab({ data, persist }) {
                         React.createElement(Plus, { size: 12 }),
                         " Add"))));
         }))));
+}
+// ===================== TIMERS =====================
+// Lives at the app root, not inside a tab, so a running timer survives moving
+// around the app. Times are stored as absolute end timestamps, so a sleeping
+// tablet or a reload doesn't drift them.
+const TIMER_KEY = "opp:timers";
+const DEFAULT_TIMER_PRESETS = [
+    { id: "tp1", label: "Wings", seconds: 480 },
+    { id: "tp2", label: "Boneless Wings", seconds: 240 },
+    { id: "tp3", label: "Chicken Fingers", seconds: 240 },
+    { id: "tp4", label: "Mozz Sticks", seconds: 210 },
+    { id: "tp5", label: "Fries", seconds: 180 },
+    { id: "tp6", label: "Onion Rings", seconds: 180 },
+    { id: "tp7", label: "Eggplant", seconds: 180 },
+    { id: "tp8", label: "Cookies", seconds: 720 }
+];
+function loadTimers() {
+    try {
+        const raw = localStorage.getItem(TIMER_KEY);
+        const list = raw ? JSON.parse(raw) : [];
+        // drop anything that finished more than an hour ago — nobody's coming back
+        const cutoff = Date.now() - 3600000;
+        return Array.isArray(list) ? list.filter((t) => t && t.endsAt > cutoff) : [];
+    }
+    catch (e) {
+        return [];
+    }
+}
+function saveTimers(list) {
+    try {
+        localStorage.setItem(TIMER_KEY, JSON.stringify(list || []));
+    }
+    catch (e) { }
+}
+function clockText(ms) {
+    const over = ms < 0;
+    const s = Math.round(Math.abs(ms) / 1000);
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return (over ? "+" : "") + m + ":" + (r < 10 ? "0" : "") + r;
+}
+function mmss(seconds) {
+    const m = Math.floor(seconds / 60), s = seconds % 60;
+    return m + ":" + (s < 10 ? "0" : "") + s;
+}
+// One audio context, opened on the tap that starts a timer, so the browser
+// doesn't block the alarm later for lacking a user gesture.
+var _timerAudio = null;
+function primeAudio() {
+    try {
+        if (!_timerAudio) {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (Ctx)
+                _timerAudio = new Ctx();
+        }
+        if (_timerAudio && _timerAudio.state === "suspended")
+            _timerAudio.resume();
+    }
+    catch (e) { }
+}
+function beep(times) {
+    primeAudio();
+    if (!_timerAudio)
+        return;
+    const n = times || 3;
+    for (let i = 0; i < n; i++) {
+        try {
+            const t0 = _timerAudio.currentTime + i * 0.45;
+            const o = _timerAudio.createOscillator();
+            const g = _timerAudio.createGain();
+            o.connect(g);
+            g.connect(_timerAudio.destination);
+            o.type = "square";
+            o.frequency.setValueAtTime(880, t0);
+            g.gain.setValueAtTime(0.0001, t0);
+            g.gain.exponentialRampToValueAtTime(0.18, t0 + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
+            o.start(t0);
+            o.stop(t0 + 0.32);
+        }
+        catch (e) { }
+    }
+    try {
+        if (navigator.vibrate)
+            navigator.vibrate([250, 120, 250]);
+    }
+    catch (e) { }
+}
+function startTimer(setTimers, label, seconds) {
+    primeAudio();
+    const t = {
+        id: uid(),
+        label: String(label || "Timer"),
+        seconds: seconds,
+        endsAt: Date.now() + seconds * 1000
+    };
+    setTimers((prev) => (prev || []).concat([t]));
+}
+function TimerOverlay({ timers, setTimers, now }) {
+    const rungRef = useRef({});
+    const list = timers || [];
+    useEffect(() => {
+        list.forEach((t) => {
+            const left = t.endsAt - Date.now();
+            if (left > 0)
+                return;
+            const last = rungRef.current[t.id] || 0;
+            // burst on the way past zero, then nag every 20s until it's dismissed
+            if (Date.now() - last > 20000) {
+                rungRef.current[t.id] = Date.now();
+                beep(3);
+            }
+        });
+    }, [now]);
+    if (!list.length)
+        return null;
+    const dismiss = (id) => {
+        delete rungRef.current[id];
+        setTimers((prev) => (prev || []).filter((t) => t.id !== id));
+    };
+    const addMinute = (id) => {
+        setTimers((prev) => (prev || []).map((t) => t.id === id ? Object.assign({}, t, { endsAt: Math.max(Date.now(), t.endsAt) + 60000 }) : t));
+    };
+    return (React.createElement("div", { style: {
+            position: "fixed", right: 10, bottom: 10, zIndex: 9999,
+            display: "flex", flexDirection: "column", gap: 8,
+            maxWidth: "min(340px, calc(100vw - 20px))", pointerEvents: "none"
+        } }, list.slice().sort((a, b) => a.endsAt - b.endsAt).map((t) => {
+        const left = t.endsAt - now;
+        const done = left <= 0;
+        const frac = Math.max(0, Math.min(1, left / (t.seconds * 1000)));
+        return (React.createElement("div", { key: t.id, style: {
+                pointerEvents: "auto",
+                background: done ? COLORS.tomato : COLORS.crust,
+                color: COLORS.cream,
+                borderRadius: 10,
+                boxShadow: "0 6px 20px rgba(0,0,0,.28)",
+                overflow: "hidden",
+                border: done ? "2px solid " + COLORS.parm : "none"
+            } },
+            React.createElement("div", { className: "flex items-center gap-2 px-3 py-2.5" },
+                React.createElement("div", { className: "min-w-0 flex-1" },
+                    React.createElement("div", { className: "text-xs truncate", style: { fontFamily: "Inter", opacity: .85 } }, done ? t.label + " \u2014 TIME" : t.label),
+                    React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: 26, fontWeight: 700, lineHeight: 1.1 } }, clockText(left))),
+                React.createElement("button", { onClick: () => addMinute(t.id), className: "text-xs px-2 py-2 rounded", style: { background: "rgba(255,255,255,.14)", color: COLORS.cream, border: "none", fontFamily: "Inter" } }, "+1m"),
+                React.createElement("button", { onClick: () => dismiss(t.id), className: "px-2.5 py-2 rounded", style: { background: done ? COLORS.cream : "rgba(255,255,255,.14)",
+                        color: done ? COLORS.tomato : COLORS.cream,
+                        border: "none", fontFamily: "Inter", fontWeight: 700, fontSize: 13 } }, done ? "Got it" : "\u2715")),
+            React.createElement("div", { style: { height: 4, background: "rgba(255,255,255,.16)" } },
+                React.createElement("div", { style: { height: 4, width: (frac * 100) + "%", background: done ? COLORS.parm : COLORS.basil } }))));
+    })));
+}
+function TimersTab({ data, persist, timers, setTimers, now }) {
+    const presets = (data && data.timerPresets) || DEFAULT_TIMER_PRESETS;
+    const [label, setLabel] = useState("");
+    const [mins, setMins] = useState("");
+    const [secs, setSecs] = useState("");
+    const [editing, setEditing] = useState(false);
+    const [newLabel, setNewLabel] = useState("");
+    const [newMins, setNewMins] = useState("");
+    const [newSecs, setNewSecs] = useState("");
+    const savePresets = (list) => {
+        const next = JSON.parse(JSON.stringify(data));
+        next.timerPresets = list;
+        persist(next);
+    };
+    const addPreset = () => {
+        const n = newLabel.trim();
+        const total = (Number(newMins) || 0) * 60 + (Number(newSecs) || 0);
+        if (!n || total <= 0)
+            return;
+        savePresets(presets.concat([{ id: uid(), label: n, seconds: total }]));
+        setNewLabel("");
+        setNewMins("");
+        setNewSecs("");
+    };
+    const removePreset = (id) => savePresets(presets.filter((p) => p.id !== id));
+    const bumpPreset = (id, delta) => savePresets(presets.map((p) => p.id === id ? Object.assign({}, p, { seconds: Math.max(5, p.seconds + delta) }) : p));
+    const quickStart = () => {
+        const total = (Number(mins) || 0) * 60 + (Number(secs) || 0);
+        if (total <= 0)
+            return;
+        startTimer(setTimers, label.trim() || mmss(total), total);
+        setLabel("");
+        setMins("");
+        setSecs("");
+    };
+    const running = (timers || []).slice().sort((a, b) => a.endsAt - b.endsAt);
+    return (React.createElement("div", { className: "space-y-4" },
+        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
+            React.createElement("div", { className: "text-xs font-semibold tracking-widest mb-2", style: { fontFamily: "Oswald", color: COLORS.tomato } }, "TAP TO START"),
+            React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-2" }, presets.map((p) => (React.createElement("button", { key: p.id, onClick: () => startTimer(setTimers, p.label, p.seconds), className: "px-3 py-3 rounded text-left", style: { background: COLORS.cream, border: "1px solid " + COLORS.line } },
+                React.createElement("div", { className: "text-sm truncate", style: { fontFamily: "Inter", color: COLORS.crust } }, p.label),
+                React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: 20, fontWeight: 700, color: COLORS.tomato } }, mmss(p.seconds)))))),
+            React.createElement("div", { className: "text-xs mt-2", style: { fontFamily: "Inter", color: COLORS.tomatoDark } }, "These times are starting points \u2014 set them to yours before anyone relies on them.")),
+        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
+            React.createElement("div", { className: "text-xs font-semibold tracking-widest mb-2", style: { fontFamily: "Oswald", color: COLORS.tomato } }, "ONE-OFF"),
+            React.createElement("div", { className: "flex flex-wrap items-end gap-2" },
+                React.createElement("input", { placeholder: "What for (optional)", value: label, onChange: (e) => setLabel(e.target.value), className: "text-base px-2.5 py-2 rounded outline-none flex-1", style: { minWidth: 130, border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
+                React.createElement("input", { inputMode: "numeric", placeholder: "min", value: mins, onChange: (e) => setMins(e.target.value), className: "text-base px-2 py-2 rounded outline-none text-center", style: { width: 62, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }),
+                React.createElement("input", { inputMode: "numeric", placeholder: "sec", value: secs, onChange: (e) => setSecs(e.target.value), className: "text-base px-2 py-2 rounded outline-none text-center", style: { width: 62, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }),
+                React.createElement(TicketButton, { onClick: quickStart }, "Start")),
+            React.createElement("div", { className: "flex flex-wrap gap-1.5 mt-2" }, [1, 2, 3, 5, 8, 10, 15, 20].map((m) => (React.createElement("button", { key: m, onClick: () => startTimer(setTimers, m + " min", m * 60), className: "text-sm px-3 py-2 rounded-full", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "Inter", color: COLORS.crust } },
+                m,
+                "m"))))),
+        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
+            React.createElement("div", { className: "flex items-center justify-between mb-2" },
+                React.createElement("div", { className: "text-xs font-semibold tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato } }, "RUNNING \u00b7 " + running.length),
+                running.length > 1 ? (React.createElement("button", { onClick: () => setTimers([]), className: "text-xs px-2.5 py-1.5 rounded", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "Inter", color: COLORS.crust } }, "Clear all")) : null),
+            running.length === 0 ? (React.createElement("div", { className: "text-sm italic", style: { fontFamily: "Inter", color: "#999" } }, "Nothing running. Timers float over every tab once started.")) : (React.createElement("div", { className: "space-y-1.5" }, running.map((t) => {
+                const left = t.endsAt - now;
+                const done = left <= 0;
+                return (React.createElement("div", { key: t.id, className: "flex items-center gap-2 px-3 py-2 rounded", style: { background: done ? "#F4D9D2" : COLORS.cream, border: "1px solid " + (done ? COLORS.tomato : COLORS.line) } },
+                    React.createElement("span", { className: "flex-1 text-sm truncate", style: { fontFamily: "Inter", color: COLORS.crust } }, t.label),
+                    React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: 18, color: done ? COLORS.tomatoDark : COLORS.crust } }, clockText(left)),
+                    React.createElement("button", { onClick: () => setTimers((prev) => (prev || []).filter((x) => x.id !== t.id)), className: "px-2 py-1.5", style: { background: "transparent", border: "none" } },
+                        React.createElement(Trash2, { size: 14, color: COLORS.tomato }))));
+            })))),
+        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
+            React.createElement("button", { onClick: () => setEditing(!editing), className: "w-full flex items-center justify-between" },
+                React.createElement("span", { className: "text-xs font-semibold tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato } }, "EDIT THE PRESET TIMES"),
+                React.createElement("span", { style: { color: COLORS.tomato, fontFamily: "Inter" } }, editing ? "\u25b4" : "\u25be")),
+            editing ? (React.createElement("div", { className: "mt-3 space-y-1.5" },
+                presets.map((p) => (React.createElement("div", { key: p.id, className: "flex items-center gap-2 px-2.5 py-2 rounded", style: { background: COLORS.cream } },
+                    React.createElement("span", { className: "flex-1 text-sm truncate", style: { fontFamily: "Inter", color: COLORS.crust } }, p.label),
+                    React.createElement("button", { onClick: () => bumpPreset(p.id, -15), className: "px-2 py-1 rounded text-xs", style: { background: COLORS.card, border: "1px solid " + COLORS.line, fontFamily: "Inter" } }, "-15s"),
+                    React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, minWidth: 52, textAlign: "center" } }, mmss(p.seconds)),
+                    React.createElement("button", { onClick: () => bumpPreset(p.id, 15), className: "px-2 py-1 rounded text-xs", style: { background: COLORS.card, border: "1px solid " + COLORS.line, fontFamily: "Inter" } }, "+15s"),
+                    React.createElement("button", { onClick: () => removePreset(p.id), className: "px-1.5 py-1.5", style: { background: "transparent", border: "none" } },
+                        React.createElement(Trash2, { size: 13, color: "#c9bda8" }))))),
+                React.createElement("div", { className: "flex flex-wrap items-end gap-2 pt-2" },
+                    React.createElement("input", { placeholder: "New preset", value: newLabel, onChange: (e) => setNewLabel(e.target.value), className: "text-sm px-2.5 py-2 rounded outline-none flex-1", style: { minWidth: 120, border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
+                    React.createElement("input", { inputMode: "numeric", placeholder: "min", value: newMins, onChange: (e) => setNewMins(e.target.value), className: "text-sm px-2 py-2 rounded outline-none text-center", style: { width: 58, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }),
+                    React.createElement("input", { inputMode: "numeric", placeholder: "sec", value: newSecs, onChange: (e) => setNewSecs(e.target.value), className: "text-sm px-2 py-2 rounded outline-none text-center", style: { width: 58, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }),
+                    React.createElement(TicketButton, { color: COLORS.basil, onClick: addPreset },
+                        React.createElement(Plus, { size: 13 }),
+                        " Add")))) : null)));
 }
 function Stars({ value, onChange }) {
   return /* @__PURE__ */ React.createElement("div", { className: "flex gap-0.5" }, [1, 2, 3, 4, 5].map((n) => /* @__PURE__ */ React.createElement(
@@ -4429,23 +4676,25 @@ function PrepListTab({ data, persist, listKey, mode }) {
     // The working list is meant to read like the paper sheet: tight rows, banded
     // like a spreadsheet, quantity right next to the name the way you'd write it.
     const workRow = (r, idx) => (React.createElement("div", { key: r.id, className: "flex items-center gap-2", style: {
-            background: r.done ? "#EEF2EA" : (idx % 2 ? COLORS.cream : COLORS.card),
+            background: r.done ? "#F7E4DE" : (idx % 2 ? COLORS.cream : COLORS.card),
             borderBottom: "1px solid " + COLORS.line
         } },
         React.createElement("button", { onClick: () => patch(r.id, { done: !r.done }), className: "flex-1 min-w-0 flex items-baseline gap-1.5 text-left px-2.5 py-1.5", style: { background: "transparent", border: "none" } },
             React.createElement("span", { className: "flex items-center justify-center rounded flex-shrink-0", style: {
                     width: 15, height: 15, alignSelf: "center",
-                    border: "1.5px solid " + (r.done ? COLORS.basil : "#c9bda8"),
-                    background: r.done ? COLORS.basil : "transparent"
+                    border: "1.5px solid " + (r.done ? COLORS.tomato : "#c9bda8"),
+                    background: r.done ? COLORS.tomato : "transparent"
                 } }, r.done ? React.createElement(Check, { size: 10, color: COLORS.cream }) : null),
             React.createElement("span", { className: "text-sm truncate", style: {
                     fontFamily: "Inter",
-                    color: r.done ? "#98a292" : COLORS.crust,
-                    textDecoration: r.done ? "line-through" : "none"
+                    color: r.done ? COLORS.tomatoDark : COLORS.crust,
+                    textDecoration: r.done ? "line-through" : "none",
+                    textDecorationColor: COLORS.tomato,
+                    textDecorationThickness: "2px"
                 } },
                 r.item,
-                React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: r.done ? "#98a292" : COLORS.tomato } }, "  \u00d7" + r.need),
-                r.note ? (React.createElement("span", { style: { color: r.done ? "#aab3a4" : "#8a7a6c", fontStyle: "italic" } }, "  \u2014 " + r.note)) : null)),
+                React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.basil } }, "  \u00d7" + r.need),
+                r.note ? (React.createElement("span", { style: { color: r.done ? "#b08b80" : "#8a7a6c", fontStyle: "italic" } }, "  \u2014 " + r.note)) : null)),
         React.createElement("button", { onClick: () => setNoteOpen(noteOpen === r.id ? "" : r.id), className: "px-2 py-1.5 flex-shrink-0", style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 11, color: "#bfb39b" } }, r.note ? "edit" : "note")));
     const noteEditor = (r) => (React.createElement("div", { key: r.id + "-note", className: "px-2.5 py-2", style: { background: COLORS.cream, borderBottom: "1px solid " + COLORS.line } },
         React.createElement("input", { autoFocus: true, placeholder: "Note for " + r.item + " \u2014 how much, which tub, anything to pass on", value: r.note || "", onChange: (e) => patch(r.id, { note: e.target.value }), onKeyDown: (e) => { if (e.key === "Enter")
