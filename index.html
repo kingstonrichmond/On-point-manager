@@ -3000,33 +3000,142 @@ function primeAudio() {
     }
     catch (e) { }
 }
-function beep(times) {
-    primeAudio();
-    if (!_timerAudio)
-        return;
-    const n = times || 3;
-    for (let i = 0; i < n; i++) {
-        try {
-            const t0 = _timerAudio.currentTime + i * 0.45;
-            const o = _timerAudio.createOscillator();
-            const g = _timerAudio.createGain();
-            o.connect(g);
-            g.connect(_timerAudio.destination);
-            o.type = "square";
-            o.frequency.setValueAtTime(880, t0);
-            g.gain.setValueAtTime(0.0001, t0);
-            g.gain.exponentialRampToValueAtTime(0.18, t0 + 0.02);
-            g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
-            o.start(t0);
-            o.stop(t0 + 0.32);
-        }
-        catch (e) { }
+// Which alarm this tablet uses. Device-local like the timers themselves — the
+// hood tablet needs to cut through a running fryer, the prep tablet doesn't.
+const SOUND_KEY = "opp:timerSound";
+const VOLUME_KEY = "opp:timerVolume";
+// Each pattern is a list of [startOffset, durationSeconds, frequency].
+// Square waves carry over kitchen noise far better than sine; the higher
+// harmonics survive when the fundamental gets swamped by the hood.
+const ALARM_SOUNDS = [
+    {
+        id: "hood",
+        label: "Hood",
+        note: "5 fast beeps, pause, repeat \u2014 loudest",
+        wave: "square",
+        gain: 1,
+        loops: 3,
+        loopGap: 0.75,
+        beeps: [[0, 0.11, 1245], [0.17, 0.11, 1245], [0.34, 0.11, 1245], [0.51, 0.11, 1245], [0.68, 0.11, 1245]]
+    },
+    {
+        id: "siren",
+        label: "Siren",
+        note: "two-tone warble, hard to ignore",
+        wave: "square",
+        gain: 1,
+        loops: 4,
+        loopGap: 0.35,
+        beeps: [[0, 0.16, 988], [0.18, 0.16, 1319], [0.36, 0.16, 988], [0.54, 0.16, 1319]]
+    },
+    {
+        id: "kitchen",
+        label: "Kitchen",
+        note: "3 firm beeps \u2014 the standard",
+        wave: "square",
+        gain: 0.8,
+        loops: 2,
+        loopGap: 0.5,
+        beeps: [[0, 0.18, 880], [0.3, 0.18, 880], [0.6, 0.18, 880]]
+    },
+    {
+        id: "prep",
+        label: "Prep",
+        note: "softer double chime",
+        wave: "triangle",
+        gain: 0.55,
+        loops: 2,
+        loopGap: 0.6,
+        beeps: [[0, 0.32, 784], [0.26, 0.42, 1047]]
+    },
+    {
+        id: "gentle",
+        label: "Gentle",
+        note: "one soft rising note \u2014 quiet areas",
+        wave: "sine",
+        gain: 0.45,
+        loops: 1,
+        loopGap: 0,
+        beeps: [[0, 0.5, 659], [0.3, 0.6, 880]]
+    },
+    {
+        id: "silent",
+        label: "Silent",
+        note: "vibrate and flash only",
+        wave: "sine",
+        gain: 0,
+        loops: 0,
+        loopGap: 0,
+        beeps: []
     }
+];
+function getSoundId() {
     try {
-        if (navigator.vibrate)
-            navigator.vibrate([250, 120, 250]);
+        return localStorage.getItem(SOUND_KEY) || "kitchen";
+    }
+    catch (e) {
+        return "kitchen";
+    }
+}
+function setSoundId(id) {
+    try {
+        localStorage.setItem(SOUND_KEY, id);
     }
     catch (e) { }
+}
+function getVolume() {
+    try {
+        const v = Number(localStorage.getItem(VOLUME_KEY));
+        return Number.isFinite(v) && v > 0 && v <= 1 ? v : 0.75;
+    }
+    catch (e) {
+        return 0.75;
+    }
+}
+function setVolume(v) {
+    try {
+        localStorage.setItem(VOLUME_KEY, String(v));
+    }
+    catch (e) { }
+}
+function soundById(id) {
+    return ALARM_SOUNDS.filter((s) => s.id === id)[0] || ALARM_SOUNDS[2];
+}
+function playAlarm(soundId, volume) {
+    primeAudio();
+    const snd = soundById(soundId || getSoundId());
+    const vol = (volume == null ? getVolume() : volume) * (snd.gain || 0);
+    try {
+        if (navigator.vibrate) {
+            navigator.vibrate(snd.id === "gentle" ? [200] : [300, 140, 300, 140, 300]);
+        }
+    }
+    catch (e) { }
+    if (!_timerAudio || vol <= 0 || !snd.beeps.length)
+        return;
+    const base = _timerAudio.currentTime + 0.02;
+    const loopLen = snd.beeps[snd.beeps.length - 1][0] +
+        snd.beeps[snd.beeps.length - 1][1] + snd.loopGap;
+    for (let L = 0; L < Math.max(1, snd.loops); L++) {
+        snd.beeps.forEach((b) => {
+            try {
+                const t0 = base + L * loopLen + b[0];
+                const o = _timerAudio.createOscillator();
+                const g = _timerAudio.createGain();
+                o.connect(g);
+                g.connect(_timerAudio.destination);
+                o.type = snd.wave;
+                o.frequency.setValueAtTime(b[2], t0);
+                g.gain.setValueAtTime(0.0001, t0);
+                g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * 0.3), t0 + 0.015);
+                g.gain.setValueAtTime(Math.max(0.0002, vol * 0.3), t0 + b[1] - 0.02);
+                g.gain.exponentialRampToValueAtTime(0.0001, t0 + b[1]);
+                o.start(t0);
+                o.stop(t0 + b[1] + 0.02);
+            }
+            catch (e) { }
+        });
+    }
 }
 function startTimer(setTimers, label, seconds) {
     primeAudio();
@@ -3050,7 +3159,7 @@ function TimerOverlay({ timers, setTimers, now }) {
             // burst on the way past zero, then nag every 20s until it's dismissed
             if (Date.now() - last > 20000) {
                 rungRef.current[t.id] = Date.now();
-                beep(3);
+                playAlarm();
             }
         });
     }, [now]);
@@ -3098,6 +3207,8 @@ function TimersTab({ data, persist, timers, setTimers, now }) {
     const [mins, setMins] = useState("");
     const [secs, setSecs] = useState("");
     const [editing, setEditing] = useState(false);
+    const [sound, setSound] = useState(getSoundId);
+    const [vol, setVol] = useState(getVolume);
     const [newLabel, setNewLabel] = useState("");
     const [newMins, setNewMins] = useState("");
     const [newSecs, setNewSecs] = useState("");
@@ -3158,6 +3269,26 @@ function TimersTab({ data, persist, timers, setTimers, now }) {
                     React.createElement("button", { onClick: () => setTimers((prev) => (prev || []).filter((x) => x.id !== t.id)), className: "px-2 py-1.5", style: { background: "transparent", border: "none" } },
                         React.createElement(Trash2, { size: 14, color: COLORS.tomato }))));
             })))),
+        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
+            React.createElement("div", { className: "text-xs font-semibold tracking-widest mb-1", style: { fontFamily: "Oswald", color: COLORS.tomato } }, "ALARM ON THIS TABLET"),
+            React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "Set per tablet \\u2014 the one by the hood can be loud without the prep area being loud."),
+            React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-2" }, ALARM_SOUNDS.map((sn) => {
+                const on = sound === sn.id;
+                return (React.createElement("button", { key: sn.id, onClick: () => { setSound(sn.id); setSoundId(sn.id); playAlarm(sn.id, vol); }, className: "px-3 py-2.5 rounded text-left", style: {
+                        background: on ? COLORS.crust : COLORS.cream,
+                        border: "1px solid " + (on ? COLORS.crust : COLORS.line)
+                    } },
+                    React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: on ? COLORS.cream : COLORS.crust } },
+                        sn.label,
+                        on ? " \u2713" : ""),
+                    React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: on ? "#c9bda8" : "#a0937f" } }, sn.note)));
+            })),
+            React.createElement("div", { className: "flex items-center gap-2 mt-3" },
+                React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8a7a6c" } }, "Volume"),
+                React.createElement("input", { type: "range", min: "10", max: "100", step: "5", value: Math.round(vol * 100), onChange: (e) => { const v = Number(e.target.value) / 100; setVol(v); setVolume(v); }, style: { flex: 1, accentColor: COLORS.tomato } }),
+                React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13, color: COLORS.crust, minWidth: 38, textAlign: "right" } }, Math.round(vol * 100) + "%"),
+                React.createElement(TicketButton, { color: COLORS.basil, onClick: () => playAlarm(sound, vol) }, "Test")),
+            React.createElement("div", { className: "text-xs mt-2", style: { fontFamily: "Inter", color: "#a0937f" } }, "Tablet volume still has the final say \\u2014 turn it up on the device too.")),
         React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
             React.createElement("button", { onClick: () => setEditing(!editing), className: "w-full flex items-center justify-between" },
                 React.createElement("span", { className: "text-xs font-semibold tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato } }, "EDIT THE PRESET TIMES"),
