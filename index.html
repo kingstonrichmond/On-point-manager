@@ -16,6 +16,14 @@
     flex-direction: column; padding: 24px; font-family: sans-serif; text-align: center;
     background: #EFEFF3; color: #17171C; z-index: 9999;
   }
+  /* ---- shared surfaces used across the tabs that aren't hand-rebuilt ---- */
+  .opp-card { border-radius: 18px !important;
+    box-shadow: 0 1px 2px rgba(23,23,28,.05), 0 6px 18px rgba(23,23,28,.05); }
+  .opp-field { border-radius: 12px !important; font-size: 16px !important; min-height: 46px;
+    border: 1px solid #E1E1E8; background: #FFFFFF; font-family: Inter, sans-serif; }
+  .opp-field:focus { border-color: #E20001; box-shadow: 0 0 0 3px rgba(226,0,1,.14); }
+  select.opp-field { min-height: 46px; }
+
   /* ---- surface layer: modern radii, depth, and touch behaviour app-wide ---- */
   * { -webkit-tap-highlight-color: transparent; }
   body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
@@ -1212,8 +1220,9 @@ function TicketButton({ children, onClick, color = COLORS.tomato, style = {}, ..
     "button",
     {
       onClick,
-      className: "px-3 py-1.5 rounded text-sm font-medium transition-transform active:scale-95 flex items-center gap-1.5",
-      style: { background: color, color: COLORS.cream, fontFamily: "Inter", ...style },
+      className: "flex items-center justify-center gap-1.5",
+      style: { background: color, color: "#FFFFFF", fontFamily: "Inter", fontSize: 15, fontWeight: 600,
+               letterSpacing: "-0.01em", border: "none", borderRadius: 12, minHeight: 44, padding: "0 16px", ...style },
       ...rest
     },
     children
@@ -1277,7 +1286,7 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
   const Row = (label, hint, control) =>
     /* @__PURE__ */ React.createElement(
       "div",
-      { className: "py-3.5", style: { borderBottom: `1px dashed ${COLORS.line}` } },
+      { className: "py-3.5", style: { borderBottom: `1px solid ${COLORS.line}` } },
       /* @__PURE__ */ React.createElement(
         "div",
         { className: "text-base mb-0.5", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } },
@@ -1348,7 +1357,7 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
         value: device,
         onChange: (e) => saveDevice(e.target.value),
         placeholder: "Name this device",
-        className: "w-full text-base px-3 py-2.5 rounded outline-none",
+        className: "w-full px-3 py-2.5 rounded outline-none opp-field",
         style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
       })
     ),
@@ -1659,12 +1668,18 @@ function PizzaOpsManager() {
       {
         key: t.id,
         onClick: () => setTab(t.id),
-        className: "flex items-center gap-1.5 px-4 py-3 rounded-t-lg text-sm whitespace-nowrap relative",
+        className: "flex items-center gap-1.5 whitespace-nowrap relative flex-shrink-0",
         style: {
-          background: active ? COLORS.cream : "transparent",
-          color: active ? COLORS.crust : COLORS.parm,
+          background: active ? "#FFFFFF" : "transparent",
+          color: active ? COLORS.crust : "#9A9AA6",
           fontFamily: "Inter",
-          fontWeight: 500
+          fontSize: 14.5,
+          fontWeight: 600,
+          letterSpacing: "-0.01em",
+          border: "none",
+          borderRadius: "14px 14px 0 0",
+          padding: "0 16px",
+          minHeight: 46
         }
       },
       /* @__PURE__ */ React.createElement(Icon, { size: 15 }),
@@ -1678,7 +1693,7 @@ function PizzaOpsManager() {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "timeoff" && /* @__PURE__ */ React.createElement(TimeOffTab, { data, persist }), tab === "tips" && /* @__PURE__ */ React.createElement(TipsTab, { data, persist }), tab === "timers" && /* @__PURE__ */ React.createElement(TimersTab, { data, persist, timers, setTimers, now: timerNow }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "foodorder" && /* @__PURE__ */ React.createElement(FoodOrderTab, { data, persist }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); } })), /* @__PURE__ */ React.createElement(TimerOverlay, { timers, setTimers, now: timerNow }));
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "timeoff" && /* @__PURE__ */ React.createElement(TimeOffTab, { data, persist }), tab === "tips" && /* @__PURE__ */ React.createElement(TipsTab, { data, persist }), tab === "timers" && /* @__PURE__ */ React.createElement(TimersTab, { data, persist, timers, setTimers, now: timerNow }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "foodorder" && /* @__PURE__ */ React.createElement(FoodOrderTab, { data, persist }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); } })), /* @__PURE__ */ React.createElement(TimerOverlay, { timers, setTimers, now: timerNow }));
 }
 function AssistantAvatar({ state }) {
   const blobs = {
@@ -2240,7 +2255,7 @@ If the user is just asking a question, return an empty actions array. Never inve
       onChange: (e) => {
         setWakeWord(e.target.value);
       },
-      className: "text-sm px-3 py-2 rounded-full outline-none",
+      className: "px-4 py-2.5 rounded-full outline-none opp-field",
       style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", color: COLORS.crust, background: "white" }
     },
     /* @__PURE__ */ React.createElement("option", { value: "computer" }, '"computer"'),
@@ -2326,12 +2341,14 @@ function TimeOffTab({ data, persist }) {
     const t0 = new Date();
     const [cursor, setCursor] = useState({ y: t0.getFullYear(), m: t0.getMonth() });
     const [sel, setSel] = useState(todayISO());
-    const [who, setWho] = useState("");
     const [typed, setTyped] = useState("");
     const [note, setNote] = useState("");
+    const [confirmId, setConfirmId] = useState("");
+    const [confirmText, setConfirmText] = useState("");
     const requests = data.timeOff || [];
     const names = staffNameList(data);
     const today = todayISO();
+    const CARD_SHADOW = "0 1px 2px rgba(23,23,28,0.05), 0 6px 18px rgba(23,23,28,0.05)";
     const addFor = (name) => {
         const nm = String(name || "").trim();
         if (!nm)
@@ -2342,25 +2359,23 @@ function TimeOffTab({ data, persist }) {
         if (!dup)
             next.timeOff.push({ id: uid(), date: sel, name: nm, note: note.trim(), added: today });
         persist(next);
-        setWho("");
         setTyped("");
         setNote("");
     };
+    // Anyone can take time off back down, but not by accident. You have to type
+    // the name on the entry — "yes" becomes muscle memory in a week, a name
+    // makes you look at whose row you're actually on.
     const removeReq = (id) => {
         const next = JSON.parse(JSON.stringify(data));
         next.timeOff = (next.timeOff || []).filter((r) => r.id !== id);
         persist(next);
+        setConfirmId("");
+        setConfirmText("");
     };
     const shiftMonth = (delta) => {
         let m = cursor.m + delta, y = cursor.y;
-        if (m < 0) {
-            m = 11;
-            y -= 1;
-        }
-        if (m > 11) {
-            m = 0;
-            y += 1;
-        }
+        if (m < 0) { m = 11; y -= 1; }
+        if (m > 11) { m = 0; y += 1; }
         setCursor({ y, m });
     };
     const lead = new Date(cursor.y, cursor.m, 1).getDay();
@@ -2370,7 +2385,6 @@ function TimeOffTab({ data, persist }) {
         cells.push(null);
     for (let d = 1; d <= dim; d++)
         cells.push(isoOf(cursor.y, cursor.m, d));
-    // Next three weeks, grouped by date — this is the "don't forget" list.
     const horizon = addDaysISO(today, 21);
     const upcoming = [];
     requests
@@ -2378,29 +2392,33 @@ function TimeOffTab({ data, persist }) {
         .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
         .forEach((r) => {
         const g = upcoming.find((x) => x.date === r.date);
-        if (g)
-            g.rows.push(r);
-        else
-            upcoming.push({ date: r.date, rows: [r] });
+        if (g) g.rows.push(r);
+        else upcoming.push({ date: r.date, rows: [r] });
     });
     const selRows = offOn(data, sel);
-    return (React.createElement("div", { className: "space-y-4" },
-        upcoming.length > 0 && (React.createElement("div", { className: "rounded p-3", style: { background: "#F4D9D2", border: "1px solid " + COLORS.tomato } },
-            React.createElement("div", { className: "text-xs font-semibold tracking-widest mb-2", style: { fontFamily: "Oswald", color: COLORS.tomatoDark } }, "HEADS UP \u2014 NEXT 3 WEEKS"),
-            React.createElement("div", { className: "flex flex-wrap gap-2" }, upcoming.map((g) => (React.createElement("button", { key: g.date, onClick: () => { setSel(g.date); const p = isoParts(g.date); setCursor({ y: p.y, m: p.m }); }, className: "text-left px-2.5 py-1.5 rounded", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "Inter" } },
-                React.createElement("div", { className: "text-xs font-semibold", style: { color: COLORS.crust } }, prettyDate(g.date)),
-                React.createElement("div", { className: "text-sm", style: { color: COLORS.tomatoDark } },
-                    "no ",
-                    g.rows.map((r) => r.name).join(", ")))))))),
-        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
+    const nameMatches = (r) => normPerson(confirmText) === normPerson(r.name) && confirmText.trim().length > 0;
+
+    return (React.createElement("div", null,
+        React.createElement("div", { className: "px-5 py-5 mb-4", style: { background: COLORS.crust, borderRadius: 20 } },
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#FF5B5B", textTransform: "uppercase" } }, "Time off"),
+            React.createElement("div", { style: { fontFamily: "Oswald", fontWeight: 600, fontSize: 34, lineHeight: 1.05, color: "#FFFFFF", marginTop: 4 } },
+                upcoming.length === 0 ? "Nobody's off" : upcoming.length + (upcoming.length === 1 ? " day booked" : " days booked")),
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#9A9AA6", marginTop: 6 } }, "Next three weeks \u00b7 anyone can add their own")),
+
+        upcoming.length > 0 && (React.createElement("div", { className: "px-4 py-4 mb-4", style: { background: "#FFF1F1", borderRadius: 16, border: "1px solid rgba(226,0,1,0.22)" } },
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: COLORS.tomatoDark, textTransform: "uppercase", marginBottom: 10 } }, "Heads up \u2014 next 3 weeks"),
+            React.createElement("div", { className: "flex flex-wrap gap-2" }, upcoming.map((g) => (React.createElement("button", { key: g.date,
+                onClick: () => { setSel(g.date); const p = isoParts(g.date); setCursor({ y: p.y, m: p.m }); },
+                className: "text-left px-3 py-2.5", style: { background: "#FFFFFF", border: "none", borderRadius: 12, fontFamily: "Inter", boxShadow: "0 1px 2px rgba(23,23,28,0.08)" } },
+                React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: COLORS.crust } }, prettyDate(g.date)),
+                React.createElement("div", { style: { fontSize: 14, fontWeight: 500, color: COLORS.tomatoDark, marginTop: 1 } }, "no " + g.rows.map((r) => r.name).join(", ")))))))),
+
+        React.createElement("div", { className: "px-4 py-4 mb-4", style: { background: COLORS.card, borderRadius: 18, boxShadow: CARD_SHADOW } },
             React.createElement("div", { className: "flex items-center justify-between mb-3" },
-                React.createElement("button", { onClick: () => shiftMonth(-1), className: "px-3 py-2 rounded text-lg", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, color: COLORS.crust } }, "\u2039"),
-                React.createElement("div", { className: "text-base font-semibold tracking-widest", style: { fontFamily: "Oswald", color: COLORS.crust } },
-                    MONFULL[cursor.m].toUpperCase(),
-                    " ",
-                    cursor.y),
-                React.createElement("button", { onClick: () => shiftMonth(1), className: "px-3 py-2 rounded text-lg", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, color: COLORS.crust } }, "\u203A")),
-            React.createElement("div", { className: "grid grid-cols-7 gap-1 mb-1" }, DOW3.map((d) => (React.createElement("div", { key: d, className: "text-center text-xs font-semibold py-1", style: { fontFamily: "Inter", color: COLORS.tomato } }, d)))),
+                React.createElement("button", { onClick: () => shiftMonth(-1), style: { background: "#F1F1F5", border: "none", borderRadius: 12, width: 44, height: 44, fontSize: 22, color: COLORS.crust, lineHeight: 1 } }, "\u2039"),
+                React.createElement("div", { style: { fontFamily: "Oswald", fontWeight: 600, fontSize: 21, letterSpacing: "0.01em", color: COLORS.crust } }, MONFULL[cursor.m] + " " + cursor.y),
+                React.createElement("button", { onClick: () => shiftMonth(1), style: { background: "#F1F1F5", border: "none", borderRadius: 12, width: 44, height: 44, fontSize: 22, color: COLORS.crust, lineHeight: 1 } }, "\u203A")),
+            React.createElement("div", { className: "grid grid-cols-7 gap-1 mb-1" }, DOW3.map((d) => (React.createElement("div", { key: d, className: "text-center py-1", style: { fontFamily: "Inter", fontSize: 11.5, fontWeight: 700, letterSpacing: "0.06em", color: INK3, textTransform: "uppercase" } }, d)))),
             React.createElement("div", { className: "grid grid-cols-7 gap-1" }, cells.map((iso, idx) => {
                 if (!iso)
                     return React.createElement("div", { key: "blank" + idx });
@@ -2408,49 +2426,61 @@ function TimeOffTab({ data, persist }) {
                 const isSel = iso === sel;
                 const isToday = iso === today;
                 const past = iso < today;
-                return (React.createElement("button", { key: iso, onClick: () => setSel(iso), className: "rounded p-1.5 text-left align-top", style: {
-                        minHeight: 62,
-                        background: isSel ? COLORS.parm : rows.length ? "#F4F4F7" : COLORS.cream,
-                        border: isToday ? "2px solid " + COLORS.basil : "1px solid " + COLORS.line,
-                        opacity: past && !isSel ? 0.55 : 1,
+                return (React.createElement("button", { key: iso, onClick: () => { setSel(iso); setConfirmId(""); }, className: "p-1.5 text-left align-top", style: {
+                        minHeight: 64, borderRadius: 10,
+                        background: isSel ? COLORS.crust : rows.length ? "#FFF1F1" : "#F8F8FB",
+                        border: isToday && !isSel ? "2px solid " + COLORS.basil : "1px solid " + (isSel ? COLORS.crust : COLORS.line),
+                        opacity: past && !isSel ? 0.5 : 1,
                         fontFamily: "Inter"
                     } },
-                    React.createElement("div", { className: "text-xs font-semibold", style: { color: COLORS.crust } }, isoParts(iso).d),
-                    rows.slice(0, 3).map((r) => (React.createElement("div", { key: r.id, className: "text-xs leading-tight truncate", style: { color: COLORS.tomatoDark } }, r.name))),
-                    rows.length > 3 && React.createElement("div", { className: "text-xs", style: { color: COLORS.tomatoDark } },
-                        "+",
-                        rows.length - 3)));
+                    React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: isSel ? "#FFFFFF" : COLORS.crust } }, isoParts(iso).d),
+                    rows.slice(0, 3).map((r) => (React.createElement("div", { key: r.id, className: "truncate", style: { fontSize: 11.5, fontWeight: 500, lineHeight: 1.3, color: isSel ? "#FF8A8A" : COLORS.tomatoDark } }, r.name))),
+                    rows.length > 3 && React.createElement("div", { style: { fontSize: 11.5, fontWeight: 600, color: isSel ? "#FF8A8A" : COLORS.tomatoDark } }, "+" + (rows.length - 3))));
             }))),
-        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
-            React.createElement("div", { className: "text-xs font-semibold tracking-widest mb-2", style: { fontFamily: "Oswald", color: COLORS.tomato } }, prettyDate(sel).toUpperCase()),
-            selRows.length === 0 && (React.createElement("div", { className: "text-sm italic mb-3", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "Everybody's available.")),
-            React.createElement("div", { className: "space-y-1.5 mb-3" }, selRows.map((r) => (React.createElement("div", { key: r.id, className: "flex items-center justify-between px-2.5 py-2 rounded", style: { background: COLORS.cream, fontFamily: "Inter" } },
-                React.createElement("span", { className: "text-sm" },
-                    React.createElement("strong", null, r.name),
-                    " is off",
-                    r.note ? React.createElement("span", { style: { color: "#777" } },
-                        " \u2014 ",
-                        r.note) : null),
-                React.createElement("button", { onClick: () => removeReq(r.id), className: "px-2 py-1" },
-                    React.createElement(Trash2, { size: 14, color: COLORS.tomato })))))),
-            React.createElement("div", { className: "text-xs mb-1.5", style: { fontFamily: "Inter", color: "#777" } }, "Tap a name to mark them off this day"),
-            React.createElement("div", { className: "flex flex-wrap gap-1.5 mb-3" }, names.map((n) => {
+
+        React.createElement("div", { className: "px-4 py-4", style: { background: COLORS.card, borderRadius: 18, boxShadow: CARD_SHADOW } },
+            React.createElement("div", { style: { fontFamily: "Oswald", fontWeight: 600, fontSize: 20, color: COLORS.crust, marginBottom: 12 } }, prettyDate(sel)),
+            selRows.length === 0 && (React.createElement("div", { className: "py-3", style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Everybody's available.")),
+            React.createElement("div", { className: "mb-4" }, selRows.map((r, i, arr) => {
+                const confirming = confirmId === r.id;
+                return React.createElement("div", { key: r.id, style: { borderBottom: i === arr.length - 1 ? "none" : "1px solid " + COLORS.line, padding: "10px 0" } },
+                    React.createElement("div", { className: "flex items-center justify-between gap-2" },
+                        React.createElement("div", { className: "min-w-0" },
+                            React.createElement("span", { style: { fontFamily: "Inter", fontSize: 16, fontWeight: 600, color: COLORS.crust } }, r.name),
+                            React.createElement("span", { style: { fontFamily: "Inter", fontSize: 16, color: INK2 } }, " is off"),
+                            r.note ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13.5, color: INK2, marginTop: 2 } }, r.note) : null),
+                        React.createElement("button", { onClick: () => { setConfirmId(confirming ? "" : r.id); setConfirmText(""); },
+                            style: { background: "transparent", border: "none", padding: 10, flexShrink: 0 } },
+                            React.createElement(Trash2, { size: 17, color: confirming ? COLORS.tomato : INK3 }))),
+                    confirming && React.createElement("div", { className: "mt-2 px-3 py-3", style: { background: "#FFF1F1", borderRadius: 12 } },
+                        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13.5, fontWeight: 500, color: COLORS.tomatoDark, marginBottom: 8 } },
+                            "Taking this off the calendar. Type " + r.name + " to confirm."),
+                        React.createElement("div", { className: "flex gap-2" },
+                            React.createElement("input", { autoFocus: true, value: confirmText, placeholder: r.name,
+                                onChange: (e) => setConfirmText(e.target.value),
+                                onKeyDown: (e) => { if (e.key === "Enter" && nameMatches(r)) removeReq(r.id); },
+                                className: "flex-1 px-3 outline-none opp-field" }),
+                            React.createElement("button", { onClick: () => { if (nameMatches(r)) removeReq(r.id); },
+                                disabled: !nameMatches(r),
+                                style: { background: nameMatches(r) ? COLORS.tomato : "#E8E8EE", color: nameMatches(r) ? "#FFFFFF" : INK3,
+                                         border: "none", borderRadius: 12, fontFamily: "Inter", fontSize: 15, fontWeight: 600, padding: "0 18px", minHeight: 46 } }, "Remove"))));
+            })),
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: INK3, textTransform: "uppercase", marginBottom: 8 } }, "Tap a name to mark them off"),
+            React.createElement("div", { className: "flex flex-wrap gap-2 mb-4" }, names.map((n) => {
                 const already = selRows.some((r) => normPerson(r.name) === normPerson(n));
-                return (React.createElement("button", { key: n, onClick: () => { if (!already)
-                        addFor(n); }, className: "px-3 py-2 rounded text-sm", style: {
-                        background: already ? COLORS.tomato : COLORS.cream,
-                        color: already ? COLORS.cream : COLORS.crust,
-                        border: "1px solid " + (already ? COLORS.tomato : COLORS.line),
-                        fontFamily: "Inter",
-                        opacity: already ? 0.65 : 1
+                return (React.createElement("button", { key: n, onClick: () => { if (!already) addFor(n); }, style: {
+                        background: already ? COLORS.tomato : "#F1F1F5",
+                        color: already ? "#FFFFFF" : COLORS.crust,
+                        border: "none", borderRadius: 999, padding: "0 16px", minHeight: 44,
+                        fontFamily: "Inter", fontSize: 15, fontWeight: 600
                     } }, n));
             })),
             React.createElement("div", { className: "flex flex-col sm:flex-row gap-2" },
-                React.createElement("input", { placeholder: "Someone not on the list", value: typed, onChange: (e) => setTyped(e.target.value), className: "text-sm px-2.5 py-2 rounded outline-none flex-1", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
-                React.createElement("input", { placeholder: "Reason (optional)", value: note, onChange: (e) => setNote(e.target.value), className: "text-sm px-2.5 py-2 rounded outline-none flex-1", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
-                React.createElement(TicketButton, { onClick: () => addFor(typed), color: COLORS.basil, style: { justifyContent: "center" } },
-                    React.createElement(Plus, { size: 13 }),
-                    " Add")))));
+                React.createElement("input", { placeholder: "Someone not on the list", value: typed, onChange: (e) => setTyped(e.target.value), className: "px-3 outline-none opp-field flex-1" }),
+                React.createElement("input", { placeholder: "Reason (optional)", value: note, onChange: (e) => setNote(e.target.value), className: "px-3 outline-none opp-field flex-1" }),
+                React.createElement("button", { onClick: () => addFor(typed), className: "flex items-center justify-center gap-1.5",
+                    style: { background: COLORS.tomato, color: "#FFFFFF", border: "none", borderRadius: 12, fontFamily: "Inter", fontSize: 15, fontWeight: 600, minHeight: 46, padding: "0 20px" } },
+                    React.createElement(Plus, { size: 16 }), "Add")))));
 }
 // ===================== TIPS TAB =====================
 const DAY_SPAN = "11-4";
@@ -2601,7 +2631,7 @@ function CrewPicker({ names, crew, setCrew, extra, setExtra }) {
             }),
             crew.filter((c) => !names.some((n) => normPerson(n) === normPerson(c))).map((c) => (React.createElement("button", { key: "x" + c, onClick: () => setCrew(crew.filter((z) => z !== c)), className: "px-3 py-2 rounded text-sm", style: { background: COLORS.basil, color: COLORS.cream, border: "1px solid " + COLORS.basil, fontFamily: "Inter" } }, c)))),
         React.createElement("div", { className: "flex gap-2" },
-            React.createElement("input", { placeholder: "Add someone else", value: extra, onChange: (e) => setExtra(e.target.value), className: "text-sm px-2.5 py-2 rounded outline-none flex-1", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
+            React.createElement("input", { placeholder: "Add someone else", value: extra, onChange: (e) => setExtra(e.target.value), className: "px-3 py-2.5 rounded outline-none opp-field flex-1", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
             React.createElement(TicketButton, { color: COLORS.basil, onClick: () => { const v = extra.trim(); if (v) {
                     setCrew(crew.concat([v]));
                     setExtra("");
@@ -2631,7 +2661,7 @@ function PayoutTable({ split, pot, byHours, times, setTimes, shares, setShares, 
     const cols = byHours ? "minmax(0,1.15fr) 0.95fr 0.8fr 0.85fr" : "minmax(0,1.6fr) 0.9fr 0.85fr";
     if (!split.rows.length)
         return null;
-    return (React.createElement("div", { className: "rounded mt-2", style: { background: COLORS.cream, border: "1px solid " + COLORS.line } },
+    return (React.createElement("div", { className: "rounded mt-2", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line } },
         React.createElement("div", { className: "grid gap-1.5 px-2.5 pt-2 pb-1 text-xs", style: { gridTemplateColumns: cols, fontFamily: "Inter", color: "#9A9AA6" } },
             React.createElement("div", null, "Who"),
             byHours ? React.createElement("div", null, "Hours worked") : null,
@@ -2882,7 +2912,7 @@ function TipsTab({ data, persist }) {
         daySplit.pot === 0 && nightSplit.pot === 0;
     const blocked = emptyForm || (existing && !okReplace);
     return (React.createElement("div", { className: "space-y-4" },
-        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
+        React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("div", { className: "flex flex-wrap items-end gap-3" },
                 React.createElement("div", null,
                     React.createElement("div", { className: "text-xs mb-1", style: { fontFamily: "Inter", color: "#777" } }, "Business day"),
@@ -2892,8 +2922,8 @@ function TipsTab({ data, persist }) {
                     React.createElement("select", { value: closeHour, onChange: (e) => setClose(Number(e.target.value)), className: "text-base px-2.5 py-2 rounded outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", background: COLORS.cream } }, CLOSE_CHOICES.map((c) => React.createElement("option", { key: c.h, value: c.h }, c.label)))),
                 React.createElement("div", { className: "text-sm pb-2", style: { fontFamily: "Inter", color: existing ? COLORS.tomatoDark : "#9A9AA6" } }, existing ? "Already logged — saving will replace it" : prettyDate(date)),
                 !existing && !emptyForm ? (React.createElement("div", { className: "text-sm pb-2 ml-auto", style: { fontFamily: "Inter", color: COLORS.basil } }, "Held \u2014 comes back when you do, on any tablet")) : null)),
-        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
-            React.createElement("div", { className: "text-xs font-semibold tracking-widest mb-2", style: { fontFamily: "Oswald", color: COLORS.tomato } },
+        React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
+            React.createElement("div", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#6D6D78" } },
                 "DAY SHIFT \u00B7 ",
                 dayCrew.length,
                 " ",
@@ -2904,11 +2934,11 @@ function TipsTab({ data, persist }) {
                 React.createElement(MoneyField, { label: "Credit card tips (day)", value: dayCC, onChange: setDayCC, hint: "gets subtracted from the night side" }),
                 React.createElement("div", { className: "flex-1", style: { minWidth: 120 } },
                     React.createElement("div", { className: "text-xs mb-1", style: { fontFamily: "Inter", color: "#777" } }, "Day pot"),
-                    React.createElement("div", { className: "text-base px-2.5 py-2 rounded", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }, money(dayTotal)))),
+                    React.createElement("div", { className: "text-base px-2.5 py-2 rounded", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }, money(dayTotal)))),
             React.createElement(SplitModeToggle, { byHours: dayByHours, setByHours: setDayByHours, defSpan: DAY_SPAN, split: daySplit }),
             React.createElement(PayoutTable, { split: daySplit, pot: dayTotal, byHours: dayByHours, times: dayTimes, setTimes: setDayTimes, shares: dayShares, setShares: setDayShares, defSpan: DAY_SPAN, paidMap: dayPaidMap, setPaidMap: setDayPaidMap })),
-        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
-            React.createElement("div", { className: "text-xs font-semibold tracking-widest mb-2", style: { fontFamily: "Oswald", color: COLORS.tomato } },
+        React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
+            React.createElement("div", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#6D6D78" } },
                 "NIGHT SHIFT \u00B7 ",
                 nightCrew.length,
                 " ",
@@ -2918,10 +2948,10 @@ function TipsTab({ data, persist }) {
                 React.createElement(MoneyField, { label: "Credit card tips \u2014 WHOLE day", value: ccAll, onChange: setCcAll }),
                 React.createElement("div", { className: "flex-1", style: { minWidth: 120 } },
                     React.createElement("div", { className: "text-xs mb-1", style: { fontFamily: "Inter", color: "#777" } }, "\u2212 Day CC (from above)"),
-                    React.createElement("div", { className: "text-base px-2.5 py-2 rounded", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }, money(num(dayCC)))),
+                    React.createElement("div", { className: "text-base px-2.5 py-2 rounded", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }, money(num(dayCC)))),
                 React.createElement(MoneyField, { label: "\u2212 Delivery (3rd party)", value: delivery, onChange: setDelivery, hint: "comes off before the split" }),
                 React.createElement(MoneyField, { label: "+ Night cash", value: nightCash, onChange: setNightCash })),
-            React.createElement("div", { className: "mt-3 text-sm px-2.5 py-2 rounded", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono", color: COLORS.crust } },
+            React.createElement("div", { className: "mt-3 text-sm px-2.5 py-2 rounded", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono", color: COLORS.crust } },
                 money(num(ccAll)),
                 " \u2212 ",
                 money(num(dayCC)),
@@ -2935,9 +2965,9 @@ function TipsTab({ data, persist }) {
                 React.createElement("strong", null, money(nightTotal))),
             React.createElement(SplitModeToggle, { byHours: nightByHours, setByHours: setNightByHours, defSpan: NIGHT_SPAN, split: nightSplit }),
             React.createElement(PayoutTable, { split: nightSplit, pot: nightTotal, byHours: nightByHours, times: nightTimes, setTimes: setNightTimes, shares: nightShares, setShares: setNightShares, defSpan: NIGHT_SPAN, paidMap: nightPaidMap, setPaidMap: setNightPaidMap })),
-        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
-            React.createElement("input", { placeholder: "Note for Val (who was off, anything unusual)", value: note, onChange: (e) => setNote(e.target.value), className: "text-sm px-2.5 py-2 rounded outline-none w-full mb-3", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
-            existing ? (React.createElement("button", { onClick: () => setOkReplace(!okReplace), className: "flex items-start gap-2.5 w-full text-left px-2.5 py-2.5 rounded mb-2", style: { background: okReplace ? "#F4D9D2" : COLORS.cream, border: "1px solid " + COLORS.tomato } },
+        React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
+            React.createElement("input", { placeholder: "Note for Val (who was off, anything unusual)", value: note, onChange: (e) => setNote(e.target.value), className: "px-3 py-2.5 rounded outline-none opp-field w-full mb-3", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
+            existing ? (React.createElement("button", { onClick: () => setOkReplace(!okReplace), className: "flex items-start gap-2.5 w-full text-left px-2.5 py-2.5 rounded mb-2", style: { background: okReplace ? "#FFF1F1" : COLORS.cream, border: "1px solid " + COLORS.tomato } },
                 React.createElement("span", { className: "flex items-center justify-center rounded flex-shrink-0", style: { width: 22, height: 22, marginTop: 1, border: "2px solid " + COLORS.tomato, background: okReplace ? COLORS.tomato : "transparent" } }, okReplace ? React.createElement(Check, { size: 13, color: COLORS.cream }) : null),
                 React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } },
                     prettyDate(date),
@@ -2949,15 +2979,15 @@ function TipsTab({ data, persist }) {
                     " ",
                     existing ? "Replace this night" : "Save the night"),
                 React.createElement(TicketButton, { onClick: clearForm, color: COLORS.line, style: { color: COLORS.crust } }, "Clear"))),
-        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
+        React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("div", { className: "flex items-center justify-between mb-2" },
-                React.createElement("div", { className: "text-xs font-semibold tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato } }, "TIP LOG"),
+                React.createElement("div", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#6D6D78" } }, "TIP LOG"),
                 log.length > 0 && (React.createElement(TicketButton, { color: COLORS.basil, onClick: () => copyOut(log.slice(0, 31).map(tipEntryText).join("\n\n"), "all") },
                     React.createElement(Copy, { size: 13 }),
                     " ",
                     copied === "all" ? "Copied" : "Copy for Val"))),
             log.length === 0 && React.createElement("div", { className: "text-sm italic", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "Nothing logged yet."),
-            React.createElement("div", { className: "space-y-1.5" }, log.map((e) => (React.createElement("div", { key: e.id, className: "rounded", style: { background: COLORS.cream, border: "1px solid " + COLORS.line } },
+            React.createElement("div", { className: "space-y-1.5" }, log.map((e) => (React.createElement("div", { key: e.id, className: "rounded", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line } },
                 React.createElement("button", { onClick: () => setOpen(open === e.id ? "" : e.id), className: "w-full text-left px-3 py-2.5 flex items-center justify-between gap-2" },
                     React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter" } },
                         React.createElement("strong", null, prettyDate(e.date)),
@@ -3355,37 +3385,37 @@ function TimersTab({ data, persist, timers, setTimers, now }) {
     };
     const running = (timers || []).slice().sort((a, b) => a.endsAt - b.endsAt);
     return (React.createElement("div", { className: "space-y-4" },
-        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
-            React.createElement("div", { className: "text-xs font-semibold tracking-widest mb-2", style: { fontFamily: "Oswald", color: COLORS.tomato } }, "TAP TO START"),
-            React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-2" }, presets.map((p) => (React.createElement("button", { key: p.id, onClick: () => startTimer(setTimers, p.label, p.seconds), className: "px-3 py-3 rounded text-left", style: { background: COLORS.cream, border: "1px solid " + COLORS.line } },
+        React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
+            React.createElement("div", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#6D6D78" } }, "TAP TO START"),
+            React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-2" }, presets.map((p) => (React.createElement("button", { key: p.id, onClick: () => startTimer(setTimers, p.label, p.seconds), className: "px-3 py-3 rounded text-left", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line } },
                 React.createElement("div", { className: "text-sm truncate", style: { fontFamily: "Inter", color: COLORS.crust } }, p.label),
                 React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: 20, fontWeight: 700, color: COLORS.tomato } }, mmss(p.seconds)))))),
             React.createElement("div", { className: "text-xs mt-2", style: { fontFamily: "Inter", color: COLORS.tomatoDark } }, "These times are starting points \u2014 set them to yours before anyone relies on them.")),
-        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
-            React.createElement("div", { className: "text-xs font-semibold tracking-widest mb-2", style: { fontFamily: "Oswald", color: COLORS.tomato } }, "ONE-OFF"),
+        React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
+            React.createElement("div", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#6D6D78" } }, "ONE-OFF"),
             React.createElement("div", { className: "flex flex-wrap items-end gap-2" },
                 React.createElement("input", { placeholder: "What for (optional)", value: label, onChange: (e) => setLabel(e.target.value), className: "text-base px-2.5 py-2 rounded outline-none flex-1", style: { minWidth: 130, border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
                 React.createElement("input", { inputMode: "numeric", placeholder: "min", value: mins, onChange: (e) => setMins(e.target.value), className: "text-base px-2 py-2 rounded outline-none text-center", style: { width: 62, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }),
                 React.createElement("input", { inputMode: "numeric", placeholder: "sec", value: secs, onChange: (e) => setSecs(e.target.value), className: "text-base px-2 py-2 rounded outline-none text-center", style: { width: 62, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }),
                 React.createElement(TicketButton, { onClick: quickStart }, "Start")),
-            React.createElement("div", { className: "flex flex-wrap gap-1.5 mt-2" }, [1, 2, 3, 5, 8, 10, 15, 20].map((m) => (React.createElement("button", { key: m, onClick: () => startTimer(setTimers, m + " min", m * 60), className: "text-sm px-3 py-2 rounded-full", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "Inter", color: COLORS.crust } },
+            React.createElement("div", { className: "flex flex-wrap gap-1.5 mt-2" }, [1, 2, 3, 5, 8, 10, 15, 20].map((m) => (React.createElement("button", { key: m, onClick: () => startTimer(setTimers, m + " min", m * 60), className: "text-sm px-3 py-2 rounded-full", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line, fontFamily: "Inter", color: COLORS.crust } },
                 m,
                 "m"))))),
-        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
+        React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("div", { className: "flex items-center justify-between mb-2" },
-                React.createElement("div", { className: "text-xs font-semibold tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato } }, "RUNNING \u00b7 " + running.length),
-                running.length > 1 ? (React.createElement("button", { onClick: () => setTimers([]), className: "text-xs px-2.5 py-1.5 rounded", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "Inter", color: COLORS.crust } }, "Clear all")) : null),
+                React.createElement("div", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#6D6D78" } }, "RUNNING \u00b7 " + running.length),
+                running.length > 1 ? (React.createElement("button", { onClick: () => setTimers([]), className: "text-xs px-2.5 py-1.5 rounded", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line, fontFamily: "Inter", color: COLORS.crust } }, "Clear all")) : null),
             running.length === 0 ? (React.createElement("div", { className: "text-sm italic", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "Nothing running. Timers float over every tab once started.")) : (React.createElement("div", { className: "space-y-1.5" }, running.map((t) => {
                 const left = t.endsAt - now;
                 const done = left <= 0;
-                return (React.createElement("div", { key: t.id, className: "flex items-center gap-2 px-3 py-2 rounded", style: { background: done ? "#F4D9D2" : COLORS.cream, border: "1px solid " + (done ? COLORS.tomato : COLORS.line) } },
+                return (React.createElement("div", { key: t.id, className: "flex items-center gap-2 px-3 py-2 rounded", style: { background: done ? "#FFF1F1" : COLORS.cream, border: "1px solid " + (done ? COLORS.tomato : COLORS.line) } },
                     React.createElement("span", { className: "flex-1 text-sm truncate", style: { fontFamily: "Inter", color: COLORS.crust } }, t.label),
                     React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: 18, color: done ? COLORS.tomatoDark : COLORS.crust } }, clockText(left)),
                     React.createElement("button", { onClick: () => setTimers((prev) => (prev || []).filter((x) => x.id !== t.id)), className: "px-2 py-1.5", style: { background: "transparent", border: "none" } },
                         React.createElement(Trash2, { size: 14, color: COLORS.tomato }))));
             })))),
-        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
-            React.createElement("div", { className: "text-xs font-semibold tracking-widest mb-1", style: { fontFamily: "Oswald", color: COLORS.tomato } }, "ALARM ON THIS TABLET"),
+        React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
+            React.createElement("div", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#6D6D78" } }, "ALARM ON THIS TABLET"),
             React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: "#6D6D78" } }, "Set per tablet \\u2014 the one by the hood can be loud without the prep area being loud."),
             React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-2" }, ALARM_SOUNDS.map((sn) => {
                 const on = sound === sn.id;
@@ -3404,9 +3434,9 @@ function TimersTab({ data, persist, timers, setTimers, now }) {
                 React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13, color: COLORS.crust, minWidth: 38, textAlign: "right" } }, Math.round(vol * 100) + "%"),
                 React.createElement(TicketButton, { color: COLORS.basil, onClick: () => playAlarm(sound, vol) }, "Test")),
             React.createElement("div", { className: "text-xs mt-2", style: { fontFamily: "Inter", color: "#a0937f" } }, "Tablet volume still has the final say \\u2014 turn it up on the device too.")),
-        React.createElement("div", { className: "rounded p-3", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
+        React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("button", { onClick: () => setEditing(!editing), className: "w-full flex items-center justify-between" },
-                React.createElement("span", { className: "text-xs font-semibold tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato } }, "EDIT THE PRESET TIMES"),
+                React.createElement("span", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#6D6D78" } }, "EDIT THE PRESET TIMES"),
                 React.createElement("span", { style: { color: COLORS.tomato, fontFamily: "Inter" } }, editing ? "\u25b4" : "\u25be")),
             editing ? (React.createElement("div", { className: "mt-3 space-y-1.5" },
                 presets.map((p) => (React.createElement("div", { key: p.id, className: "flex items-center gap-2 px-2.5 py-2 rounded", style: { background: COLORS.cream } },
@@ -3417,9 +3447,9 @@ function TimersTab({ data, persist, timers, setTimers, now }) {
                     React.createElement("button", { onClick: () => removePreset(p.id), className: "px-1.5 py-1.5", style: { background: "transparent", border: "none" } },
                         React.createElement(Trash2, { size: 13, color: "#9A9AA6" }))))),
                 React.createElement("div", { className: "flex flex-wrap items-end gap-2 pt-2" },
-                    React.createElement("input", { placeholder: "New preset", value: newLabel, onChange: (e) => setNewLabel(e.target.value), className: "text-sm px-2.5 py-2 rounded outline-none flex-1", style: { minWidth: 120, border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
-                    React.createElement("input", { inputMode: "numeric", placeholder: "min", value: newMins, onChange: (e) => setNewMins(e.target.value), className: "text-sm px-2 py-2 rounded outline-none text-center", style: { width: 58, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }),
-                    React.createElement("input", { inputMode: "numeric", placeholder: "sec", value: newSecs, onChange: (e) => setNewSecs(e.target.value), className: "text-sm px-2 py-2 rounded outline-none text-center", style: { width: 58, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }),
+                    React.createElement("input", { placeholder: "New preset", value: newLabel, onChange: (e) => setNewLabel(e.target.value), className: "px-3 py-2.5 rounded outline-none opp-field flex-1", style: { minWidth: 120, border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
+                    React.createElement("input", { inputMode: "numeric", placeholder: "min", value: newMins, onChange: (e) => setNewMins(e.target.value), className: "px-3 py-2.5 rounded outline-none opp-field text-center", style: { width: 58, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }),
+                    React.createElement("input", { inputMode: "numeric", placeholder: "sec", value: newSecs, onChange: (e) => setNewSecs(e.target.value), className: "px-3 py-2.5 rounded outline-none opp-field text-center", style: { width: 58, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }),
                     React.createElement(TicketButton, { color: COLORS.basil, onClick: addPreset },
                         React.createElement(Plus, { size: 13 }),
                         " Add")))) : null)));
@@ -3515,20 +3545,20 @@ function StaffTab({ data, persist }) {
     },
     /* @__PURE__ */ React.createElement("option", { value: "" }, "Select a position..."),
     allPositions.map((p) => /* @__PURE__ */ React.createElement("option", { key: p, value: p }, p))
-  ), fillPosition && (fillCandidates.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "No one's listed for ", fillPosition, " yet.") : /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, fillCandidates.map(({ s, p }) => /* @__PURE__ */ React.createElement("div", { key: s.id, className: "flex items-center justify-between text-sm", style: { fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(Stars, { value: p.skill }), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { color: "#888" } }, s.phone || "no number"))))))), adding && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-3 rounded space-y-1.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("input", { placeholder: "Name", value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full text-sm px-2.5 py-2 rounded outline-none", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full text-sm px-2.5 py-2 rounded outline-none", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: addStaff, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => {
+  ), fillPosition && (fillCandidates.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "No one's listed for ", fillPosition, " yet.") : /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, fillCandidates.map(({ s, p }) => /* @__PURE__ */ React.createElement("div", { key: s.id, className: "flex items-center justify-between text-sm", style: { fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(Stars, { value: p.skill }), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { color: "#888" } }, s.phone || "no number"))))))), adding && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-3 rounded space-y-1.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("input", { placeholder: "Name", value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: addStaff, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => {
     setAdding(false);
     setDraft({ name: "", phone: "" });
   }, color: "#888" }, "Cancel"))), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, staff.map((s) => {
     const editing = editingId === s.id;
     const open = expanded === s.id;
     const pd = posDraft[s.id] || { name: "", skill: 3 };
-    return /* @__PURE__ */ React.createElement("div", { key: s.id, className: "rounded px-3 py-2.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, editing ? /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, /* @__PURE__ */ React.createElement("input", { value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full text-sm px-2.5 py-2 rounded outline-none", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full text-sm px-2.5 py-2 rounded outline-none", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: saveEdit, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => setEditingId(null), color: "#888" }, "Cancel"))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "flex items-start justify-between gap-2 cursor-pointer", onClick: () => setExpanded(open ? null : s.id) }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#888" } }, s.phone || "no number on file", (s.positions || []).length > 0 && " \xB7 " + s.positions.map((p) => p.name).join(", "))), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 shrink-0" }, /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+    return /* @__PURE__ */ React.createElement("div", { key: s.id, className: "rounded px-3 py-2.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, editing ? /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, /* @__PURE__ */ React.createElement("input", { value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: saveEdit, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => setEditingId(null), color: "#888" }, "Cancel"))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "flex items-start justify-between gap-2 cursor-pointer", onClick: () => setExpanded(open ? null : s.id) }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#888" } }, s.phone || "no number on file", (s.positions || []).length > 0 && " \xB7 " + s.positions.map((p) => p.name).join(", "))), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 shrink-0" }, /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
       e.stopPropagation();
       startEdit(s);
     }, className: "text-xs px-2 py-0.5 rounded", style: { fontFamily: "Inter", border: `1px solid ${COLORS.line}`, color: COLORS.crust } }, "Edit"), /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
       e.stopPropagation();
       remove(s.id);
-    } }, /* @__PURE__ */ React.createElement(Trash2, { size: 13, color: "#9A9AA6" })), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "JetBrains Mono", color: "#9A9AA6" } }, open ? "\u2212" : "+"))), open && /* @__PURE__ */ React.createElement("div", { className: "mt-2.5 pt-2.5", style: { borderTop: `1px dashed ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-1", style: { fontFamily: "Inter", color: COLORS.crust } }, "Positions & skill"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1 mb-2" }, (s.positions || []).map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, className: "flex items-center justify-between" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.crust } }, p.name), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(Stars, { value: p.skill, onChange: (n) => setPositionSkill(s.id, p.id, n) }), /* @__PURE__ */ React.createElement("button", { onClick: () => removePosition(s.id, p.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 12, color: "#9A9AA6" }))))), (s.positions || []).length === 0 && /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "No positions listed yet.")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 mb-3" }, /* @__PURE__ */ React.createElement(
+    } }, /* @__PURE__ */ React.createElement(Trash2, { size: 13, color: "#9A9AA6" })), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "JetBrains Mono", color: "#9A9AA6" } }, open ? "\u2212" : "+"))), open && /* @__PURE__ */ React.createElement("div", { className: "mt-2.5 pt-2.5", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-1", style: { fontFamily: "Inter", color: COLORS.crust } }, "Positions & skill"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1 mb-2" }, (s.positions || []).map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, className: "flex items-center justify-between" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.crust } }, p.name), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(Stars, { value: p.skill, onChange: (n) => setPositionSkill(s.id, p.id, n) }), /* @__PURE__ */ React.createElement("button", { onClick: () => removePosition(s.id, p.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 12, color: "#9A9AA6" }))))), (s.positions || []).length === 0 && /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "No positions listed yet.")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 mb-3" }, /* @__PURE__ */ React.createElement(
       "select",
       {
         value: pd.name,
@@ -3743,7 +3773,7 @@ function InvoiceScanner({ data, persist, onClose }) {
     /* @__PURE__ */ React.createElement(
       "div",
       { className: "flex-1 overflow-y-auto p-4" },
-      err ? /* @__PURE__ */ React.createElement("div", { className: "text-sm px-3 py-2.5 rounded mb-3", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } }, err) : null,
+      err ? /* @__PURE__ */ React.createElement("div", { className: "text-sm px-3 py-2.5 rounded mb-3", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } }, err) : null,
       applied ? /* @__PURE__ */ React.createElement(
         "div",
         { className: "text-center py-10" },
@@ -3956,7 +3986,7 @@ function InventoryTab({ data, persist }) {
           style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono", color: isLow ? COLORS.tomatoDark : COLORS.crust }
         }
       ), /* @__PURE__ */ React.createElement("span", { className: "text-xs w-14", style: { fontFamily: "Inter", color: "#888" } }, i.unit), /* @__PURE__ */ React.createElement("button", { onClick: () => remove(i.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 13, color: "#9A9AA6" })))),
-      showCost && /* @__PURE__ */ React.createElement("div", { className: "mt-2.5 pt-2.5 space-y-1.5", style: { borderTop: `1px dashed ${COLORS.line}` } },
+      showCost && /* @__PURE__ */ React.createElement("div", { className: "mt-2.5 pt-2.5 space-y-1.5", style: { borderTop: `1px solid ${COLORS.line}` } },
         ["qfc", "thomsen"].map((vk) => {
           const p = (i.prices || {})[vk];
           const best = costOf(i);
@@ -3999,7 +4029,7 @@ function InventoryTab({ data, persist }) {
         )
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5 items-center pt-2", style: { borderTop: `1px dashed ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("input", { placeholder: "Item", value: draft.item, onChange: (e) => setDraft({ ...draft, item: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none flex-1 min-w-[100px]", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Qty", type: "number", value: draft.qty, onChange: (e) => setDraft({ ...draft, qty: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Unit", value: draft.unit, onChange: (e) => setDraft({ ...draft, unit: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Low at", type: "number", value: draft.low, onChange: (e) => setDraft({ ...draft, low: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Cost $", type: "number", step: "0.01", value: draft.cost, onChange: (e) => setDraft({ ...draft, cost: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("select", { value: draft.vendor, onChange: (e) => setDraft({ ...draft, vendor: e.target.value }), className: "text-sm px-2 py-2 rounded outline-none w-24", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", background: "white" } }, React.createElement("option", { value: "" }, "Vendor"), React.createElement("option", { value: "QFC" }, "Quality"), React.createElement("option", { value: "Thomsen" }, "Thomsen")), /* @__PURE__ */ React.createElement(TicketButton, { onClick: add, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 13 }), " Add")), /* @__PURE__ */ React.createElement("div", { className: "mt-4 pt-3", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, "Storage Map"), /* @__PURE__ */ React.createElement(
+  })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5 items-center pt-2", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("input", { placeholder: "Item", value: draft.item, onChange: (e) => setDraft({ ...draft, item: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none flex-1 min-w-[100px]", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Qty", type: "number", value: draft.qty, onChange: (e) => setDraft({ ...draft, qty: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Unit", value: draft.unit, onChange: (e) => setDraft({ ...draft, unit: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Low at", type: "number", value: draft.low, onChange: (e) => setDraft({ ...draft, low: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Cost $", type: "number", step: "0.01", value: draft.cost, onChange: (e) => setDraft({ ...draft, cost: e.target.value }), className: "text-xs px-2 py-1.5 rounded outline-none w-16", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("select", { value: draft.vendor, onChange: (e) => setDraft({ ...draft, vendor: e.target.value }), className: "px-3 py-2.5 rounded outline-none opp-field w-24", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", background: "white" } }, React.createElement("option", { value: "" }, "Vendor"), React.createElement("option", { value: "QFC" }, "Quality"), React.createElement("option", { value: "Thomsen" }, "Thomsen")), /* @__PURE__ */ React.createElement(TicketButton, { onClick: add, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 13 }), " Add")), /* @__PURE__ */ React.createElement("div", { className: "mt-4 pt-3", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, "Storage Map"), /* @__PURE__ */ React.createElement(
     "button",
     {
       onClick: () => setShowMap((s) => !s),
@@ -4033,7 +4063,7 @@ function InventoryTab({ data, persist }) {
       placeholder: "Area name (e.g. Walk-in cooler)",
       value: mapDraft.area,
       onChange: (e) => setMapDraft({ ...mapDraft, area: e.target.value }),
-      className: "w-full text-sm px-2.5 py-2 rounded outline-none",
+      className: "w-full px-3 py-2.5 rounded outline-none opp-field",
       style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
     }
   ), /* @__PURE__ */ React.createElement(
@@ -4043,7 +4073,7 @@ function InventoryTab({ data, persist }) {
       value: mapDraft.items,
       onChange: (e) => setMapDraft({ ...mapDraft, items: e.target.value }),
       rows: 2,
-      className: "w-full text-sm px-2.5 py-2 rounded outline-none",
+      className: "w-full px-3 py-2.5 rounded outline-none opp-field",
       style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
     }
   ), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: addMapArea, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 13 }), " Add area"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => {
@@ -4416,7 +4446,7 @@ function RecipesTab({ data, persist }) {
       placeholder: "Recipe name",
       value: draft.name,
       onChange: (e) => setDraft({ ...draft, name: e.target.value }),
-      className: "w-full text-sm px-2.5 py-2 rounded outline-none",
+      className: "w-full px-3 py-2.5 rounded outline-none opp-field",
       style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
     }
   ), /* @__PURE__ */ React.createElement(
@@ -4426,7 +4456,7 @@ function RecipesTab({ data, persist }) {
       value: draft.steps,
       onChange: (e) => setDraft({ ...draft, steps: e.target.value }),
       rows: 8,
-      className: "w-full text-sm px-2.5 py-2 rounded outline-none",
+      className: "w-full px-3 py-2.5 rounded outline-none opp-field",
       style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
     }
   ), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: onSave, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: onCancel, color: "#888" }, "Cancel")));
@@ -4454,14 +4484,19 @@ function RecipesTab({ data, persist }) {
         e.stopPropagation();
         remove(r.id);
       } }, /* @__PURE__ */ React.createElement(Trash2, { size: 13, color: "#9A9AA6" })), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "JetBrains Mono", color: "#9A9AA6" } }, open ? "\u2212" : "+"))
-    ), open && !editing && /* @__PURE__ */ React.createElement("div", { className: "px-3 pb-3 text-sm whitespace-pre-wrap", style: { fontFamily: "Inter", color: COLORS.crust, borderTop: `1px dashed ${COLORS.line}`, paddingTop: 10 } }, r.steps), editing && /* @__PURE__ */ React.createElement("div", { className: "px-3 pb-3" }, editorBox(saveEdit, () => {
+    ), open && !editing && /* @__PURE__ */ React.createElement("div", { className: "px-3 pb-3 text-sm whitespace-pre-wrap", style: { fontFamily: "Inter", color: COLORS.crust, borderTop: `1px solid ${COLORS.line}`, paddingTop: 10 } }, r.steps), editing && /* @__PURE__ */ React.createElement("div", { className: "px-3 pb-3" }, editorBox(saveEdit, () => {
       setEditingId(null);
       setDraft({ name: "", steps: "" });
     })));
   })));
 }
 function SectionHeader({ children }) {
-  return /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-2 mt-5 tracking-widest", style: { fontFamily: "Oswald", color: COLORS.tomato } }, children);
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    { className: "flex items-center gap-2 mb-2.5 mt-6 px-1" },
+    /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: "#6D6D78", textTransform: "uppercase" } }, children),
+    /* @__PURE__ */ React.createElement("span", { style: { flex: 1, height: 1, background: COLORS.line } })
+  );
 }
 // What a given vendor calls this item, when that differs from what we call it.
 // One line on the order sheet, but the rep still gets the exact product.
@@ -4658,7 +4693,7 @@ function PriceDetail({ i, vendorOf, patch }) {
         verdict = VENDOR_SHORT[winner] + " is $" + c.diff.toFixed(2) + " cheaper per " + base +
             " ($" + Math.min(c.qb, c.tb).toFixed(2) + " vs $" + Math.max(c.qb, c.tb).toFixed(2) + ")" + perOrder + ".";
     }
-    return (React.createElement("div", { className: "mt-2 pt-2.5", style: { borderTop: "1px dashed " + COLORS.line } },
+    return (React.createElement("div", { className: "mt-2 pt-2.5", style: { borderTop: "1px solid " + COLORS.line } },
         React.createElement("div", { className: "flex gap-2 flex-wrap" },
             col("qfc", "QFC"),
             col("thomsen", "Thomsen")),
@@ -4836,7 +4871,7 @@ function FoodOrderTab({ data, persist }) {
                     color: view === v.id ? COLORS.cream : COLORS.crust
                 } }, v.label + " (" + v.n + ")"))),
             React.createElement("span", { className: "text-xs ml-auto", style: { fontFamily: "Inter", color: "#6D6D78" } }, "tap an item for both prices")),
-        view === "packs" ? (React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded", style: { background: COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "Inter", color: COLORS.crust } },
+        view === "packs" ? (React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line, fontFamily: "Inter", color: COLORS.crust } },
             "These have a price from both vendors, but on different units \u2014 Quality usually quotes by the pound and Thomsen by the case. Enter how many ",
             "of our unit",
             " are in one of theirs and the comparison turns on for good.")) : null,
@@ -5114,7 +5149,7 @@ function PrepParTab({ data, persist }) {
         value: newFlag,
         onChange: (e) => setNewFlag(e.target.value),
         onKeyDown: (e) => e.key === "Enter" && addFlag(),
-        className: "flex-1 text-base px-3 py-2.5 rounded outline-none",
+        className: "flex-1 px-3 py-2.5 rounded outline-none opp-field",
         style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
       }),
       /* @__PURE__ */ React.createElement(
@@ -5371,7 +5406,7 @@ function TempPanel({ data, persist }) {
           editing
             ? /* @__PURE__ */ React.createElement(
                 "div",
-                { className: "flex flex-wrap items-center gap-1.5 mt-2.5 pt-2.5", style: { borderTop: `1px dashed ${COLORS.line}` } },
+                { className: "flex flex-wrap items-center gap-1.5 mt-2.5 pt-2.5", style: { borderTop: `1px solid ${COLORS.line}` } },
                 ["cooler", "freezer"].map((k) =>
                   /* @__PURE__ */ React.createElement(
                     "button",
@@ -5807,7 +5842,7 @@ function LiveOpsTab({ data, persist }) {
       }
     },
     m === 0 ? "Off" : m < 60 ? `${m}s` : `${m / 60}m`
-  ))), lastResult && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-4 rounded", style: { background: COLORS.card, border: `1px dashed ${COLORS.line}`, fontFamily: "JetBrains Mono", fontSize: 13, color: COLORS.crust } }, lastResult), liveOps.stationLog.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(SectionHeader, null, "Recent Checks"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, liveOps.stationLog.map((l) => /* @__PURE__ */ React.createElement("div", { key: l.id, className: "px-3 py-2 rounded text-xs", style: { background: COLORS.card, border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("div", { className: "mb-0.5 flex items-center gap-1.5" }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.tomato, fontWeight: 600 } }, l.station), /* @__PURE__ */ React.createElement("span", { style: { color: "#9A9AA6" } }, "\xB7 ", l.time)), /* @__PURE__ */ React.createElement("div", { style: { color: COLORS.crust } }, l.note))))));
+  ))), lastResult && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-4 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono", fontSize: 13, color: COLORS.crust } }, lastResult), liveOps.stationLog.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(SectionHeader, null, "Recent Checks"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, liveOps.stationLog.map((l) => /* @__PURE__ */ React.createElement("div", { key: l.id, className: "px-3 py-2 rounded text-xs", style: { background: COLORS.card, border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("div", { className: "mb-0.5 flex items-center gap-1.5" }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.tomato, fontWeight: 600 } }, l.station), /* @__PURE__ */ React.createElement("span", { style: { color: "#9A9AA6" } }, "\xB7 ", l.time)), /* @__PURE__ */ React.createElement("div", { style: { color: COLORS.crust } }, l.note))))));
 }
 function guideSrc(g) {
   if (g.key) return MEDIA_URL + "?key=" + encodeURIComponent(g.key) + "&v=" + (g.v || 0);
@@ -6021,7 +6056,7 @@ function GuidesTab({ data, persist }) {
     err
       ? /* @__PURE__ */ React.createElement(
           "div",
-          { className: "text-sm px-3 py-2.5 rounded mb-3", style: { background: "#F4D9D2", color: COLORS.tomatoDark, fontFamily: "Inter" } },
+          { className: "text-sm px-3 py-2.5 rounded mb-3", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } },
           err
         )
       : null,
