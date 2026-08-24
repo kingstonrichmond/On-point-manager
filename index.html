@@ -1715,7 +1715,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   const isAdmin = role === "admin";
   var _a;
   const [data, setData] = useState(null);
-  const [tab, setTab] = useState("today");
+  const [rawTab, setTab] = useState("today");
   const [timers, setTimers] = useState(loadTimers);
   const [timerNow, setTimerNow] = useState(Date.now());
   useEffect(() => {
@@ -1940,9 +1940,10 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
     { id: "tasks", label: "Tasks", icon: ClipboardList, badge: openTasks },
     { id: "settings", label: "Settings", icon: Activity, badge: 0 }
   ].filter((t) => isAdmin || !ADMIN_TABS[t.id]);
-  useEffect(() => {
-    if (!tabs.some((t) => t.id === tab)) setTab("today");
-  }, [role]);
+  // If this tablet was left on a tab its role can't see, fall back during
+  // render rather than in an effect — no hook below the early return, and no
+  // flash of the wrong screen.
+  const tab = tabs.some((t) => t.id === rawTab) ? rawTab : "today";
   return /* @__PURE__ */ React.createElement("div", { className: "w-full min-h-screen", style: { background: COLORS.crust } }, /* @__PURE__ */ React.createElement("style", null, FONTS), /* @__PURE__ */ React.createElement("div", { className: "px-5 pt-6 pb-4 flex items-center gap-3", style: { borderBottom: "1px solid rgba(255,255,255,0.09)" } }, /* @__PURE__ */ React.createElement(
     "div",
     {
