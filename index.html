@@ -605,6 +605,7 @@ const DEFAULT_DATA = {
     ],
     lowStock: []
   },
+  focus: [],
   menu: {
     info: {
       phone: "(401) 789-1926",
@@ -939,6 +940,69 @@ function merge3(base, mine, theirs) {
 const SYNC_URL = (typeof window !== "undefined" && window.SYNC_URL) || "/.netlify/functions/data";
 const MEDIA_URL = (typeof window !== "undefined" && window.MEDIA_URL) || "/.netlify/functions/media";
 const YOLINK_URL = (typeof window !== "undefined" && window.YOLINK_URL) || "/.netlify/functions/yolink";
+// ===================== ACCESS =====================
+// Two shared codes, not per-person accounts: shared tablets, floury hands, and
+// staff turnover all argue against usernames. The code is only a key — the
+// function on the other end is what actually enforces it. Hiding tabs in here
+// is convenience, never security.
+const AUTH_KEY = "opp:key";
+const AUTH_ROLE = "opp:role";
+const AUTH_WHO = "opp:who";
+const ADMIN_IDLE_MS = 30 * 60 * 1e3;
+function getAuthKey() { try { return localStorage.getItem(AUTH_KEY) || ""; } catch (e) { return ""; } }
+function setAuthKey(v) { try { v ? localStorage.setItem(AUTH_KEY, v) : localStorage.removeItem(AUTH_KEY); } catch (e) {} }
+function getStoredRole() { try { return localStorage.getItem(AUTH_ROLE) || ""; } catch (e) { return ""; } }
+function setStoredRole(v) { try { v ? localStorage.setItem(AUTH_ROLE, v) : localStorage.removeItem(AUTH_ROLE); } catch (e) {} }
+function getWho() { try { return localStorage.getItem(AUTH_WHO) || ""; } catch (e) { return ""; } }
+function setWho(v) { try { v ? localStorage.setItem(AUTH_WHO, v) : localStorage.removeItem(AUTH_WHO); } catch (e) {} }
+
+// Patch fetch once rather than touching ten call sites — anything aimed at our
+// own functions picks up the key, including code written later.
+(function installAuthFetch() {
+  if (typeof window === "undefined" || !window.fetch || window.__oppFetchPatched) return;
+  window.__oppFetchPatched = true;
+  const raw = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    const url = typeof input === "string" ? input : (input && input.url) || "";
+    if (url.indexOf("/.netlify/functions/") === -1) return raw(input, init);
+    const opts = Object.assign({}, init || {});
+    const h = new Headers((opts && opts.headers) || (typeof input !== "string" && input.headers) || {});
+    const k = getAuthKey();
+    if (k) h.set("x-opp-key", k);
+    const who = getWho();
+    if (who) h.set("x-opp-who", who);
+    opts.headers = h;
+    return raw(typeof input === "string" ? input : input.url, opts).then((res) => {
+      // The server tells us which code we handed it. No header means the
+      // function hasn't been updated yet — see the banner in Settings.
+      const role = res.headers && res.headers.get && res.headers.get("x-opp-role");
+      if (role && role !== getStoredRole()) {
+        setStoredRole(role);
+        try { window.dispatchEvent(new Event("opp:role")); } catch (e) {}
+      }
+      if (res.status === 401) {
+        setStoredRole("");
+        try { window.dispatchEvent(new Event("opp:denied")); } catch (e) {}
+      }
+      return res;
+    });
+  };
+})();
+
+async function checkKey(code) {
+  try {
+    const res = await fetch(SYNC_URL, { headers: { "cache-control": "no-cache", "x-opp-key": code } });
+    if (res.status === 401) return { ok: false, reason: "That code didn't work." };
+    if (!res.ok) return { ok: false, reason: "Couldn't reach the server \u2014 check the connection and try again." };
+    const role = (res.headers.get && res.headers.get("x-opp-role")) || "";
+    // No role header: the old function is still deployed and nothing is being
+    // enforced yet. Let him in rather than locking him out of his own app.
+    return { ok: true, role: role || "admin", enforced: !!role };
+  } catch (e) {
+    return { ok: false, reason: "Couldn't reach the server \u2014 check the connection and try again." };
+  }
+}
+
 const RECIPE_VERSION = 2;
 // The pizza sauce, dough and buffalo recipes in the app disagreed with the
 // printed wall guides. The guides are what the crew actually follows, so they
@@ -1280,7 +1344,24 @@ function TicketButton({ children, onClick, color = COLORS.tomato, style = {}, ..
     children
   );
 }
-function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServer, rev }) {
+function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServer, rev, role, enforced, onRoleChange, onSignOut, data }) {
+  const [who, setWhoState] = useState(getWho);
+  const [adminCode, setAdminCode] = useState("");
+  const [adminErr, setAdminErr] = useState("");
+  const [adminBusy, setAdminBusy] = useState(false);
+  const staffNames = staffNameList(data || {});
+  const chooseWho = (v) => { setWhoState(v); setWho(v); };
+  const tryAdmin = async () => {
+    if (!adminCode.trim() || adminBusy) return;
+    setAdminBusy(true); setAdminErr("");
+    const r = await checkKey(adminCode.trim());
+    setAdminBusy(false);
+    if (!r.ok) { setAdminErr(r.reason); return; }
+    if (r.role !== "admin") { setAdminErr("That's the staff code, not the admin one."); return; }
+    setAuthKey(adminCode.trim());
+    setAdminCode("");
+    if (onRoleChange) onRoleChange("admin");
+  };
   const [device, setDevice] = useState(() => localStorage.getItem("opp:device") || "");
   const saveDevice = (v) => {
     setDevice(v);
@@ -1437,6 +1518,53 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
         : null
     ),
 
+    /* @__PURE__ */ React.createElement(SectionHeader, null, "Access"),
+    enforced === false && /* @__PURE__ */ React.createElement(
+      "div",
+      { className: "px-4 py-3 mb-3", style: { background: "#FFF1F1", borderRadius: 14, border: "1px solid rgba(226,0,1,0.22)", fontFamily: "Inter", fontSize: 14, color: COLORS.tomatoDark, lineHeight: 1.5 } },
+      "The code screen is up, but the server isn't checking it yet \u2014 the functions still need the auth snippet added. Until then anyone with the URL can still reach the data directly."
+    ),
+    Row(
+      "You're signed in as",
+      role === "admin"
+        ? "Admin \u2014 everything is visible. This drops back to staff after half an hour of nobody touching the screen."
+        : "Staff. Tips, Staff, Food Order, Live Ops and Settings changes need the admin code.",
+      role === "admin"
+        ? /* @__PURE__ */ React.createElement(
+            "div",
+            { className: "flex gap-2 flex-wrap" },
+            /* @__PURE__ */ React.createElement("button", { onClick: () => onRoleChange && onRoleChange("staff"),
+              style: { background: "#F1F1F5", color: COLORS.crust, border: "none", borderRadius: 12, minHeight: 46, padding: "0 18px", fontFamily: "Inter", fontSize: 15, fontWeight: 600 } }, "Drop to staff"),
+            /* @__PURE__ */ React.createElement("button", { onClick: () => onSignOut && onSignOut(),
+              style: { background: "transparent", color: COLORS.tomato, border: "1px solid " + COLORS.line, borderRadius: 12, minHeight: 46, padding: "0 18px", fontFamily: "Inter", fontSize: 15, fontWeight: 600 } }, "Forget this device")
+          )
+        : /* @__PURE__ */ React.createElement(
+            "div",
+            null,
+            /* @__PURE__ */ React.createElement(
+              "div",
+              { className: "flex gap-2" },
+              /* @__PURE__ */ React.createElement("input", { type: "password", value: adminCode, placeholder: "Admin code",
+                onChange: (e) => setAdminCode(e.target.value),
+                onKeyDown: (e) => { if (e.key === "Enter") tryAdmin(); },
+                className: "flex-1 px-3 outline-none opp-field" }),
+              /* @__PURE__ */ React.createElement("button", { onClick: tryAdmin,
+                style: { background: COLORS.tomato, color: "#FFFFFF", border: "none", borderRadius: 12, minHeight: 46, padding: "0 20px", fontFamily: "Inter", fontSize: 15, fontWeight: 600, opacity: adminBusy ? 0.6 : 1 } }, adminBusy ? "\u2026" : "Unlock")
+            ),
+            adminErr && /* @__PURE__ */ React.createElement("div", { className: "mt-2", style: { fontFamily: "Inter", fontSize: 13.5, color: COLORS.tomato } }, adminErr)
+          )
+    ),
+    Row(
+      "Who's on this device",
+      "Used to record who added or removed a time-off entry. Not a login \u2014 just a name on the change.",
+      /* @__PURE__ */ React.createElement(
+        "select",
+        { value: who, onChange: (e) => chooseWho(e.target.value), className: "w-full px-3 outline-none opp-field" },
+        /* @__PURE__ */ React.createElement("option", { value: "" }, "Not set"),
+        staffNames.map((n) => /* @__PURE__ */ React.createElement("option", { key: n, value: n }, n))
+      )
+    ),
+
     /* @__PURE__ */ React.createElement(SectionHeader, null, "This screen"),
     Row(
       "Assistant voice",
@@ -1500,9 +1628,9 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
       )
     ),
 
-    /* @__PURE__ */ React.createElement("div", { style: { height: 18 } }),
-    /* @__PURE__ */ React.createElement(SectionHeader, null, "If something looks wrong"),
-    Row(
+    role === "admin" && /* @__PURE__ */ React.createElement("div", { style: { height: 18 } }),
+    role === "admin" && /* @__PURE__ */ React.createElement(SectionHeader, null, "If something looks wrong"),
+    role === "admin" && Row(
       "Reload everything from the shop data",
       "Throws away anything on this device that hasn\u2019t been sent up and takes the shop\u2019s copy as-is. Use it if this tablet is showing something stale or strange.",
       /* @__PURE__ */ React.createElement(
@@ -1525,10 +1653,69 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
   );
 }
 
-function PizzaOpsManager() {
+// The lock screen. One code per tablet, entered once, ever.
+function LockScreen({ onUnlocked }) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const submit = async () => {
+    if (!code.trim() || busy) return;
+    setBusy(true);
+    setErr("");
+    const r = await checkKey(code.trim());
+    setBusy(false);
+    if (!r.ok) { setErr(r.reason); return; }
+    setAuthKey(code.trim());
+    setStoredRole(r.role);
+    onUnlocked(r.role, r.enforced);
+  };
+  return /* @__PURE__ */ React.createElement(
+    "div",
+    { className: "w-full min-h-screen flex items-center justify-center px-5", style: { background: COLORS.crust } },
+    /* @__PURE__ */ React.createElement("style", null, FONTS),
+    /* @__PURE__ */ React.createElement(
+      "div",
+      { style: { width: "100%", maxWidth: 380 } },
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "flex items-center justify-center mb-6" },
+        /* @__PURE__ */ React.createElement(
+          "div",
+          { className: "flex items-center justify-center", style: { width: 76, height: 76, borderRadius: 22, background: "#FFFFFF", boxShadow: "0 4px 24px rgba(0,0,0,0.4)" } },
+          /* @__PURE__ */ React.createElement("img", { src: LOGO_MARK, alt: "On Point Pizza", style: { width: 44, height: "auto", display: "block" } })
+        )
+      ),
+      /* @__PURE__ */ React.createElement("div", { className: "text-center", style: { fontFamily: "Oswald", fontWeight: 600, fontSize: 26, color: "#FFFFFF", letterSpacing: "0.01em" } }, "ON POINT MANAGER"),
+      /* @__PURE__ */ React.createElement("div", { className: "text-center mb-6", style: { fontFamily: "Inter", fontSize: 14, color: "#9A9AA6", marginTop: 6 } }, "Enter the shop code. This tablet only asks once."),
+      /* @__PURE__ */ React.createElement("input", {
+        type: "password",
+        inputMode: "text",
+        autoFocus: true,
+        value: code,
+        placeholder: "Code",
+        onChange: (e) => setCode(e.target.value),
+        onKeyDown: (e) => { if (e.key === "Enter") submit(); },
+        className: "w-full px-4 outline-none text-center",
+        style: { border: "1px solid rgba(255,255,255,0.16)", background: "rgba(255,255,255,0.06)", color: "#FFFFFF",
+                 borderRadius: 14, minHeight: 54, fontFamily: "Inter", fontSize: 18, letterSpacing: "0.08em" }
+      }),
+      err && /* @__PURE__ */ React.createElement("div", { className: "mt-3 text-center", style: { fontFamily: "Inter", fontSize: 14, color: "#FF7A7A" } }, err),
+      /* @__PURE__ */ React.createElement(
+        "button",
+        { onClick: submit, className: "w-full mt-4 flex items-center justify-center",
+          style: { background: COLORS.tomato, color: "#FFFFFF", border: "none", borderRadius: 14, minHeight: 54,
+                   fontFamily: "Inter", fontSize: 17, fontWeight: 600, opacity: busy ? 0.6 : 1 } },
+        busy ? "Checking\u2026" : "Unlock"
+      )
+    )
+  );
+}
+
+function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
+  const isAdmin = role === "admin";
   var _a;
   const [data, setData] = useState(null);
-  const [tab, setTab] = useState("assistant");
+  const [tab, setTab] = useState("today");
   const [timers, setTimers] = useState(loadTimers);
   const [timerNow, setTimerNow] = useState(Date.now());
   useEffect(() => {
@@ -1727,7 +1914,14 @@ function PizzaOpsManager() {
   const foodOrderNeed = (data.inventory || []).filter((i) => Number(i.orderNeed) > 0).length;
   const _t0 = todayISO(), _t7 = addDaysISO(_t0, 7);
   const offSoon = ((data.timeOff || []).filter((r) => r.date >= _t0 && r.date <= _t7).map((r) => r.date).filter((v, i, a) => a.indexOf(v) === i)).length;
+  // Admin-only tabs are the ones holding money, people's details, or pictures
+  // of customers. Everything the crew needs to run a shift stays open.
+  // Settings deliberately stays open to staff: it holds the admin unlock, the
+  // per-tablet preferences, and nothing worth hiding. The rows inside it that
+  // do matter are gated by role instead.
+  const ADMIN_TABS = { tips: 1, staff: 1, foodorder: 1, liveops: 1 };
   const tabs = [
+    { id: "today", label: "Today", icon: Activity },
     { id: "assistant", label: "Ask the Manager", icon: MessageSquare },
     { id: "schedule", label: "Schedule", icon: Users },
     { id: "timeoff", label: "Time Off", icon: Calendar, badge: offSoon },
@@ -1745,7 +1939,10 @@ function PizzaOpsManager() {
     { id: "liveops", label: "Live Ops", icon: Activity },
     { id: "tasks", label: "Tasks", icon: ClipboardList, badge: openTasks },
     { id: "settings", label: "Settings", icon: Activity, badge: 0 }
-  ];
+  ].filter((t) => isAdmin || !ADMIN_TABS[t.id]);
+  useEffect(() => {
+    if (!tabs.some((t) => t.id === tab)) setTab("today");
+  }, [role]);
   return /* @__PURE__ */ React.createElement("div", { className: "w-full min-h-screen", style: { background: COLORS.crust } }, /* @__PURE__ */ React.createElement("style", null, FONTS), /* @__PURE__ */ React.createElement("div", { className: "px-5 pt-6 pb-4 flex items-center gap-3", style: { borderBottom: "1px solid rgba(255,255,255,0.09)" } }, /* @__PURE__ */ React.createElement(
     "div",
     {
@@ -1793,7 +1990,7 @@ function PizzaOpsManager() {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist }), tab === "timeoff" && /* @__PURE__ */ React.createElement(TimeOffTab, { data, persist }), tab === "tips" && /* @__PURE__ */ React.createElement(TipsTab, { data, persist }), tab === "timers" && /* @__PURE__ */ React.createElement(TimersTab, { data, persist, timers, setTimers, now: timerNow }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "foodorder" && /* @__PURE__ */ React.createElement(FoodOrderTab, { data, persist }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); } })), /* @__PURE__ */ React.createElement(TimerOverlay, { timers, setTimers, now: timerNow }));
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo: setTab }), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist, canEdit: isAdmin }), tab === "timeoff" && /* @__PURE__ */ React.createElement(TimeOffTab, { data, persist }), tab === "tips" && /* @__PURE__ */ React.createElement(TipsTab, { data, persist }), tab === "timers" && /* @__PURE__ */ React.createElement(TimersTab, { data, persist, timers, setTimers, now: timerNow }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "foodorder" && /* @__PURE__ */ React.createElement(FoodOrderTab, { data, persist }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); }, data })), /* @__PURE__ */ React.createElement(TimerOverlay, { timers, setTimers, now: timerNow }));
 }
 function AssistantAvatar({ state }) {
   // "waiting" is always-on standing by. It holds completely still: a mic that
@@ -2592,6 +2789,174 @@ function TimeOffTab({ data, persist }) {
                     style: { background: COLORS.tomato, color: "#FFFFFF", border: "none", borderRadius: 12, fontFamily: "Inter", fontSize: 15, fontWeight: 600, minHeight: 46, padding: "0 20px" } },
                     React.createElement(Plus, { size: 16 }), "Add")))));
 }
+// ===================== TODAY =====================
+// The screen that stays up. Everything a shift actually needs to glance at,
+// pulled from the tabs that own it — this reads and writes the same data, it
+// never keeps its own copy.
+function TodayTab({ data, persist, goTo }) {
+  const [text, setText] = useState("");
+  const D = DENSITY[useDensity()];
+  const today = todayISO();
+  const prep = data.prep || {};
+  const par = prep.par || [];
+  const prepLeft = par.filter((r) => Number(r.need) > 0 && !r.done);
+  const prepDone = par.filter((r) => Number(r.need) > 0 && r.done).length;
+  const flags = (prep.lowStock || []).filter((f) => f.status === "low" || f.status === "86");
+  const eighty = flags.filter((f) => f.status === "86");
+  const low = flags.filter((f) => f.status === "low");
+  const offToday = offOn(data, today);
+  const focusAll = data.focus || [];
+  const mine = focusAll.filter((f) => f.date === today);
+  const carry = focusAll.filter((f) => f.date !== today && !f.done);
+  const openFocus = mine.filter((f) => !f.done);
+  const CARD = { background: COLORS.card, borderRadius: 18, boxShadow: "0 1px 2px rgba(23,23,28,0.05), 0 6px 18px rgba(23,23,28,0.05)" };
+
+  const addFocus = () => {
+    if (!text.trim()) return;
+    const next = JSON.parse(JSON.stringify(data));
+    next.focus = next.focus || [];
+    next.focus.push({ id: uid(), text: text.trim(), done: false, date: today });
+    persist(next);
+    setText("");
+  };
+  const toggleFocus = (id) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const f = (next.focus || []).find((x) => x.id === id);
+    if (f) f.done = !f.done;
+    persist(next);
+  };
+  const dropFocus = (id) => {
+    const next = JSON.parse(JSON.stringify(data));
+    next.focus = (next.focus || []).filter((x) => x.id !== id);
+    persist(next);
+  };
+  const bringForward = () => {
+    const next = JSON.parse(JSON.stringify(data));
+    (next.focus || []).forEach((f) => { if (f.date !== today && !f.done) f.date = today; });
+    persist(next);
+  };
+  const togglePrep = (id) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const row = (next.prep.par || []).find((r) => r.id === id);
+    if (row) row.done = !row.done;
+    persist(next);
+  };
+
+  const label = (t) => React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase", marginBottom: 10 } }, t);
+  const jump = (id, icon, text2, badge) => React.createElement(
+    "button",
+    { key: id, onClick: () => goTo(id), className: "flex items-center justify-center gap-2 flex-1",
+      style: { background: COLORS.card, border: "none", borderRadius: 14, minHeight: 52, fontFamily: "Inter", fontSize: 15, fontWeight: 600, color: COLORS.crust, boxShadow: "0 1px 2px rgba(23,23,28,0.08)" } },
+    React.createElement(icon, { size: 17, color: COLORS.tomato }), text2,
+    badge > 0 ? React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: 12.5, background: COLORS.tomato, color: "#FFFFFF", borderRadius: 7, padding: "2px 7px" } }, badge) : null
+  );
+
+  return React.createElement(
+    "div",
+    null,
+    // headline: the one number that says whether the shift is on track
+    React.createElement(
+      "div",
+      { className: "px-5 py-5 mb-4", style: { background: COLORS.crust, borderRadius: 20 } },
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#FF5B5B", textTransform: "uppercase" } }, todayLong()),
+      React.createElement("div", { style: { fontFamily: "Oswald", fontWeight: 600, fontSize: 34, lineHeight: 1.05, color: "#FFFFFF", marginTop: 4 } },
+        prepLeft.length + openFocus.length === 0 ? "Nothing outstanding" : (prepLeft.length + openFocus.length) + " things left today"),
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#9A9AA6", marginTop: 6 } },
+        prepLeft.length + " prep \u00b7 " + openFocus.length + " priorities \u00b7 " + eighty.length + " 86'd" + (offToday.length ? " \u00b7 " + offToday.length + " off" : ""))
+    ),
+
+    // people first — you can't fix the rest if you're short-handed
+    offToday.length > 0 && React.createElement(
+      "div",
+      { className: "px-4 py-3 mb-3", style: { background: "#FFF1F1", borderRadius: 16, border: "1px solid rgba(226,0,1,0.22)" } },
+      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: COLORS.tomatoDark, textTransform: "uppercase" } }, "Off today \u2014 "),
+      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 15, fontWeight: 600, color: COLORS.crust } }, offToday.map((r) => r.name).join(", "))
+    ),
+
+    // the handful of things that actually matter today
+    React.createElement(
+      "div",
+      { className: "px-4 py-4 mb-3", style: CARD },
+      label("Today's priorities"),
+      carry.length > 0 && React.createElement(
+        "button",
+        { onClick: bringForward, className: "w-full mb-3 px-3 py-2.5 text-left",
+          style: { background: "#FFF6E8", border: "1px solid rgba(217,138,0,0.35)", borderRadius: 12, fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: "#8A5A00" } },
+        carry.length + (carry.length === 1 ? " item" : " items") + " never got finished \u2014 bring forward"
+      ),
+      mine.length === 0 && React.createElement("div", { className: "pb-3", style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Nothing flagged yet. Add the thing you'd be annoyed to find undone at 5pm."),
+      mine.map((f, i) => React.createElement(
+        "div",
+        { key: f.id, className: "flex items-center gap-3", style: { borderBottom: i === mine.length - 1 ? "none" : "1px solid " + COLORS.line, minHeight: D.row } },
+        React.createElement(
+          "button",
+          { onClick: () => toggleFocus(f.id), className: "flex-1 min-w-0 flex items-center gap-3 text-left",
+            style: { background: "transparent", border: "none", minHeight: D.row } },
+          React.createElement("span", { className: "flex items-center justify-center flex-shrink-0",
+            style: { width: D.check, height: D.check, borderRadius: 999, border: f.done ? "none" : "2px solid #CFCFD8", background: f.done ? COLORS.basil : "transparent" } },
+            f.done ? React.createElement(Check, { size: 15, color: "#FFFFFF" }) : null),
+          React.createElement("span", { className: "truncate", style: { fontFamily: "Inter", fontSize: D.name, fontWeight: 600, letterSpacing: "-0.012em",
+            color: f.done ? INK3 : COLORS.crust, textDecoration: f.done ? "line-through" : "none", textDecorationThickness: "2px" } }, f.text)
+        ),
+        React.createElement("button", { onClick: () => dropFocus(f.id), style: { background: "transparent", border: "none", padding: 10, flexShrink: 0 } },
+          React.createElement(Trash2, { size: 15, color: INK3 }))
+      )),
+      React.createElement(
+        "div",
+        { className: "flex gap-2 mt-3" },
+        React.createElement("input", { placeholder: "e.g. Detroit dough needs spreading", value: text,
+          onChange: (e) => setText(e.target.value), onKeyDown: (e) => { if (e.key === "Enter") addFocus(); },
+          className: "flex-1 px-3 outline-none opp-field" }),
+        React.createElement("button", { onClick: addFocus, className: "flex items-center justify-center",
+          style: { background: COLORS.tomato, color: "#FFFFFF", border: "none", borderRadius: 12, minHeight: 46, padding: "0 18px", fontFamily: "Inter", fontSize: 15, fontWeight: 600 } },
+          React.createElement(Plus, { size: 17 }))
+      )
+    ),
+
+    // prep left, tappable right here — no reason to walk to another tab for it
+    React.createElement(
+      "div",
+      { className: "px-4 py-4 mb-3", style: CARD },
+      React.createElement("div", { className: "flex items-baseline justify-between" },
+        label("Prep left"),
+        React.createElement("button", { onClick: () => goTo("preplist"), style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.tomato, padding: "0 0 10px 0" } }, "Full list")),
+      prepLeft.length === 0
+        ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } },
+            prepDone > 0 ? "All " + prepDone + " done. Nothing left." : "Nothing set for today yet.")
+        : prepLeft.map((r, i) => React.createElement(
+            "button",
+            { key: r.id, onClick: () => togglePrep(r.id), className: "w-full flex items-center gap-3 text-left",
+              style: { background: "transparent", border: "none", minHeight: D.row, borderBottom: i === prepLeft.length - 1 ? "none" : "1px solid " + COLORS.line } },
+            React.createElement("span", { className: "flex-shrink-0", style: { width: D.check, height: D.check, borderRadius: 999, border: "2px solid #CFCFD8" } }),
+            React.createElement("span", { className: "truncate flex-1", style: { fontFamily: "Inter", fontSize: D.name, fontWeight: 600, letterSpacing: "-0.012em", color: COLORS.crust } }, r.item),
+            React.createElement("span", { className: "flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: D.chip, color: "#FFFFFF", background: COLORS.tomato, borderRadius: 8, padding: "3px 10px" } }, "\u00d7" + r.need)
+          ))
+    ),
+
+    // 86 and low, compact — this is a glance, the board is where you edit
+    React.createElement(
+      "div",
+      { className: "px-4 py-4 mb-3", style: CARD },
+      React.createElement("div", { className: "flex items-baseline justify-between" },
+        label("86 & low"),
+        React.createElement("button", { onClick: () => goTo("prep"), style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.tomato, padding: "0 0 10px 0" } }, "Board")),
+      flags.length === 0
+        ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Nothing flagged. We've got everything.")
+        : React.createElement("div", { className: "flex flex-wrap gap-2" },
+            eighty.map((f) => React.createElement("span", { key: f.id, style: { fontFamily: "Inter", fontSize: 15, fontWeight: 600, background: COLORS.tomato, color: "#FFFFFF", borderRadius: 999, padding: "7px 14px" } }, "86 \u00b7 " + f.item)),
+            low.map((f) => React.createElement("span", { key: f.id, style: { fontFamily: "Inter", fontSize: 15, fontWeight: 600, background: "#FFF6E8", color: "#8A5A00", border: "1px solid rgba(217,138,0,0.35)", borderRadius: 999, padding: "6px 13px" } }, "Low \u00b7 " + f.item)))
+    ),
+
+    React.createElement(
+      "div",
+      { className: "flex gap-2" },
+      jump("timers", Clock, "Timers", 0),
+      jump("tasks", ClipboardList, "Tasks", (data.tasks || []).filter((t) => !t.done).length),
+      jump("assistant", MessageSquare, "Ask", 0)
+    )
+  );
+}
+
 // ===================== TIPS TAB =====================
 const DAY_SPAN = "11-4";
 const NIGHT_SPAN = "4-close";
@@ -3125,7 +3490,7 @@ function TipsTab({ data, persist }) {
                             React.createElement(Trash2, { size: 13 }))))))))))));
 }
 // ===================== SCHEDULE TAB (with time-off warnings) =====================
-function ScheduleTab({ data, persist }) {
+function ScheduleTab({ data, persist, canEdit }) {
     const [draft, setDraft] = useState({});
     const addShift = (day) => {
         const d = draft[day];
@@ -3185,10 +3550,10 @@ function ScheduleTab({ data, persist }) {
                                         color: off ? COLORS.tomatoDark : COLORS.crust,
                                         textDecoration: off ? "line-through" : "none", textDecorationThickness: "2px" } }, s.name),
                                 React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: 12.5, fontWeight: 500, color: off ? COLORS.tomatoDark : INK2, marginTop: 1 } }, off ? (s.time ? s.time + "  \u00b7  OFF" : "OFF") : s.time)),
-                            React.createElement("button", { onClick: () => removeShift(day, s.id), style: { background: "transparent", border: "none", padding: 8, flexShrink: 0 } },
+                            canEdit && React.createElement("button", { onClick: () => removeShift(day, s.id), style: { background: "transparent", border: "none", padding: 8, flexShrink: 0 } },
                                 React.createElement(Trash2, { size: 15, color: INK3 }))));
                     })),
-                React.createElement("div", { className: "flex flex-col gap-2" },
+                canEdit && React.createElement("div", { className: "flex flex-col gap-2" },
                     React.createElement("input", { placeholder: "Name", value: (draft[day] && draft[day].name) || "", onChange: (e) => setDraft({ ...draft, [day]: { ...draft[day], name: e.target.value } }), className: "px-3 outline-none", style: FIELD }),
                     React.createElement("input", { placeholder: "Time \u2014 e.g. 4pm\u2013close", value: (draft[day] && draft[day].time) || "", onChange: (e) => setDraft({ ...draft, [day]: { ...draft[day], time: e.target.value } }), className: "px-3 outline-none", style: FIELD }),
                     React.createElement("button", { onClick: () => addShift(day), className: "flex items-center justify-center gap-1.5",
@@ -6442,8 +6807,50 @@ function TasksTab({ data, persist }) {
 }
 
 
+// Everything sits behind the gate. Admin drops back to staff after a spell of
+// no touching, so a tablet left on the counter isn't sitting there with Tips
+// and the cameras open.
+function AppGate() {
+  const [role, setRole] = useState(() => (getAuthKey() ? (getStoredRole() || "staff") : ""));
+  const [enforced, setEnforced] = useState(true);
+  const lastTouch = useRef(Date.now());
+
+  useEffect(() => {
+    const bump = () => { lastTouch.current = Date.now(); };
+    ["pointerdown", "keydown"].forEach((e) => window.addEventListener(e, bump, { passive: true }));
+    const iv = setInterval(() => {
+      if (getStoredRole() === "admin" && Date.now() - lastTouch.current > ADMIN_IDLE_MS) {
+        setStoredRole("staff");
+        setRole("staff");
+      }
+    }, 3e4);
+    const onRole = () => setRole(getStoredRole() || "staff");
+    const onDenied = () => { setAuthKey(""); setStoredRole(""); setRole(""); };
+    window.addEventListener("opp:role", onRole);
+    window.addEventListener("opp:denied", onDenied);
+    return () => {
+      ["pointerdown", "keydown"].forEach((e) => window.removeEventListener(e, bump));
+      clearInterval(iv);
+      window.removeEventListener("opp:role", onRole);
+      window.removeEventListener("opp:denied", onDenied);
+    };
+  }, []);
+
+  if (!role) {
+    return React.createElement(LockScreen, {
+      onUnlocked: (r, wasEnforced) => { setEnforced(wasEnforced); setRole(r); lastTouch.current = Date.now(); }
+    });
+  }
+  return React.createElement(PizzaOpsManager, {
+    role,
+    enforced,
+    onRoleChange: (r) => { setStoredRole(r); setRole(r); lastTouch.current = Date.now(); },
+    onSignOut: () => { setAuthKey(""); setStoredRole(""); setRole(""); }
+  });
+}
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(React.createElement(PizzaOpsManager));
+root.render(React.createElement(AppGate));
 const bootStatus = document.getElementById("boot-status");
 if (bootStatus) bootStatus.style.display = "none";
 </script>
