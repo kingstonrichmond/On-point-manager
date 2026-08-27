@@ -191,6 +191,19 @@ const Clock = makeIcon(
   /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "9" }), /* @__PURE__ */ React.createElement("path", { d: "M12 7v5l3.5 2" }))
 );
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+// Hours live in the shared data, never in the code. A beach town changes its
+// hours with the season, they stay open late on a good night, and the day crew
+// sometimes cashes out early — none of that should need a redeploy.
+const DEFAULT_HOURS = [
+    { open: 12, close: 21 }, // Sun
+    { open: 11, close: 21 }, // Mon
+    { open: 11, close: 21 }, // Tue
+    { open: 11, close: 21 }, // Wed
+    { open: 11, close: 22 }, // Thu
+    { open: 11, close: 22 }, // Fri
+    { open: 11, close: 22 }  // Sat
+];
+const DEFAULT_SHIFT_CHANGE = 16;
 const DEFAULT_DATA = {
   scheduleVersion: 2,
   timeOffVersion: 1,
@@ -606,6 +619,8 @@ const DEFAULT_DATA = {
     lowStock: []
   },
   focus: [],
+  handoff: {},
+  shopHours: { days: DEFAULT_HOURS.map((d) => ({ open: d.open, close: d.close })), shiftChange: DEFAULT_SHIFT_CHANGE },
   menu: {
     info: {
       phone: "(401) 789-1926",
@@ -948,7 +963,12 @@ const YOLINK_URL = (typeof window !== "undefined" && window.YOLINK_URL) || "/.ne
 const AUTH_KEY = "opp:key";
 const AUTH_ROLE = "opp:role";
 const AUTH_WHO = "opp:who";
+// Admin used to fall back to staff on a timer. He'd rather decide: an option
+// he can switch on per tablet, off everywhere by default.
+const AUTO_STAFF_KEY = "opp:autoStaff";
 const ADMIN_IDLE_MS = 30 * 60 * 1e3;
+function getAutoStaff() { try { return localStorage.getItem(AUTO_STAFF_KEY) === "1"; } catch (e) { return false; } }
+function setAutoStaff(on) { try { on ? localStorage.setItem(AUTO_STAFF_KEY, "1") : localStorage.removeItem(AUTO_STAFF_KEY); } catch (e) {} }
 function getAuthKey() { try { return localStorage.getItem(AUTH_KEY) || ""; } catch (e) { return ""; } }
 function setAuthKey(v) { try { v ? localStorage.setItem(AUTH_KEY, v) : localStorage.removeItem(AUTH_KEY); } catch (e) {} }
 function getStoredRole() { try { return localStorage.getItem(AUTH_ROLE) || ""; } catch (e) { return ""; } }
@@ -1344,7 +1364,7 @@ function TicketButton({ children, onClick, color = COLORS.tomato, style = {}, ..
     children
   );
 }
-function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServer, rev, role, enforced, onRoleChange, onSignOut, data }) {
+function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServer, rev, role, enforced, onRoleChange, onSignOut, data, onHoursChange }) {
   const [who, setWhoState] = useState(getWho);
   const [adminCode, setAdminCode] = useState("");
   const [adminErr, setAdminErr] = useState("");
@@ -1370,6 +1390,20 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
     } catch (e) {}
   };
   const [density, setDensityState] = useState(getDensity);
+  const [autoStaff, setAutoStaffState] = useState(getAutoStaff);
+  const chooseAutoStaff = (v) => { setAutoStaffState(v); setAutoStaff(v); };
+  const hours = shopHours(data || {});
+  const setHours = (dow, key, value) => {
+    if (!onHoursChange) return;
+    const days = hours.days.map((d, i) => (i === dow ? Object.assign({}, d, { [key]: Number(value) }) : Object.assign({}, d)));
+    onHoursChange({ days, shiftChange: hours.shiftChange });
+  };
+  const setShiftChange = (value) => {
+    if (!onHoursChange) return;
+    onHoursChange({ days: hours.days.map((d) => Object.assign({}, d)), shiftChange: Number(value) });
+  };
+  const HOUR_OPTS = [];
+  for (let h = 6; h <= 26; h++) HOUR_OPTS.push(h);
   const [voices, setVoices] = useState(() => allVoices());
   const [voiceName, setVoiceName] = useState(getVoiceName);
   useEffect(() => {
@@ -1527,7 +1561,7 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
     Row(
       "You're signed in as",
       role === "admin"
-        ? "Admin \u2014 everything is visible. This drops back to staff after half an hour of nobody touching the screen."
+        ? "Admin \u2014 everything is visible. It stays that way until you drop it yourself, unless auto-drop is switched on below."
         : "Staff. Tips, Staff, Food Order, Live Ops and Settings changes need the admin code.",
       role === "admin"
         ? /* @__PURE__ */ React.createElement(
@@ -1565,11 +1599,64 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
       )
     ),
 
+    role === "admin" && /* @__PURE__ */ React.createElement(SectionHeader, null, "Shop hours"),
+    role === "admin" && Row(
+      "When you open and close",
+      "Used by the Today page to work out who's on the floor right now, and it sets the default \u201Cclose\u201D for the tip split. Change it whenever the season does \u2014 no redeploy needed.",
+      /* @__PURE__ */ React.createElement(
+        "div",
+        null,
+        DOW3.map((d, i) => /* @__PURE__ */ React.createElement(
+          "div",
+          { key: d, className: "flex items-center gap-2 mb-2" },
+          /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "Inter", fontSize: 14, fontWeight: 700, color: COLORS.crust, width: 42 } }, d),
+          /* @__PURE__ */ React.createElement("select", { value: hours.days[i].open, onChange: (e) => setHours(i, "open", e.target.value), className: "px-2 outline-none opp-field", style: { flex: 1 } },
+            HOUR_OPTS.filter((h) => h < 18).map((h) => /* @__PURE__ */ React.createElement("option", { key: h, value: h }, hourLabel(h)))),
+          /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "Inter", fontSize: 14, color: "#9A9AA6" } }, "to"),
+          /* @__PURE__ */ React.createElement("select", { value: hours.days[i].close, onChange: (e) => setHours(i, "close", e.target.value), className: "px-2 outline-none opp-field", style: { flex: 1 } },
+            HOUR_OPTS.filter((h) => h > 15).map((h) => /* @__PURE__ */ React.createElement("option", { key: h, value: h }, hourLabel(h))))
+        ))
+      )
+    ),
+    role === "admin" && Row(
+      "Day shift hands over at",
+      "Where the day ends and the night begins. Moves the default spans on the tip split, for when they cash out early or the changeover drifts.",
+      /* @__PURE__ */ React.createElement(
+        "select",
+        { value: hours.shiftChange, onChange: (e) => setShiftChange(e.target.value), className: "w-full px-3 outline-none opp-field" },
+        [14, 15, 16, 17, 18].map((h) => /* @__PURE__ */ React.createElement("option", { key: h, value: h }, hourLabel(h)))
+      )
+    ),
+
     /* @__PURE__ */ React.createElement(SectionHeader, null, "This screen"),
     Row(
       "Assistant voice",
       "Which voice Ask the Manager speaks with. The list comes from this device, so a tablet and a phone won't offer the same options \u2014 anything marked Natural or Neural sounds the least robotic.",
       voiceControl
+    ),
+    role === "admin" && Row(
+      "Drop back to staff on its own",
+      "Off by default — admin stays admin until you change it. Switch this on for a tablet in a public spot and it'll fall back to staff after half an hour untouched.",
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "flex gap-1", style: { background: "#E6E6EC", borderRadius: 14, padding: 3, maxWidth: 320 } },
+        [{ id: false, label: "Stay admin" }, { id: true, label: "Auto-drop" }].map((o) => /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            key: String(o.id),
+            onClick: () => chooseAutoStaff(o.id),
+            className: "flex-1",
+            style: {
+              fontFamily: "Inter", fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em",
+              borderRadius: 12, border: "none", minHeight: 40, padding: "0 12px",
+              background: autoStaff === o.id ? "#FFFFFF" : "transparent",
+              color: autoStaff === o.id ? COLORS.crust : "#6D6D78",
+              boxShadow: autoStaff === o.id ? "0 1px 3px rgba(23,23,28,0.12)" : "none"
+            }
+          },
+          o.label
+        ))
+      )
     ),
     Row(
       "Row size",
@@ -1991,7 +2078,8 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo: setTab }), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist, canEdit: isAdmin }), tab === "timeoff" && /* @__PURE__ */ React.createElement(TimeOffTab, { data, persist }), tab === "tips" && /* @__PURE__ */ React.createElement(TipsTab, { data, persist }), tab === "timers" && /* @__PURE__ */ React.createElement(TimersTab, { data, persist, timers, setTimers, now: timerNow }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "foodorder" && /* @__PURE__ */ React.createElement(FoodOrderTab, { data, persist }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); }, data })), /* @__PURE__ */ React.createElement(TimerOverlay, { timers, setTimers, now: timerNow }));
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo: setTab, timers, now: timerNow }), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist, canEdit: isAdmin }), tab === "timeoff" && /* @__PURE__ */ React.createElement(TimeOffTab, { data, persist }), tab === "tips" && /* @__PURE__ */ React.createElement(TipsTab, { data, persist }), tab === "timers" && /* @__PURE__ */ React.createElement(TimersTab, { data, persist, timers, setTimers, now: timerNow }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "foodorder" && /* @__PURE__ */ React.createElement(FoodOrderTab, { data, persist }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); }, data,
+        onHoursChange: (next) => { const d = JSON.parse(JSON.stringify(dataRef.current)); d.shopHours = next; persist(d); } })), /* @__PURE__ */ React.createElement(TimerOverlay, { timers, setTimers, now: timerNow }));
 }
 function AssistantAvatar({ state }) {
   // "waiting" is always-on standing by. It holds completely still: a mic that
@@ -2794,10 +2882,52 @@ function TimeOffTab({ data, persist }) {
 // The screen that stays up. Everything a shift actually needs to glance at,
 // pulled from the tabs that own it — this reads and writes the same data, it
 // never keeps its own copy.
-function TodayTab({ data, persist, goTo }) {
+// Staff write shift times the way they'd say them: "4-close", "day", "5-9".
+// Turn that into a real window so the Today page can say who's actually here.
+function scheduleWindow(raw, hrs) {
+  const t = String(raw || "").trim();
+  if (!t) return null;
+  if (/^day$/i.test(t)) return { start: hrs.open, end: 16, loose: false };
+  if (/^night$/i.test(t)) return { start: 16, end: hrs.close, loose: false };
+  if (/open\s*(or|\/|-)\s*close/i.test(t)) return { start: hrs.open, end: hrs.close, loose: true };
+  const m = t.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm|a|p)?|open)\s*(?:-|\u2013|\u2014|\bto\b)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm|a|p)?|close)/i);
+  if (!m) return null;
+  const start = /open/i.test(m[1]) ? hrs.open : parseClock(m[1], hrs.close);
+  let end = /close/i.test(m[2]) ? hrs.close : parseClock(m[2], hrs.close);
+  if (start == null || end == null) return null;
+  if (end < start) end += 12;
+  return { start, end, loose: /[~?]|maybe|confirm/i.test(t) };
+}
+// Everyone on today's schedule, with what they're doing at this moment.
+function crewForDate(data, iso, nowDate) {
+  const dayKey = DOW3[isoToDate(iso).getDay()];
+  const rows = (data.schedule && data.schedule[dayKey]) || [];
+  const hrs = hoursOn(data, iso);
+  const now = hourNow(nowDate);
+  return rows.map((shift) => {
+    const raw = String(shift.name || "").trim();
+    const m = raw.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+    const person = m ? m[1].trim() : raw;
+    const position = m ? m[2].trim() : "";
+    const unfilled = /^open\b|needs? filling/i.test(person) || /needs? filling/i.test(String(shift.time || ""));
+    const off = !unfilled && isOffThatDay(data, iso, person);
+    const win = scheduleWindow(shift.time, hrs);
+    let status = "tbd";
+    if (unfilled) status = "unfilled";
+    else if (off) status = "off";
+    else if (win && now < win.start) status = "later";
+    else if (win && now <= win.end) status = "now";
+    else if (win) status = "done";
+    return { id: shift.id, person, position, time: shift.time, unfilled, off, win, status };
+  });
+}
+function TodayTab({ data, persist, goTo, timers, now }) {
   const [text, setText] = useState("");
+  const [showAllPrep, setShowAllPrep] = useState(false);
+  const [handoffOpen, setHandoffOpen] = useState(false);
   const D = DENSITY[useDensity()];
   const today = todayISO();
+  const nowDate = new Date(now || Date.now());
   const prep = data.prep || {};
   const par = prep.par || [];
   const prepLeft = par.filter((r) => Number(r.need) > 0 && !r.done);
@@ -2805,155 +2935,214 @@ function TodayTab({ data, persist, goTo }) {
   const flags = (prep.lowStock || []).filter((f) => f.status === "low" || f.status === "86");
   const eighty = flags.filter((f) => f.status === "86");
   const low = flags.filter((f) => f.status === "low");
-  const offToday = offOn(data, today);
   const focusAll = data.focus || [];
   const mine = focusAll.filter((f) => f.date === today);
   const carry = focusAll.filter((f) => f.date !== today && !f.done);
   const openFocus = mine.filter((f) => !f.done);
+  const openTasks = (data.tasks || []).filter((t) => !t.done);
+  const crew = crewForDate(data, today, nowDate);
+  const onNow = crew.filter((c) => c.status === "now");
+  const later = crew.filter((c) => c.status === "later");
+  const offToday = crew.filter((c) => c.off);
+  const unfilled = crew.filter((c) => c.unfilled);
+  const status = shopStatusNow(data, today, nowDate);
+  const hrs = hoursOn(data, today);
+  const running = (timers || []).slice().sort((a, b) => a.endsAt - b.endsAt);
+  const overdue = running.find((t) => t.endsAt <= (now || Date.now()));
   const CARD = { background: COLORS.card, borderRadius: 18, boxShadow: "0 1px 2px rgba(23,23,28,0.05), 0 6px 18px rgba(23,23,28,0.05)" };
 
+  // One thing at the top, not seven. Worst first: anything actually burning,
+  // then coverage, then stock, then the work.
+  let alert = null;
+  if (openTasks.length) alert = { tone: "work", text: openTasks.length + " open task" + (openTasks.length === 1 ? "" : "s") };
+  if (prepLeft.length) alert = { tone: "work", text: prepLeft.length + " prep item" + (prepLeft.length === 1 ? "" : "s") + " left" };
+  if (openFocus.length) alert = { tone: "work", text: openFocus[0].text };
+  if (eighty.length) alert = { tone: "bad", text: "86 \u00b7 " + eighty.map((f) => f.item).join(", ") };
+  if (offToday.length) alert = { tone: "bad", text: offToday[0].person + " is on the schedule but booked off" };
+  if (unfilled.length) alert = { tone: "bad", text: "Shift needs filling" + (unfilled[0].time ? " \u00b7 " + unfilled[0].time : "") };
+  if (overdue) alert = { tone: "bad", text: (overdue.label || "Timer") + " is overdue" };
+  const alertColor = !alert ? "#75B879" : alert.tone === "bad" ? "#FF5B5B" : COLORS.parm;
+
+  const clone = () => JSON.parse(JSON.stringify(data));
   const addFocus = () => {
     if (!text.trim()) return;
-    const next = JSON.parse(JSON.stringify(data));
+    const next = clone();
     next.focus = next.focus || [];
     next.focus.push({ id: uid(), text: text.trim(), done: false, date: today });
-    persist(next);
-    setText("");
+    persist(next); setText("");
   };
-  const toggleFocus = (id) => {
-    const next = JSON.parse(JSON.stringify(data));
-    const f = (next.focus || []).find((x) => x.id === id);
-    if (f) f.done = !f.done;
-    persist(next);
-  };
-  const dropFocus = (id) => {
-    const next = JSON.parse(JSON.stringify(data));
-    next.focus = (next.focus || []).filter((x) => x.id !== id);
-    persist(next);
-  };
-  const bringForward = () => {
-    const next = JSON.parse(JSON.stringify(data));
-    (next.focus || []).forEach((f) => { if (f.date !== today && !f.done) f.date = today; });
-    persist(next);
-  };
-  const togglePrep = (id) => {
-    const next = JSON.parse(JSON.stringify(data));
-    const row = (next.prep.par || []).find((r) => r.id === id);
-    if (row) row.done = !row.done;
-    persist(next);
-  };
+  const toggleFocus = (id) => { const n = clone(); const f = (n.focus || []).find((x) => x.id === id); if (f) f.done = !f.done; persist(n); };
+  const dropFocus = (id) => { const n = clone(); n.focus = (n.focus || []).filter((x) => x.id !== id); persist(n); };
+  const bringForward = () => { const n = clone(); (n.focus || []).forEach((f) => { if (f.date !== today && !f.done) f.date = today; }); persist(n); };
+  const togglePrep = (id) => { const n = clone(); const r = (n.prep.par || []).find((x) => x.id === id); if (r) r.done = !r.done; persist(n); };
 
-  const label = (t) => React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase", marginBottom: 10 } }, t);
-  const jump = (id, icon, text2, badge) => React.createElement(
-    "button",
-    { key: id, onClick: () => goTo(id), className: "flex items-center justify-center gap-2 flex-1",
-      style: { background: COLORS.card, border: "none", borderRadius: 14, minHeight: 52, fontFamily: "Inter", fontSize: 15, fontWeight: 600, color: COLORS.crust, boxShadow: "0 1px 2px rgba(23,23,28,0.08)" } },
-    React.createElement(icon, { size: 17, color: COLORS.tomato }), text2,
-    badge > 0 ? React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: 12.5, background: COLORS.tomato, color: "#FFFFFF", borderRadius: 7, padding: "2px 7px" } }, badge) : null
-  );
+  // Closing handoff: four questions, and tomorrow's answer becomes tomorrow's
+  // first priority automatically so nothing falls in the gap between shifts.
+  const handoff = (data.handoff && data.handoff[today]) || {};
+  const setHandoff = (key, value) => {
+    const n = clone();
+    n.handoff = n.handoff || {};
+    n.handoff[today] = Object.assign({}, n.handoff[today] || {}, { [key]: value, submittedAt: "" });
+    persist(n);
+  };
+  const completeHandoff = () => {
+    const n = clone();
+    n.handoff = n.handoff || {};
+    const h = Object.assign({}, n.handoff[today] || {});
+    h.submittedAt = new Date().toISOString();
+    h.submittedBy = getWho() || "";
+    n.handoff[today] = h;
+    const tmr = String(h.tomorrow || "").trim();
+    if (tmr) {
+      const d = addDaysISO(today, 1);
+      n.focus = n.focus || [];
+      if (!n.focus.some((f) => f.date === d && String(f.text).toLowerCase() === tmr.toLowerCase()))
+        n.focus.push({ id: uid(), text: tmr, done: false, date: d });
+    }
+    persist(n);
+    setHandoffOpen(false);
+  };
+  const handoffStarted = ["stock", "unfinished", "problems", "tomorrow"].some((k) => String(handoff[k] || "").trim());
+
+  const label = (t, right) => React.createElement("div", { className: "flex items-baseline justify-between mb-2.5" },
+    React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, t),
+    right || null);
+  const link = (tab, txt) => React.createElement("button", { onClick: () => goTo(tab), style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, color: COLORS.tomato, padding: 0 } }, txt);
+  const pill = (txt, bg, fg, bd) => React.createElement("span", { key: txt, style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, background: bg, color: fg, border: bd ? "1px solid " + bd : "none", borderRadius: 999, padding: "5px 12px" } }, txt);
+
+  const shownPrep = showAllPrep ? prepLeft : prepLeft.slice(0, 4);
 
   return React.createElement(
     "div",
     null,
-    // headline: the one number that says whether the shift is on track
+    // hero: status, the single most pressing thing, and the counts
     React.createElement(
       "div",
-      { className: "px-5 py-5 mb-4", style: { background: COLORS.crust, borderRadius: 20 } },
-      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#FF5B5B", textTransform: "uppercase" } }, todayLong()),
-      React.createElement("div", { style: { fontFamily: "Oswald", fontWeight: 600, fontSize: 34, lineHeight: 1.05, color: "#FFFFFF", marginTop: 4 } },
-        prepLeft.length + openFocus.length === 0 ? "Nothing outstanding" : (prepLeft.length + openFocus.length) + " things left today"),
-      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#9A9AA6", marginTop: 6 } },
-        prepLeft.length + " prep \u00b7 " + openFocus.length + " priorities \u00b7 " + eighty.length + " 86'd" + (offToday.length ? " \u00b7 " + offToday.length + " off" : ""))
+      { className: "px-5 py-4 mb-3", style: { background: COLORS.crust, borderRadius: 20, borderLeft: "6px solid " + alertColor } },
+      React.createElement("div", { className: "flex items-center justify-between gap-3" },
+        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: alertColor, textTransform: "uppercase" } },
+          status.label + " \u00b7 " + hourLabel(hrs.open) + "\u2013" + hourLabel(hrs.close)),
+        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, color: "#9A9AA6" } }, todayLong())),
+      React.createElement("div", { style: { fontFamily: "Oswald", fontWeight: 600, fontSize: 27, lineHeight: 1.12, color: "#FFFFFF", marginTop: 5 } },
+        alert ? alert.text : "Nothing needs you right now"),
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#9A9AA6", marginTop: 5 } },
+        [prepLeft.length + " prep", openFocus.length + " priorities", openTasks.length + " tasks", eighty.length + " 86'd"].join(" \u00b7 "))
     ),
 
-    // people first — you can't fix the rest if you're short-handed
-    offToday.length > 0 && React.createElement(
+    // who's actually here
+    React.createElement(
       "div",
-      { className: "px-4 py-3 mb-3", style: { background: "#FFF1F1", borderRadius: 16, border: "1px solid rgba(226,0,1,0.22)" } },
-      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: COLORS.tomatoDark, textTransform: "uppercase" } }, "Off today \u2014 "),
-      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 15, fontWeight: 600, color: COLORS.crust } }, offToday.map((r) => r.name).join(", "))
+      { className: "px-4 py-4 mb-3", style: CARD },
+      label("On the floor", link("schedule", "Schedule")),
+      crew.length === 0
+        ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Nobody on today's schedule.")
+        : React.createElement("div", { className: "flex flex-wrap gap-2" },
+            onNow.map((c) => pill(c.person + (c.position ? " \u00b7 " + c.position : ""), COLORS.basil, "#FFFFFF")),
+            later.map((c) => pill(c.person + (c.win ? " from " + hourLabel(c.win.start) : ""), "#F1F1F5", COLORS.crust)),
+            unfilled.map((c) => pill("Needs filling" + (c.time ? " \u00b7 " + c.time : ""), "#FFF6E8", "#8A5A00", "rgba(217,138,0,0.35)")),
+            offToday.map((c) => pill(c.person + " \u2014 off", "#FFF1F1", COLORS.tomatoDark, "rgba(226,0,1,0.25)")),
+            onNow.length + later.length + unfilled.length + offToday.length === 0
+              ? React.createElement("span", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Everyone's shift has finished.") : null)
     ),
 
-    // the handful of things that actually matter today
+    // priorities
     React.createElement(
       "div",
       { className: "px-4 py-4 mb-3", style: CARD },
       label("Today's priorities"),
-      carry.length > 0 && React.createElement(
-        "button",
-        { onClick: bringForward, className: "w-full mb-3 px-3 py-2.5 text-left",
-          style: { background: "#FFF6E8", border: "1px solid rgba(217,138,0,0.35)", borderRadius: 12, fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: "#8A5A00" } },
-        carry.length + (carry.length === 1 ? " item" : " items") + " never got finished \u2014 bring forward"
-      ),
-      mine.length === 0 && React.createElement("div", { className: "pb-3", style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Nothing flagged yet. Add the thing you'd be annoyed to find undone at 5pm."),
-      mine.map((f, i) => React.createElement(
-        "div",
-        { key: f.id, className: "flex items-center gap-3", style: { borderBottom: i === mine.length - 1 ? "none" : "1px solid " + COLORS.line, minHeight: D.row } },
-        React.createElement(
-          "button",
-          { onClick: () => toggleFocus(f.id), className: "flex-1 min-w-0 flex items-center gap-3 text-left",
+      carry.length > 0 && React.createElement("button", { onClick: bringForward, className: "w-full mb-2.5 px-3 py-2 text-left",
+        style: { background: "#FFF6E8", border: "1px solid rgba(217,138,0,0.35)", borderRadius: 12, fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, color: "#8A5A00" } },
+        carry.length + " unfinished from before \u2014 bring forward"),
+      mine.length === 0 && React.createElement("div", { className: "pb-2", style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Nothing flagged yet."),
+      mine.map((f, i) => React.createElement("div", { key: f.id, className: "flex items-center gap-3",
+          style: { borderBottom: i === mine.length - 1 ? "none" : "1px solid " + COLORS.line, minHeight: D.row } },
+        React.createElement("button", { onClick: () => toggleFocus(f.id), className: "flex-1 min-w-0 flex items-center gap-3 text-left",
             style: { background: "transparent", border: "none", minHeight: D.row } },
           React.createElement("span", { className: "flex items-center justify-center flex-shrink-0",
             style: { width: D.check, height: D.check, borderRadius: 999, border: f.done ? "none" : "2px solid #CFCFD8", background: f.done ? COLORS.basil : "transparent" } },
             f.done ? React.createElement(Check, { size: 15, color: "#FFFFFF" }) : null),
           React.createElement("span", { className: "truncate", style: { fontFamily: "Inter", fontSize: D.name, fontWeight: 600, letterSpacing: "-0.012em",
-            color: f.done ? INK3 : COLORS.crust, textDecoration: f.done ? "line-through" : "none", textDecorationThickness: "2px" } }, f.text)
-        ),
+            color: f.done ? INK3 : COLORS.crust, textDecoration: f.done ? "line-through" : "none", textDecorationThickness: "2px" } }, f.text)),
         React.createElement("button", { onClick: () => dropFocus(f.id), style: { background: "transparent", border: "none", padding: 10, flexShrink: 0 } },
-          React.createElement(Trash2, { size: 15, color: INK3 }))
-      )),
-      React.createElement(
-        "div",
-        { className: "flex gap-2 mt-3" },
+          React.createElement(Trash2, { size: 15, color: INK3 })))),
+      React.createElement("div", { className: "flex gap-2 mt-2.5" },
         React.createElement("input", { placeholder: "e.g. Detroit dough needs spreading", value: text,
           onChange: (e) => setText(e.target.value), onKeyDown: (e) => { if (e.key === "Enter") addFocus(); },
           className: "flex-1 px-3 outline-none opp-field" }),
         React.createElement("button", { onClick: addFocus, className: "flex items-center justify-center",
-          style: { background: COLORS.tomato, color: "#FFFFFF", border: "none", borderRadius: 12, minHeight: 46, padding: "0 18px", fontFamily: "Inter", fontSize: 15, fontWeight: 600 } },
-          React.createElement(Plus, { size: 17 }))
-      )
+          style: { background: COLORS.tomato, color: "#FFFFFF", border: "none", borderRadius: 12, minHeight: 46, padding: "0 18px" } },
+          React.createElement(Plus, { size: 17 })))
     ),
 
-    // prep left, tappable right here — no reason to walk to another tab for it
+    // prep, trimmed to what fits
     React.createElement(
       "div",
       { className: "px-4 py-4 mb-3", style: CARD },
-      React.createElement("div", { className: "flex items-baseline justify-between" },
-        label("Prep left"),
-        React.createElement("button", { onClick: () => goTo("preplist"), style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.tomato, padding: "0 0 10px 0" } }, "Full list")),
+      label("Prep left", link("preplist", "Full list")),
       prepLeft.length === 0
-        ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } },
-            prepDone > 0 ? "All " + prepDone + " done. Nothing left." : "Nothing set for today yet.")
-        : prepLeft.map((r, i) => React.createElement(
-            "button",
-            { key: r.id, onClick: () => togglePrep(r.id), className: "w-full flex items-center gap-3 text-left",
-              style: { background: "transparent", border: "none", minHeight: D.row, borderBottom: i === prepLeft.length - 1 ? "none" : "1px solid " + COLORS.line } },
-            React.createElement("span", { className: "flex-shrink-0", style: { width: D.check, height: D.check, borderRadius: 999, border: "2px solid #CFCFD8" } }),
-            React.createElement("span", { className: "truncate flex-1", style: { fontFamily: "Inter", fontSize: D.name, fontWeight: 600, letterSpacing: "-0.012em", color: COLORS.crust } }, r.item),
-            React.createElement("span", { className: "flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: D.chip, color: "#FFFFFF", background: COLORS.tomato, borderRadius: 8, padding: "3px 10px" } }, "\u00d7" + r.need)
-          ))
+        ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, prepDone > 0 ? "All " + prepDone + " done." : "Nothing set for today yet.")
+        : React.createElement("div", null,
+            shownPrep.map((r, i) => React.createElement("button", { key: r.id, onClick: () => togglePrep(r.id), className: "w-full flex items-center gap-3 text-left",
+                style: { background: "transparent", border: "none", minHeight: D.row, borderBottom: i === shownPrep.length - 1 ? "none" : "1px solid " + COLORS.line } },
+              React.createElement("span", { className: "flex-shrink-0", style: { width: D.check, height: D.check, borderRadius: 999, border: "2px solid #CFCFD8" } }),
+              React.createElement("span", { className: "truncate flex-1", style: { fontFamily: "Inter", fontSize: D.name, fontWeight: 600, letterSpacing: "-0.012em", color: COLORS.crust } }, r.item),
+              React.createElement("span", { className: "flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: D.chip, color: "#FFFFFF", background: COLORS.tomato, borderRadius: 8, padding: "3px 10px" } }, "\u00d7" + r.need))),
+            prepLeft.length > 4 && React.createElement("button", { onClick: () => setShowAllPrep(!showAllPrep), className: "mt-2",
+              style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, color: COLORS.tomato, padding: 0 } },
+              showAllPrep ? "Show fewer" : "+" + (prepLeft.length - 4) + " more"))
     ),
 
-    // 86 and low, compact — this is a glance, the board is where you edit
+    // 86 / low / timers, all in one strip
+    (flags.length > 0 || running.length > 0) && React.createElement(
+      "div",
+      { className: "px-4 py-4 mb-3", style: CARD },
+      label("Right now", running.length ? link("timers", "Timers") : null),
+      React.createElement("div", { className: "flex flex-wrap gap-2" },
+        eighty.map((f) => pill("86 \u00b7 " + f.item, COLORS.tomato, "#FFFFFF")),
+        low.map((f) => pill("Low \u00b7 " + f.item, "#FFF6E8", "#8A5A00", "rgba(217,138,0,0.35)")),
+        running.slice(0, 3).map((t) => {
+          const leftMs = t.endsAt - (now || Date.now());
+          const over = leftMs <= 0;
+          const mins = Math.floor(Math.abs(leftMs) / 60000);
+          const secs = Math.floor((Math.abs(leftMs) % 60000) / 1000);
+          const txt = (t.label || "Timer") + " \u00b7 " + (over ? "+" : "") + mins + ":" + String(secs).padStart(2, "0");
+          return pill(txt, over ? COLORS.tomato : COLORS.crust, "#FFFFFF");
+        }))
+    ),
+
+    // closing handoff, collapsed until someone opens it
     React.createElement(
       "div",
       { className: "px-4 py-4 mb-3", style: CARD },
-      React.createElement("div", { className: "flex items-baseline justify-between" },
-        label("86 & low"),
-        React.createElement("button", { onClick: () => goTo("prep"), style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.tomato, padding: "0 0 10px 0" } }, "Board")),
-      flags.length === 0
-        ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Nothing flagged. We've got everything.")
-        : React.createElement("div", { className: "flex flex-wrap gap-2" },
-            eighty.map((f) => React.createElement("span", { key: f.id, style: { fontFamily: "Inter", fontSize: 15, fontWeight: 600, background: COLORS.tomato, color: "#FFFFFF", borderRadius: 999, padding: "7px 14px" } }, "86 \u00b7 " + f.item)),
-            low.map((f) => React.createElement("span", { key: f.id, style: { fontFamily: "Inter", fontSize: 15, fontWeight: 600, background: "#FFF6E8", color: "#8A5A00", border: "1px solid rgba(217,138,0,0.35)", borderRadius: 999, padding: "6px 13px" } }, "Low \u00b7 " + f.item)))
+      React.createElement("button", { onClick: () => setHandoffOpen(!handoffOpen), className: "w-full flex items-center justify-between gap-3 text-left",
+          style: { background: "transparent", border: "none" } },
+        React.createElement("div", null,
+          React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, "Closing handoff"),
+          React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15.5, fontWeight: 600, color: COLORS.crust, marginTop: 3 } },
+            handoff.submittedAt ? "Done for tonight" : handoffStarted ? "Half written" : "Leave tomorrow a clean start")),
+        React.createElement("span", { style: { fontFamily: "Inter", color: COLORS.tomato, fontSize: 20 } }, handoffOpen ? "\u25b4" : "\u25be")),
+      handoff.submittedAt && !handoffOpen ? React.createElement("div", { className: "mt-2 px-3 py-2", style: { background: "#F1F7F3", borderRadius: 10, fontFamily: "Inter", fontSize: 13, color: COLORS.basil } },
+        "Saved" + (handoff.submittedBy ? " by " + handoff.submittedBy : "")) : null,
+      handoffOpen && React.createElement("div", { className: "mt-3" },
+        [["stock", "What ran low or got 86'd?"], ["unfinished", "What didn't get finished?"], ["problems", "Anything to follow up?"], ["tomorrow", "First thing tomorrow"]].map((f) =>
+          React.createElement("div", { key: f[0], className: "mb-3" },
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, fontWeight: 700, color: COLORS.crust, marginBottom: 4 } }, f[1]),
+            React.createElement("textarea", { value: handoff[f[0]] || "", onChange: (e) => setHandoff(f[0], e.target.value), rows: 2,
+              className: "w-full px-3 py-2.5 outline-none opp-field", style: { resize: "vertical", lineHeight: 1.45 } }))),
+        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: INK2, marginBottom: 10 } }, "Whatever you put under \u201Cfirst thing tomorrow\u201D lands on tomorrow's priorities by itself."),
+        React.createElement("button", { onClick: completeHandoff, className: "w-full flex items-center justify-center gap-2",
+          style: { background: COLORS.basil, color: "#FFFFFF", border: "none", borderRadius: 13, minHeight: 50, fontFamily: "Inter", fontSize: 16, fontWeight: 600 } },
+          React.createElement(Check, { size: 17 }), handoff.submittedAt ? "Save changes" : "Finish handoff"))
     ),
 
     React.createElement(
       "div",
       { className: "flex gap-2" },
-      jump("timers", Clock, "Timers", 0),
-      jump("tasks", ClipboardList, "Tasks", (data.tasks || []).filter((t) => !t.done).length),
-      jump("assistant", MessageSquare, "Ask", 0)
+      [["timers", Clock, "Timers", running.length], ["tasks", ClipboardList, "Tasks", openTasks.length], ["assistant", MessageSquare, "Ask", 0]].map((j) =>
+        React.createElement("button", { key: j[0], onClick: () => goTo(j[0]), className: "flex items-center justify-center gap-2 flex-1",
+            style: { background: COLORS.card, border: "none", borderRadius: 14, minHeight: 52, fontFamily: "Inter", fontSize: 15, fontWeight: 600, color: COLORS.crust, boxShadow: "0 1px 2px rgba(23,23,28,0.08)" } },
+          React.createElement(j[1], { size: 17, color: COLORS.tomato }), j[2],
+          j[3] > 0 ? React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: 12.5, background: COLORS.tomato, color: "#FFFFFF", borderRadius: 7, padding: "2px 7px" } }, j[3]) : null))
     )
   );
 }
@@ -2961,6 +3150,37 @@ function TodayTab({ data, persist, goTo }) {
 // ===================== TIPS TAB =====================
 const DAY_SPAN = "11-4";
 const NIGHT_SPAN = "4-close";
+function shopHours(data) {
+    const h = (data && data.shopHours) || {};
+    const days = Array.isArray(h.days) && h.days.length === 7 ? h.days : DEFAULT_HOURS;
+    const shiftChange = Number(h.shiftChange) || DEFAULT_SHIFT_CHANGE;
+    return { days, shiftChange };
+}
+function hoursOn(data, iso) {
+    const dow = iso ? isoToDate(iso).getDay() : new Date().getDay();
+    return shopHours(data).days[dow] || DEFAULT_HOURS[dow];
+}
+function hourNow(d) { const x = d || new Date(); return x.getHours() + x.getMinutes() / 60; }
+// What the shop is doing at this moment, in the words staff would use.
+function shopStatusNow(data, iso, nowDate) {
+    const h = hoursOn(data, iso);
+    const now = hourNow(nowDate);
+    if (now >= h.close) return { label: "Closed", tone: "quiet" };
+    if (now >= h.close - 1) return { label: "Closing", tone: "warn" };
+    if (now >= h.open) return { label: "Open", tone: "good" };
+    if (now >= h.open - 3) return { label: "Prep", tone: "warn" };
+    return { label: "Closed", tone: "quiet" };
+}
+function hourLabel(h) {
+    const n = Number(h);
+    if (!isFinite(n)) return "";
+    const wrapped = n >= 24 ? n - 24 : n;
+    const ap = wrapped >= 12 && wrapped < 24 ? "pm" : "am";
+    let base = wrapped % 12;
+    if (base === 0) base = 12;
+    const mins = Math.round((n - Math.floor(n)) * 60);
+    return base + (mins ? ":" + String(mins).padStart(2, "0") : "") + ap;
+}
 const CLOSE_CHOICES = [
     { label: "8pm", h: 20 }, { label: "9pm", h: 21 }, { label: "10pm", h: 22 },
     { label: "11pm", h: 23 }, { label: "12am", h: 24 }
@@ -3244,6 +3464,7 @@ function TipsTab({ data, persist }) {
     const dayCrew = field("dayCrew", []);
     const dayCash = field("dayCash", "");
     const dayCC = field("dayCC", "");
+    const dayDelivery = field("dayDelivery", "");
     const dayByHours = field("dayByHours", false);
     const dayTimes = field("dayTimes", {});
     const dayShares = field("dayShares", {});
@@ -3261,6 +3482,7 @@ function TipsTab({ data, persist }) {
     const setDayCrew = (v) => put({ dayCrew: v });
     const setDayCash = (v) => put({ dayCash: v });
     const setDayCC = (v) => put({ dayCC: v });
+    const setDayDelivery = (v) => put({ dayDelivery: v });
     const setDayByHours = (v) => put({ dayByHours: v });
     const setDayTimes = (v) => put({ dayTimes: v });
     const setDayShares = (v) => put({ dayShares: v });
@@ -3279,24 +3501,59 @@ function TipsTab({ data, persist }) {
     const [nightExtra, setNightExtra] = useState("");
     const [open, setOpen] = useState("");
     const [copied, setCopied] = useState("");
-    const [okReplace, setOkReplace] = useState(false);
+    const [okReplaceDay, setOkReplaceDay] = useState(false);
+    const [okReplaceNight, setOkReplaceNight] = useState(false);
     const names = staffNameList(data);
+    // A leftover sheet from a previous day was the thing confusing people: they
+    // opened Tips and found numbers already in it. If that old day was saved,
+    // clear it out automatically. If it wasn't, don't silently bin someone's
+    // work — say so and let them choose.
+    const staleDraft = !!draft.date && draft.date !== todayISO();
+    const staleSaved = staleDraft && (data.tips || []).some((x) => x.date === draft.date);
+    useEffect(() => {
+        if (staleDraft && staleSaved) put(blankDraft(todayISO()));
+    }, [staleDraft, staleSaved]);
     const log = (data.tips || []).slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-    const closeHour = (data.tipSettings && data.tipSettings.close) || 21;
+    // Default to the shop's actual close for this date; the selector in the tab
+    // header still overrides it for the nights they stay late.
+    const closeHour = (data.tipSettings && data.tipSettings.close) || hoursOn(data, date).close;
+    // Shift spans follow the handover time in Settings, so cashing out early
+    // just means moving one setting instead of retyping everyone's hours.
+    const _sc = shopHours(data).shiftChange;
+    const _open = hoursOn(data, date).open;
+    const _h12 = (h) => (h > 12 ? h - 12 : h);
+    const DAY_SPAN = _h12(_open) + "-" + _h12(_sc);
+    const NIGHT_SPAN = _h12(_sc) + "-close";
     const setClose = (h) => {
         const next = JSON.parse(JSON.stringify(data));
         next.tipSettings = Object.assign({}, next.tipSettings || {}, { close: h });
         persist(next);
     };
-    const dayTotal = num(dayCash) + num(dayCC);
-    const nightCC = num(ccAll) - num(dayCC) - num(delivery);
+    const clockOf = (iso) => {
+        try {
+            const d = new Date(iso);
+            let h = d.getHours(), ap = h >= 12 ? "pm" : "am";
+            h = h % 12 || 12;
+            return h + ":" + String(d.getMinutes()).padStart(2, "0") + ap;
+        } catch (e) { return ""; }
+    };
+    const dayCCSplit = num(dayCC) - num(dayDelivery);
+    const dayTotal = num(dayCash) + dayCCSplit;
+    // ccAll is the whole day's card tips. Take off what the day shift already
+    // split and the night's own delivery tips; what's left is the night's.
+    // Delivery is entered once, at the end, as the whole day's figure — same
+    // shape as the card tips above it. Whatever the day already logged comes
+    // back off, so the night only carries its own share.
+    const nightDelivery = num(delivery) - num(dayDelivery);
+    const nightCC = num(ccAll) - num(dayCC) - nightDelivery;
     const nightTotal = nightCC + num(nightCash);
-    const daySplit = computeSplit(dayCrew, dayByHours, dayTimes, dayShares, DAY_SPAN, closeHour, num(dayCC), num(dayCash));
+    const daySplit = computeSplit(dayCrew, dayByHours, dayTimes, dayShares, DAY_SPAN, closeHour, dayCCSplit, num(dayCash));
     const nightSplit = computeSplit(nightCrew, nightByHours, nightTimes, nightShares, NIGHT_SPAN, closeHour, nightCC, num(nightCash));
     const dayEach = dayCrew.length ? dayTotal / dayCrew.length : 0;
     const nightEach = nightCrew.length ? nightTotal / nightCrew.length : 0;
     const loadDate = (iso) => {
-        setOkReplace(false);
+        setOkReplaceDay(false);
+        setOkReplaceNight(false);
         const e = (data.tips || []).find((x) => x.date === iso);
         if (!e) {
             put({ date: iso });
@@ -3322,51 +3579,69 @@ function TipsTab({ data, persist }) {
         put(Object.assign({ date: iso, note: e.note || "" }, unpack(e.day, "day"), unpack(e.night, "night"), {
             dayCash: e.day ? String(e.day.cash) : "",
             dayCC: e.day ? String(e.day.cc) : "",
+            dayDelivery: e.day && e.day.delivery != null ? String(e.day.delivery) : "",
             ccAll: e.night ? String(e.night.ccAll) : "",
-            delivery: e.night ? String(e.night.delivery) : "",
+            delivery: e.night ? String(e.night.deliveryAll != null ? e.night.deliveryAll : e.night.delivery) : "",
             nightCash: e.night ? String(e.night.cash) : ""
         }));
     };
     const blankDraft = (keepDate) => ({
         date: keepDate || todayISO(),
-        dayCrew: [], dayCash: "", dayCC: "", dayByHours: false, dayTimes: {}, dayShares: {}, dayPaidMap: {},
+        dayCrew: [], dayCash: "", dayCC: "", dayDelivery: "", dayByHours: false, dayTimes: {}, dayShares: {}, dayPaidMap: {},
         nightCrew: [], ccAll: "", delivery: "", nightCash: "", nightByHours: false,
         nightTimes: {}, nightShares: {}, nightPaidMap: {}, note: ""
     });
-    const clearForm = () => { put(blankDraft(date)); setOkReplace(false); };
+    const clearForm = () => { put(blankDraft(date)); setOkReplaceDay(false); setOkReplaceNight(false); };
     const packRows = (split, paidMap) => split.rows.map((r) => ({
         name: r.name, span: r.span, hours: r.hours, share: r.share,
         ccExact: Math.round(r.ccExact * 100) / 100,
         exact: Math.round(r.exact * 100) / 100,
         paid: paidOf(r, paidMap)
     }));
-    const save = () => {
-        if (blocked)
+    // Each shift saves on its own. The day crew cashes out mid-afternoon and
+    // needs to bank their half and walk away; the night crew finishes the sheet
+    // hours later. Both land in the same entry for the date.
+    const saveShift = (which) => {
+        if (which === "day" ? dayBlocked : nightBlocked)
             return;
-        const entry = {
-            id: uid(),
-            date,
-            day: {
-                crew: dayCrew, cash: num(dayCash), cc: num(dayCC), total: dayTotal, each: dayEach,
+        const stamp = new Date().toISOString();
+        const by = (typeof localStorage !== "undefined" && localStorage.getItem("opp:device")) || "";
+        const next = JSON.parse(JSON.stringify(data));
+        next.tips = next.tips || [];
+        let entry = next.tips.find((x) => x.date === date);
+        if (!entry) {
+            entry = { id: uid(), date, day: null, night: null, note: "" };
+            next.tips.push(entry);
+        }
+        if (which === "day") {
+            entry.day = {
+                crew: dayCrew, cash: num(dayCash), cc: num(dayCC), delivery: num(dayDelivery),
+                total: dayTotal, each: dayEach,
                 paid: daySplit.rows.length ? paidOf(daySplit.rows[0], dayPaidMap) : 0,
                 byHours: dayByHours, rows: packRows(daySplit, dayPaidMap)
-            },
-            night: {
-                crew: nightCrew, ccAll: num(ccAll), dayCC: num(dayCC), delivery: num(delivery),
+            };
+            entry.daySavedAt = stamp;
+            entry.daySavedBy = by;
+        } else {
+            entry.night = {
+                crew: nightCrew, ccAll: num(ccAll), dayCC: num(dayCC), delivery: nightDelivery, deliveryAll: num(delivery),
                 cc: nightCC, cash: num(nightCash), total: nightTotal, each: nightEach,
                 paid: nightSplit.rows.length ? paidOf(nightSplit.rows[0], nightPaidMap) : 0,
                 byHours: nightByHours, rows: packRows(nightSplit, nightPaidMap)
-            },
-            note: note.trim(),
-            savedBy: (typeof localStorage !== "undefined" && localStorage.getItem("opp:device")) || "",
-            savedAt: new Date().toISOString()
-        };
-        const next = JSON.parse(JSON.stringify(data));
-        next.tips = (next.tips || []).filter((x) => x.date !== date);
-        next.tips.push(entry);
-        next.tipDraft = blankDraft(date);
+            };
+            entry.nightSavedAt = stamp;
+            entry.nightSavedBy = by;
+        }
+        entry.note = note.trim();
+        entry.savedBy = by;
+        entry.savedAt = stamp;
+        // Only the night closes the sheet out. Saving the day leaves its numbers
+        // on screen, because the night side has to subtract the day's card tips.
+        if (which === "night")
+            next.tipDraft = blankDraft(date);
         persist(next);
-        setOkReplace(false);
+        setOkReplaceDay(false);
+        setOkReplaceNight(false);
     };
     const removeEntry = (id) => {
         const next = JSON.parse(JSON.stringify(data));
@@ -3381,12 +3656,17 @@ function TipsTab({ data, persist }) {
         }
         catch (e) { /* clipboard blocked — the text is on screen to select */ }
     };
-    const existing = (data.tips || []).some((x) => x.date === date);
-    // Two ways to lose a night's work with one tap: saving a blank form over a
-    // good one, or re-saving a date without meaning to. Both are now blocked.
-    const emptyForm = !dayCrew.length && !nightCrew.length &&
-        daySplit.pot === 0 && nightSplit.pot === 0;
-    const blocked = emptyForm || (existing && !okReplace);
+    const entryFor = (data.tips || []).find((x) => x.date === date) || null;
+    const daySaved = !!(entryFor && entryFor.day);
+    const nightSaved = !!(entryFor && entryFor.night);
+    const existing = !!entryFor;
+    // Two ways to lose work with one tap: saving a blank form over a good one,
+    // or re-saving a shift without meaning to. Both are blocked, per shift.
+    const emptyDay = !dayCrew.length && daySplit.pot === 0;
+    const emptyNight = !nightCrew.length && nightSplit.pot === 0;
+    const emptyForm = emptyDay && emptyNight;
+    const dayBlocked = emptyDay || (daySaved && !okReplaceDay);
+    const nightBlocked = emptyNight || (nightSaved && !okReplaceNight);
     return (React.createElement("div", { className: "space-y-4" },
         React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("div", { className: "flex flex-wrap items-end gap-3" },
@@ -3396,7 +3676,8 @@ function TipsTab({ data, persist }) {
                 React.createElement("div", null,
                     React.createElement("div", { className: "text-xs mb-1", style: { fontFamily: "Inter", color: "#777" } }, "\"Close\" means"),
                     React.createElement("select", { value: closeHour, onChange: (e) => setClose(Number(e.target.value)), className: "text-base px-2.5 py-2 rounded outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", background: COLORS.cream } }, CLOSE_CHOICES.map((c) => React.createElement("option", { key: c.h, value: c.h }, c.label)))),
-                React.createElement("div", { className: "text-sm pb-2", style: { fontFamily: "Inter", color: existing ? COLORS.tomatoDark : "#9A9AA6" } }, existing ? "Already logged — saving will replace it" : prettyDate(date)),
+                React.createElement("div", { className: "text-sm pb-2", style: { fontFamily: "Inter", color: existing ? COLORS.basil : "#9A9AA6" } },
+                    daySaved && nightSaved ? "Day and night both saved" : daySaved ? "Day saved · night still open" : nightSaved ? "Night saved · day still open" : prettyDate(date)),
                 !existing && !emptyForm ? (React.createElement("div", { className: "text-sm pb-2 ml-auto", style: { fontFamily: "Inter", color: COLORS.basil } }, "Held \u2014 comes back when you do, on any tablet")) : null)),
         React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("div", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#6D6D78" } },
@@ -3408,11 +3689,26 @@ function TipsTab({ data, persist }) {
             React.createElement("div", { className: "flex flex-wrap gap-3 mt-3" },
                 React.createElement(MoneyField, { label: "Cash tips", value: dayCash, onChange: setDayCash }),
                 React.createElement(MoneyField, { label: "Credit card tips (day)", value: dayCC, onChange: setDayCC, hint: "gets subtracted from the night side" }),
+                React.createElement(MoneyField, { label: "\u2212 Delivery (3rd party)", value: dayDelivery, onChange: setDayDelivery, hint: "online orders during the day \u2014 comes off before the split" }),
                 React.createElement("div", { className: "flex-1", style: { minWidth: 120 } },
                     React.createElement("div", { className: "text-xs mb-1", style: { fontFamily: "Inter", color: "#777" } }, "Day pot"),
                     React.createElement("div", { className: "text-base px-2.5 py-2 rounded", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }, money(dayTotal)))),
+            num(dayDelivery) > 0 ? React.createElement("div", { className: "mt-3 text-sm px-2.5 py-2 rounded", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono", color: COLORS.crust } },
+                money(num(dayCash)), " + ", money(num(dayCC)), " \u2212 ", money(num(dayDelivery)), " = ", React.createElement("strong", null, money(dayTotal))) : null,
             React.createElement(SplitModeToggle, { byHours: dayByHours, setByHours: setDayByHours, defSpan: DAY_SPAN, split: daySplit }),
-            React.createElement(PayoutTable, { split: daySplit, pot: dayTotal, byHours: dayByHours, times: dayTimes, setTimes: setDayTimes, shares: dayShares, setShares: setDayShares, defSpan: DAY_SPAN, paidMap: dayPaidMap, setPaidMap: setDayPaidMap })),
+            React.createElement(PayoutTable, { split: daySplit, pot: dayTotal, byHours: dayByHours, times: dayTimes, setTimes: setDayTimes, shares: dayShares, setShares: setDayShares, defSpan: DAY_SPAN, paidMap: dayPaidMap, setPaidMap: setDayPaidMap }),
+            // The day crew cash out and go home, so their Save sits with their
+            // own numbers instead of at the bottom of the night's sheet.
+            React.createElement("div", { className: "mt-4 pt-4", style: { borderTop: "1px solid " + COLORS.line } },
+                daySaved ? React.createElement("button", { onClick: () => setOkReplaceDay(!okReplaceDay), className: "flex items-start gap-2.5 w-full text-left px-2.5 py-2.5 rounded mb-2", style: { background: okReplaceDay ? "#FFF1F1" : "#F1F7F3", border: "1px solid " + (okReplaceDay ? COLORS.tomato : COLORS.basil) } },
+                    React.createElement("span", { className: "flex items-center justify-center rounded flex-shrink-0", style: { width: 22, height: 22, marginTop: 1, border: "2px solid " + (okReplaceDay ? COLORS.tomato : COLORS.basil), background: okReplaceDay ? COLORS.tomato : COLORS.basil } },
+                        React.createElement(Check, { size: 13, color: "#FFFFFF" })),
+                    React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } },
+                        okReplaceDay ? "Ticked \u2014 saving will overwrite the day tips already logged." : "Day tips are saved" + (entryFor && entryFor.daySavedAt ? " (" + clockOf(entryFor.daySavedAt) + ")" : "") + ". Tap to change them.")) : null,
+                React.createElement("div", { className: "flex flex-wrap gap-2 items-center" },
+                    React.createElement(TicketButton, { onClick: () => saveShift("day"), color: dayBlocked ? COLORS.line : COLORS.basil, style: { padding: "10px 20px", fontSize: 15, opacity: dayBlocked ? 0.5 : 1, color: dayBlocked ? "#6D6D78" : undefined } },
+                        React.createElement(Check, { size: 15 }), " ", daySaved ? "Replace the day tips" : "Save the day tips"),
+                    emptyDay ? React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "Pick who worked and put the money in first.") : null))),
         React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("div", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#6D6D78" } },
                 "NIGHT SHIFT \u00B7 ",
@@ -3425,14 +3721,17 @@ function TipsTab({ data, persist }) {
                 React.createElement("div", { className: "flex-1", style: { minWidth: 120 } },
                     React.createElement("div", { className: "text-xs mb-1", style: { fontFamily: "Inter", color: "#777" } }, "\u2212 Day CC (from above)"),
                     React.createElement("div", { className: "text-base px-2.5 py-2 rounded", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }, money(num(dayCC)))),
-                React.createElement(MoneyField, { label: "\u2212 Delivery (3rd party)", value: delivery, onChange: setDelivery, hint: "comes off before the split" }),
+                React.createElement(MoneyField, { label: "Delivery tips \u2014 WHOLE day", value: delivery, onChange: setDelivery, hint: "everything the drivers took, all day" }),
+                React.createElement("div", { className: "flex-1", style: { minWidth: 120 } },
+                    React.createElement("div", { className: "text-xs mb-1", style: { fontFamily: "Inter", color: "#777" } }, "\u2212 Day delivery (from above)"),
+                    React.createElement("div", { className: "text-base px-2.5 py-2 rounded", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }, money(num(dayDelivery)))),
                 React.createElement(MoneyField, { label: "+ Night cash", value: nightCash, onChange: setNightCash })),
             React.createElement("div", { className: "mt-3 text-sm px-2.5 py-2 rounded", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono", color: COLORS.crust } },
                 money(num(ccAll)),
                 " \u2212 ",
                 money(num(dayCC)),
                 " \u2212 ",
-                money(num(delivery)),
+                money(nightDelivery),
                 " = ",
                 money(nightCC),
                 " + ",
@@ -3443,18 +3742,18 @@ function TipsTab({ data, persist }) {
             React.createElement(PayoutTable, { split: nightSplit, pot: nightTotal, byHours: nightByHours, times: nightTimes, setTimes: setNightTimes, shares: nightShares, setShares: setNightShares, defSpan: NIGHT_SPAN, paidMap: nightPaidMap, setPaidMap: setNightPaidMap })),
         React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("input", { placeholder: "Note for Val (who was off, anything unusual)", value: note, onChange: (e) => setNote(e.target.value), className: "px-3 py-2.5 rounded outline-none opp-field w-full mb-3", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
-            existing ? (React.createElement("button", { onClick: () => setOkReplace(!okReplace), className: "flex items-start gap-2.5 w-full text-left px-2.5 py-2.5 rounded mb-2", style: { background: okReplace ? "#FFF1F1" : COLORS.cream, border: "1px solid " + COLORS.tomato } },
-                React.createElement("span", { className: "flex items-center justify-center rounded flex-shrink-0", style: { width: 22, height: 22, marginTop: 1, border: "2px solid " + COLORS.tomato, background: okReplace ? COLORS.tomato : "transparent" } }, okReplace ? React.createElement(Check, { size: 13, color: COLORS.cream }) : null),
+            nightSaved ? (React.createElement("button", { onClick: () => setOkReplaceNight(!okReplaceNight), className: "flex items-start gap-2.5 w-full text-left px-2.5 py-2.5 rounded mb-2", style: { background: okReplaceNight ? "#FFF1F1" : "#F1F7F3", border: "1px solid " + (okReplaceNight ? COLORS.tomato : COLORS.basil) } },
+                React.createElement("span", { className: "flex items-center justify-center rounded flex-shrink-0", style: { width: 22, height: 22, marginTop: 1, border: "2px solid " + (okReplaceNight ? COLORS.tomato : COLORS.basil), background: okReplaceNight ? COLORS.tomato : COLORS.basil } },
+                    React.createElement(Check, { size: 13, color: "#FFFFFF" })),
                 React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } },
-                    prettyDate(date),
-                    " is already logged. Tick this to replace it \u2014 otherwise Save stays off."))) : null,
-            emptyForm ? (React.createElement("div", { className: "text-sm mb-2 px-2.5 py-2 rounded", style: { background: COLORS.cream, fontFamily: "Inter", color: "#6D6D78" } }, "Nothing entered yet \u2014 pick who worked and put the money in first.")) : null,
+                    okReplaceNight ? "Ticked \u2014 saving will overwrite the night already logged." : "Night tips are saved" + (entryFor && entryFor.nightSavedAt ? " (" + clockOf(entryFor.nightSavedAt) + ")" : "") + ". Tap to change them."))) : null,
+            emptyNight ? (React.createElement("div", { className: "text-sm mb-2 px-2.5 py-2 rounded", style: { background: "#F8F8FB", fontFamily: "Inter", color: "#6D6D78" } }, "Nothing entered for the night yet \u2014 pick who worked and put the money in first.")) : null,
             React.createElement("div", { className: "flex flex-wrap gap-2" },
-                React.createElement(TicketButton, { onClick: save, color: blocked ? COLORS.line : undefined, style: { padding: "10px 20px", fontSize: 15, opacity: blocked ? 0.5 : 1, color: blocked ? "#6D6D78" : undefined } },
+                React.createElement(TicketButton, { onClick: () => saveShift("night"), color: nightBlocked ? COLORS.line : undefined, style: { padding: "10px 20px", fontSize: 15, opacity: nightBlocked ? 0.5 : 1, color: nightBlocked ? "#6D6D78" : undefined } },
                     React.createElement(Check, { size: 15 }),
                     " ",
-                    existing ? "Replace this night" : "Save the night"),
-                React.createElement(TicketButton, { onClick: clearForm, color: COLORS.line, style: { color: COLORS.crust } }, "Clear"))),
+                    nightSaved ? "Replace the night" : "Save the night"),
+                React.createElement(TicketButton, { onClick: clearForm, color: COLORS.line, style: { color: COLORS.crust } }, "Clear the whole sheet"))),
         React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("div", { className: "flex items-center justify-between mb-2" },
                 React.createElement("div", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#6D6D78" } }, "TIP LOG"),
@@ -6820,7 +7119,7 @@ function AppGate() {
     const bump = () => { lastTouch.current = Date.now(); };
     ["pointerdown", "keydown"].forEach((e) => window.addEventListener(e, bump, { passive: true }));
     const iv = setInterval(() => {
-      if (getStoredRole() === "admin" && Date.now() - lastTouch.current > ADMIN_IDLE_MS) {
+      if (getAutoStaff() && getStoredRole() === "admin" && Date.now() - lastTouch.current > ADMIN_IDLE_MS) {
         setStoredRole("staff");
         setRole("staff");
       }
