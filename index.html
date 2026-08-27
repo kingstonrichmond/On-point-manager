@@ -2924,7 +2924,10 @@ function crewForDate(data, iso, nowDate) {
 function TodayTab({ data, persist, goTo, timers, now }) {
   const [text, setText] = useState("");
   const [showAllPrep, setShowAllPrep] = useState(false);
-  const [handoffOpen, setHandoffOpen] = useState(false);
+  const [addMe, setAddMe] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addTime, setAddTime] = useState("");
+  const [handoffOpen, setHandoffOpen] = useState("");
   const D = DENSITY[useDensity()];
   const today = todayISO();
   const nowDate = new Date(now || Date.now());
@@ -2975,24 +2978,50 @@ function TodayTab({ data, persist, goTo, timers, now }) {
   const dropFocus = (id) => { const n = clone(); n.focus = (n.focus || []).filter((x) => x.id !== id); persist(n); };
   const bringForward = () => { const n = clone(); (n.focus || []).forEach((f) => { if (f.date !== today && !f.done) f.date = today; }); persist(n); };
   const togglePrep = (id) => { const n = clone(); const r = (n.prep.par || []).find((x) => x.id === id); if (r) r.done = !r.done; persist(n); };
+  // People work the same shifts most weeks, so letting them put themselves on
+  // when they don't see their name builds the schedule from the bottom up —
+  // he only has to take off whoever isn't actually working.
+  const addToSchedule = () => {
+    const nm = String(addName || getWho() || "").trim();
+    if (!nm) return;
+    const n = clone();
+    const key = DOW3[isoToDate(today).getDay()];
+    n.schedule = n.schedule || {};
+    n.schedule[key] = (n.schedule[key] || []).concat([{ id: uid(), name: nm, time: String(addTime || "").trim() }]);
+    persist(n);
+    setAddMe(false); setAddName(""); setAddTime("");
+  };
 
-  // Closing handoff: four questions, and tomorrow's answer becomes tomorrow's
-  // first priority automatically so nothing falls in the gap between shifts.
-  const handoff = (data.handoff && data.handoff[today]) || {};
-  const setHandoff = (key, value) => {
+  // Two handoffs, not one. The day crew leaves notes for the night crew — half
+  // of whom aren't in yet — and the night crew closes the day out. Entries
+  // written before the shape changed are kept as the night's.
+  const dayBook = (data.handoff && data.handoff[today]) || {};
+  const legacy = dayBook.stock !== undefined || dayBook.unfinished !== undefined || dayBook.tomorrow !== undefined;
+  const bookFor = (which) => (legacy && which === "night" ? dayBook : (dayBook[which] || {}));
+  const setHandoff = (which, key, value) => {
     const n = clone();
     n.handoff = n.handoff || {};
-    n.handoff[today] = Object.assign({}, n.handoff[today] || {}, { [key]: value, submittedAt: "" });
+    const day = Object.assign({}, n.handoff[today] || {});
+    if (legacy) {
+      const moved = { stock: day.stock, unfinished: day.unfinished, problems: day.problems, tomorrow: day.tomorrow, submittedAt: day.submittedAt, submittedBy: day.submittedBy };
+      ["stock", "unfinished", "problems", "tomorrow", "submittedAt", "submittedBy"].forEach((k) => { delete day[k]; });
+      day.night = Object.assign({}, moved, day.night || {});
+    }
+    day[which] = Object.assign({}, day[which] || {}, { [key]: value, submittedAt: "" });
+    n.handoff[today] = day;
     persist(n);
   };
-  const completeHandoff = () => {
+  const completeHandoff = (which) => {
     const n = clone();
     n.handoff = n.handoff || {};
-    const h = Object.assign({}, n.handoff[today] || {});
+    const day = Object.assign({}, n.handoff[today] || {});
+    const h = Object.assign({}, day[which] || (legacy && which === "night" ? day : {}));
     h.submittedAt = new Date().toISOString();
     h.submittedBy = getWho() || "";
-    n.handoff[today] = h;
-    const tmr = String(h.tomorrow || "").trim();
+    day[which] = h;
+    n.handoff[today] = day;
+    // Only the closing note reaches into tomorrow.
+    const tmr = which === "night" ? String(h.tomorrow || "").trim() : "";
     if (tmr) {
       const d = addDaysISO(today, 1);
       n.focus = n.focus || [];
@@ -3000,15 +3029,26 @@ function TodayTab({ data, persist, goTo, timers, now }) {
         n.focus.push({ id: uid(), text: tmr, done: false, date: d });
     }
     persist(n);
-    setHandoffOpen(false);
+    setHandoffOpen("");
   };
-  const handoffStarted = ["stock", "unfinished", "problems", "tomorrow"].some((k) => String(handoff[k] || "").trim());
+  const HANDOFFS = [
+    { id: "day", title: "Day handoff", blurb: "For the night crew \u2014 most of them aren't in yet",
+      fields: [["unfinished", "What still needs doing?"], ["stock", "Anything running low?"], ["problems", "Anything to pass on?"]] },
+    { id: "night", title: "Closing handoff", blurb: "Leave tomorrow a clean start",
+      fields: [["stock", "What ran low or got 86'd?"], ["unfinished", "What didn't get finished?"], ["problems", "Anything to follow up?"], ["tomorrow", "First thing tomorrow"]] }
+  ];
+  const shiftChangeHour = shopHours(data).shiftChange;
+  const currentHandoff = hourNow(nowDate) >= shiftChangeHour ? "night" : "day";
 
   const label = (t, right) => React.createElement("div", { className: "flex items-baseline justify-between mb-2.5" },
     React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, t),
     right || null);
   const link = (tab, txt) => React.createElement("button", { onClick: () => goTo(tab), style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, color: COLORS.tomato, padding: 0 } }, txt);
   const pill = (txt, bg, fg, bd) => React.createElement("span", { key: txt, style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, background: bg, color: fg, border: bd ? "1px solid " + bd : "none", borderRadius: 999, padding: "5px 12px" } }, txt);
+  // 86 and low chips are the shortest route to the board — tapping one should
+  // take you there, the same way "Full list" does for prep.
+  const tapPill = (txt, tab, bg, fg, bd) => React.createElement("button", { key: txt, onClick: () => goTo(tab),
+    style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, background: bg, color: fg, border: bd ? "1px solid " + bd : "none", borderRadius: 999, padding: "6px 13px", minHeight: 34 } }, txt);
 
   const shownPrep = showAllPrep ? prepLeft : prepLeft.slice(0, 4);
 
@@ -3033,7 +3073,7 @@ function TodayTab({ data, persist, goTo, timers, now }) {
     React.createElement(
       "div",
       { className: "px-4 py-4 mb-3", style: CARD },
-      label("On the floor", link("schedule", "Schedule")),
+      label("On the floor", link("schedule", "Full schedule")),
       crew.length === 0
         ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Nobody on today's schedule.")
         : React.createElement("div", { className: "flex flex-wrap gap-2" },
@@ -3042,7 +3082,24 @@ function TodayTab({ data, persist, goTo, timers, now }) {
             unfilled.map((c) => pill("Needs filling" + (c.time ? " \u00b7 " + c.time : ""), "#FFF6E8", "#8A5A00", "rgba(217,138,0,0.35)")),
             offToday.map((c) => pill(c.person + " \u2014 off", "#FFF1F1", COLORS.tomatoDark, "rgba(226,0,1,0.25)")),
             onNow.length + later.length + unfilled.length + offToday.length === 0
-              ? React.createElement("span", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Everyone's shift has finished.") : null)
+              ? React.createElement("span", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Everyone's shift has finished.") : null),
+      addMe
+        ? React.createElement("div", { className: "mt-3" },
+            React.createElement("div", { className: "flex gap-2 mb-2" },
+              React.createElement("select", { value: addName, onChange: (e) => setAddName(e.target.value), className: "flex-1 px-3 outline-none opp-field" },
+                React.createElement("option", { value: "" }, getWho() ? getWho() + " (this tablet)" : "Who?"),
+                staffNameList(data).map((n2) => React.createElement("option", { key: n2, value: n2 }, n2))),
+              React.createElement("input", { placeholder: "e.g. 4-close", value: addTime, onChange: (e) => setAddTime(e.target.value),
+                onKeyDown: (e) => { if (e.key === "Enter") addToSchedule(); }, className: "px-3 outline-none opp-field", style: { width: 130 } })),
+            React.createElement("div", { className: "flex gap-2" },
+              React.createElement("button", { onClick: addToSchedule, className: "flex items-center justify-center gap-1.5",
+                style: { background: COLORS.tomato, color: "#FFFFFF", border: "none", borderRadius: 12, minHeight: 44, padding: "0 18px", fontFamily: "Inter", fontSize: 15, fontWeight: 600 } },
+                React.createElement(Check, { size: 16 }), "Add to today"),
+              React.createElement("button", { onClick: () => setAddMe(false),
+                style: { background: "transparent", color: INK2, border: "1px solid " + COLORS.line, borderRadius: 12, minHeight: 44, padding: "0 16px", fontFamily: "Inter", fontSize: 15, fontWeight: 600 } }, "Cancel")))
+        : React.createElement("button", { onClick: () => { setAddMe(true); setAddName(getWho() || ""); }, className: "mt-3 flex items-center gap-1.5",
+            style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.tomato, padding: 0 } },
+            React.createElement(Plus, { size: 15 }), "Don't see your name? Add yourself")
     ),
 
     // priorities
@@ -3096,10 +3153,10 @@ function TodayTab({ data, persist, goTo, timers, now }) {
     (flags.length > 0 || running.length > 0) && React.createElement(
       "div",
       { className: "px-4 py-4 mb-3", style: CARD },
-      label("Right now", running.length ? link("timers", "Timers") : null),
+      label("Right now", flags.length ? link("prep", "86 board") : running.length ? link("timers", "Timers") : null),
       React.createElement("div", { className: "flex flex-wrap gap-2" },
-        eighty.map((f) => pill("86 \u00b7 " + f.item, COLORS.tomato, "#FFFFFF")),
-        low.map((f) => pill("Low \u00b7 " + f.item, "#FFF6E8", "#8A5A00", "rgba(217,138,0,0.35)")),
+        eighty.map((f) => tapPill("86 \u00b7 " + f.item, "prep", COLORS.tomato, "#FFFFFF")),
+        low.map((f) => tapPill("Low \u00b7 " + f.item, "prep", "#FFF6E8", "#8A5A00", "rgba(217,138,0,0.35)")),
         running.slice(0, 3).map((t) => {
           const leftMs = t.endsAt - (now || Date.now());
           const over = leftMs <= 0;
@@ -3110,30 +3167,36 @@ function TodayTab({ data, persist, goTo, timers, now }) {
         }))
     ),
 
-    // closing handoff, collapsed until someone opens it
-    React.createElement(
-      "div",
-      { className: "px-4 py-4 mb-3", style: CARD },
-      React.createElement("button", { onClick: () => setHandoffOpen(!handoffOpen), className: "w-full flex items-center justify-between gap-3 text-left",
-          style: { background: "transparent", border: "none" } },
-        React.createElement("div", null,
-          React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, "Closing handoff"),
-          React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15.5, fontWeight: 600, color: COLORS.crust, marginTop: 3 } },
-            handoff.submittedAt ? "Done for tonight" : handoffStarted ? "Half written" : "Leave tomorrow a clean start")),
-        React.createElement("span", { style: { fontFamily: "Inter", color: COLORS.tomato, fontSize: 20 } }, handoffOpen ? "\u25b4" : "\u25be")),
-      handoff.submittedAt && !handoffOpen ? React.createElement("div", { className: "mt-2 px-3 py-2", style: { background: "#F1F7F3", borderRadius: 10, fontFamily: "Inter", fontSize: 13, color: COLORS.basil } },
-        "Saved" + (handoff.submittedBy ? " by " + handoff.submittedBy : "")) : null,
-      handoffOpen && React.createElement("div", { className: "mt-3" },
-        [["stock", "What ran low or got 86'd?"], ["unfinished", "What didn't get finished?"], ["problems", "Anything to follow up?"], ["tomorrow", "First thing tomorrow"]].map((f) =>
-          React.createElement("div", { key: f[0], className: "mb-3" },
+    // Both handoffs stay on the page; the one that belongs to this half of the
+    // day is the one that reads as live.
+    HANDOFFS.map((H) => {
+      const book = bookFor(H.id);
+      const started = H.fields.some((f) => String(book[f[0]] || "").trim());
+      const open = handoffOpen === H.id;
+      const active = currentHandoff === H.id;
+      return React.createElement(
+        "div",
+        { key: H.id, className: "px-4 py-4 mb-3", style: Object.assign({}, CARD, active && !book.submittedAt ? { boxShadow: "0 1px 2px rgba(23,23,28,0.05), 0 6px 18px rgba(23,23,28,0.05)", border: "1px solid " + COLORS.line } : { opacity: book.submittedAt || active ? 1 : 0.78 }) },
+        React.createElement("button", { onClick: () => setHandoffOpen(open ? "" : H.id), className: "w-full flex items-center justify-between gap-3 text-left",
+            style: { background: "transparent", border: "none" } },
+          React.createElement("div", { className: "min-w-0" },
+            React.createElement("div", { className: "flex items-center gap-2" },
+              React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, H.title),
+              active && !book.submittedAt ? React.createElement("span", { style: { fontFamily: "Inter", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", background: "rgba(226,0,1,0.10)", color: COLORS.tomato, borderRadius: 999, padding: "2px 8px" } }, "Now") : null),
+            React.createElement("div", { className: "truncate", style: { fontFamily: "Inter", fontSize: 15.5, fontWeight: 600, color: COLORS.crust, marginTop: 3 } },
+              book.submittedAt ? "Done" + (book.submittedBy ? " \u00b7 " + book.submittedBy : "") : started ? "Half written" : H.blurb)),
+          React.createElement("span", { style: { fontFamily: "Inter", color: COLORS.tomato, fontSize: 20 } }, open ? "\u25b4" : "\u25be")),
+        open && React.createElement("div", { className: "mt-3" },
+          H.fields.map((f) => React.createElement("div", { key: f[0], className: "mb-3" },
             React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, fontWeight: 700, color: COLORS.crust, marginBottom: 4 } }, f[1]),
-            React.createElement("textarea", { value: handoff[f[0]] || "", onChange: (e) => setHandoff(f[0], e.target.value), rows: 2,
+            React.createElement("textarea", { value: book[f[0]] || "", onChange: (e) => setHandoff(H.id, f[0], e.target.value), rows: 2,
               className: "w-full px-3 py-2.5 outline-none opp-field", style: { resize: "vertical", lineHeight: 1.45 } }))),
-        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: INK2, marginBottom: 10 } }, "Whatever you put under \u201Cfirst thing tomorrow\u201D lands on tomorrow's priorities by itself."),
-        React.createElement("button", { onClick: completeHandoff, className: "w-full flex items-center justify-center gap-2",
-          style: { background: COLORS.basil, color: "#FFFFFF", border: "none", borderRadius: 13, minHeight: 50, fontFamily: "Inter", fontSize: 16, fontWeight: 600 } },
-          React.createElement(Check, { size: 17 }), handoff.submittedAt ? "Save changes" : "Finish handoff"))
-    ),
+          H.id === "night" ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: INK2, marginBottom: 10 } }, "Whatever you put under \u201Cfirst thing tomorrow\u201D lands on tomorrow's priorities by itself.") : null,
+          React.createElement("button", { onClick: () => completeHandoff(H.id), className: "w-full flex items-center justify-center gap-2",
+            style: { background: COLORS.basil, color: "#FFFFFF", border: "none", borderRadius: 13, minHeight: 50, fontFamily: "Inter", fontSize: 16, fontWeight: 600 } },
+            React.createElement(Check, { size: 17 }), book.submittedAt ? "Save changes" : "Finish handoff"))
+      );
+    }),
 
     React.createElement(
       "div",
