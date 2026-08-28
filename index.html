@@ -2951,6 +2951,14 @@ function TodayTab({ data, persist, goTo, timers, now }) {
   const status = shopStatusNow(data, today, nowDate);
   const hrs = hoursOn(data, today);
   const running = (timers || []).slice().sort((a, b) => a.endsAt - b.endsAt);
+  // Mozz sticks go in the fryer constantly, so that timer shouldn't cost a trip
+  // to another tab. Pinned presets get a one-tap button right here; if nothing
+  // has been pinned yet, mozz sticks is the one that shows.
+  const allPresets = (data && data.timerPresets) || DEFAULT_TIMER_PRESETS;
+  let pinned = allPresets.filter((p) => p.onToday);
+  if (!pinned.length) pinned = allPresets.filter((p) => /mozz/i.test(p.label)).slice(0, 1);
+  pinned = pinned.slice(0, 3);
+  const startPreset = (p) => { if (setTimers) startTimer(setTimers, p.label, p.seconds); };
   const overdue = running.find((t) => t.endsAt <= (now || Date.now()));
   const CARD = { background: COLORS.card, borderRadius: 18, boxShadow: "0 1px 2px rgba(23,23,28,0.05), 0 6px 18px rgba(23,23,28,0.05)" };
 
@@ -3150,10 +3158,19 @@ function TodayTab({ data, persist, goTo, timers, now }) {
     ),
 
     // 86 / low / timers, all in one strip
-    (flags.length > 0 || running.length > 0) && React.createElement(
+    React.createElement(
       "div",
       { className: "px-4 py-4 mb-3", style: CARD },
-      label("Right now", flags.length ? link("prep", "86 board") : running.length ? link("timers", "Timers") : null),
+      label("Right now", flags.length ? link("prep", "86 board") : link("timers", "Timers")),
+      pinned.length ? React.createElement("div", { className: "flex flex-wrap gap-2 mb-3" }, pinned.map((pz) =>
+        React.createElement("button", { key: pz.id, onClick: () => startPreset(pz), className: "flex items-center gap-2",
+          style: { background: COLORS.crust, color: "#FFFFFF", border: "none", borderRadius: 13, minHeight: 50, padding: "0 18px",
+                   fontFamily: "Inter", fontSize: 15.5, fontWeight: 600 } },
+          React.createElement(Clock, { size: 16, color: "#FF5B5B" }), pz.label,
+          React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: 13, color: "#9A9AA6" } }, mmss(pz.seconds))))) : null,
+      (flags.length === 0 && running.length === 0)
+        ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Nothing flagged, no timers going.")
+        : null,
       React.createElement("div", { className: "flex flex-wrap gap-2" },
         eighty.map((f) => tapPill("86 \u00b7 " + f.item, "prep", COLORS.tomato, "#FFFFFF")),
         low.map((f) => tapPill("Low \u00b7 " + f.item, "prep", "#FFF6E8", "#8A5A00", "rgba(217,138,0,0.35)")),
@@ -4211,6 +4228,14 @@ function TimersTab({ data, persist, timers, setTimers, now }) {
         setNewSecs("");
     };
     const removePreset = (id) => savePresets(presets.filter((p) => p.id !== id));
+    // Pin up to three presets onto the Today page as one-tap buttons. Nothing
+    // pinned means mozz sticks shows there by default.
+    const pinnedCount = presets.filter((p) => p.onToday).length;
+    const togglePin = (id) => savePresets(presets.map((p) => {
+        if (p.id !== id) return p;
+        if (!p.onToday && pinnedCount >= 3) return p;
+        return Object.assign({}, p, { onToday: !p.onToday });
+    }));
     const bumpPreset = (id, delta) => savePresets(presets.map((p) => p.id === id ? Object.assign({}, p, { seconds: Math.max(5, p.seconds + delta) }) : p));
     const quickStart = () => {
         const total = (Number(mins) || 0) * 60 + (Number(secs) || 0);
@@ -4277,7 +4302,13 @@ function TimersTab({ data, persist, timers, setTimers, now }) {
                 React.createElement("span", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#6D6D78" } }, "EDIT THE PRESET TIMES"),
                 React.createElement("span", { style: { color: COLORS.tomato, fontFamily: "Inter" } }, editing ? "\u25b4" : "\u25be")),
             editing ? (React.createElement("div", { className: "mt-3 space-y-1.5" },
+                React.createElement("div", { className: "text-sm px-2.5 pb-1", style: { fontFamily: "Inter", color: "#6D6D78" } },
+                    "Tap a star to put that timer on the Today page \u2014 up to three." + (pinnedCount === 0 ? " Right now Mozz Sticks shows there by default." : "")),
                 presets.map((p) => (React.createElement("div", { key: p.id, className: "flex items-center gap-2 px-2.5 py-2 rounded", style: { background: COLORS.cream } },
+                    React.createElement("button", { onClick: () => togglePin(p.id), title: "Show on the Today page",
+                        style: { background: "transparent", border: "none", padding: "6px 4px", fontSize: 15, lineHeight: 1,
+                                 color: p.onToday ? COLORS.tomato : "#C7C7D1", opacity: !p.onToday && pinnedCount >= 3 ? 0.4 : 1 } },
+                        p.onToday ? "\u2605" : "\u2606"),
                     React.createElement("span", { className: "flex-1 text-sm truncate", style: { fontFamily: "Inter", color: COLORS.crust } }, p.label),
                     React.createElement("button", { onClick: () => bumpPreset(p.id, -15), className: "px-2 py-1 rounded text-xs", style: { background: COLORS.card, border: "1px solid " + COLORS.line, fontFamily: "Inter" } }, "-15s"),
                     React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, minWidth: 52, textAlign: "center" } }, mmss(p.seconds)),
@@ -4477,6 +4508,7 @@ function InvoiceScanner({ data, persist, onClose }) {
   const [err, setErr] = useState("");
   const [parsed, setParsed] = useState(null);
   const [rows, setRows] = useState([]);
+  const [progress, setProgress] = useState("");
   const [applied, setApplied] = useState(null);
 
   const addFiles = async (files) => {
@@ -4486,12 +4518,50 @@ function InvoiceScanner({ data, persist, onClose }) {
     setBusy(true);
     try {
       const out = [];
-      for (const f of list) out.push(await shrinkImage(f, 1600));
+      for (const f of list) out.push(await shrinkImage(f, 1500));
       setImgs((prev) => prev.concat(out).slice(0, 8));
     } catch (e) {
       setErr(e.message || "Couldn't process those photos.");
     }
     setBusy(false);
+  };
+
+  // One request per couple of pages. Aborts a beat before Netlify would, so a
+  // slow read says something useful instead of dying as a raw 502.
+  const readBatch = async (pages, index, total) => {
+    const content = pages.map((b64) => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } }));
+    content.push({
+      type: "text",
+      text: 'These photos are ' + (total > 1 ? "pages " + (index * 2 + 1) + " onward of" : "") + ' one food-distributor invoice for a pizza shop. Read every line item on THESE pages only. Respond with ONLY raw JSON, no prose and no markdown fences, in exactly this shape:\n{"vendor":"QFC" or "Thomsen" or the vendor name you see,"invoice_date":"YYYY-MM-DD","lines":[{"desc":"item description as printed","code":"item/product number if shown else empty string","unit":"the unit the PRICE is per - lb, case, box, ea, bag, bundle, pail","price":0.00}]}\nRules: "price" must be the UNIT price (price per lb, per case, etc), NOT the extended line total. If a line shows both a unit price and a total, use the unit price. Skip any line you cannot read a price for. If the vendor or invoice date is not visible on these pages, use an empty string. Return an empty lines array if these pages have no priced items.'
+    });
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 24e3);
+    let res;
+    try {
+      res = await fetch(window.CHAT_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: ctrl.signal,
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 3000, messages: [{ role: "user", content }] })
+      });
+    } catch (e) {
+      if (e && e.name === "AbortError")
+        throw new Error("That page took too long to read. Try one page at a time, or a tighter crop on the item lines.");
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
+    const raw = await res.text();
+    if (res.status === 502 || res.status === 504)
+      throw new Error("The server gave up partway through that page. Photograph just the lines you need and try again.");
+    if (!res.ok) throw new Error(`Server said ${res.status}. ${raw.slice(0, 200)}`);
+    const json = JSON.parse(raw);
+    if (json.error) throw new Error(json.error.message || "API error");
+    let text = (json.content || []).map((c) => c.text || "").join("\n").trim();
+    text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error("Couldn't read line items from those photos. Try a straighter, better-lit shot.");
+    return JSON.parse(m[0]);
   };
 
   const readInvoice = async () => {
@@ -4501,25 +4571,24 @@ function InvoiceScanner({ data, persist, onClose }) {
     setParsed(null);
     setRows([]);
     try {
-      const content = imgs.map((b64) => ({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } }));
-      content.push({
-        type: "text",
-        text: 'These photos are pages of one food-distributor invoice for a pizza shop. Read every line item across all the pages. Respond with ONLY raw JSON, no prose and no markdown fences, in exactly this shape:\n{"vendor":"QFC" or "Thomsen" or the vendor name you see,"invoice_date":"YYYY-MM-DD","lines":[{"desc":"item description as printed","code":"item/product number if shown else empty string","unit":"the unit the PRICE is per - lb, case, box, ea, bag, bundle, pail","price":0.00}]}\nRules: "price" must be the UNIT price (price per lb, per case, etc), NOT the extended line total. If a line shows both a unit price and a total, use the unit price. Skip any line you cannot read a price for. If the invoice date is unclear use an empty string.'
-      });
-      const res = await fetch(window.CHAT_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 3000, messages: [{ role: "user", content }] })
-      });
-      const raw = await res.text();
-      if (!res.ok) throw new Error(`Server said ${res.status}. ${raw.slice(0, 200)}`);
-      const json = JSON.parse(raw);
-      if (json.error) throw new Error(json.error.message || "API error");
-      let text = (json.content || []).map((c) => c.text || "").join("\n").trim();
-      text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-      const m = text.match(/\{[\s\S]*\}/);
-      if (!m) throw new Error("Couldn't read line items from those photos. Try a straighter, better-lit shot.");
-      const out = JSON.parse(m[0]);
+      // Netlify cuts a synchronous function off at 10 seconds (26 at most, and
+      // only on request), which is why more than two pages died. So send the
+      // pages a couple at a time and stitch the line items back together — each
+      // call is small enough to finish, however many pages there are.
+      const PAGES_PER_CALL = 2;
+      const batches = [];
+      for (let i = 0; i < imgs.length; i += PAGES_PER_CALL) batches.push(imgs.slice(i, i + PAGES_PER_CALL));
+      const allLines = [];
+      let vendor = "", invDate = "";
+      for (let b = 0; b < batches.length; b++) {
+        setProgress(batches.length > 1 ? "Reading page " + (b * PAGES_PER_CALL + 1) + (batches[b].length > 1 ? "\u2013" + (b * PAGES_PER_CALL + batches[b].length) : "") + " of " + imgs.length + "\u2026" : "");
+        const got = await readBatch(batches[b], b, batches.length);
+        if (!vendor && got.vendor) vendor = got.vendor;
+        if (!invDate && got.invoice_date) invDate = got.invoice_date;
+        (got.lines || []).forEach((l) => allLines.push(l));
+      }
+      setProgress("");
+      const out = { vendor, invoice_date: invDate, lines: allLines };
       const lines = (out.lines || []).filter((l) => l && l.desc && Number(l.price) > 0);
       if (!lines.length) throw new Error("No priced line items found. Make sure the price column is in frame.");
       setParsed({ vendor: out.vendor || "", date: out.invoice_date || "" });
@@ -4543,8 +4612,10 @@ function InvoiceScanner({ data, persist, onClose }) {
         };
       }));
     } catch (e) {
+      setProgress("");
       setErr(e.message || "Something went wrong reading that invoice.");
     }
+    setProgress("");
     setBusy(false);
   };
 
@@ -4624,7 +4695,7 @@ function InvoiceScanner({ data, persist, onClose }) {
         !rows.length ? /* @__PURE__ */ React.createElement(
           "div",
           null,
-          /* @__PURE__ */ React.createElement("p", { className: "text-sm mb-3", style: { fontFamily: "Inter", color: "#7a6a5c", lineHeight: 1.5 } }, "Take a photo of each page of the invoice \u2014 make sure the item descriptions and the price column are both in frame. Up to 8 pages."),
+          /* @__PURE__ */ React.createElement("p", { className: "text-sm mb-3", style: { fontFamily: "Inter", color: "#7a6a5c", lineHeight: 1.5 } }, "Take a photo of each page of the invoice \u2014 make sure the item descriptions and the price column are both in frame. Up to 8 pages; they're read two at a time so long invoices don't time out."),
           /* @__PURE__ */ React.createElement(
             "label",
             { className: "flex items-center justify-center gap-2 w-full px-3 py-4 rounded mb-3", style: { background: COLORS.tomato, color: COLORS.cream, fontFamily: "Inter", fontWeight: 600 } },
@@ -4653,7 +4724,7 @@ function InvoiceScanner({ data, persist, onClose }) {
           imgs.length ? /* @__PURE__ */ React.createElement(
             "button",
             { onClick: readInvoice, disabled: busy, className: "w-full px-3 py-4 rounded", style: { background: busy ? "#9aa892" : COLORS.basil, color: COLORS.cream, fontFamily: "Inter", fontWeight: 600, border: "none" } },
-            busy ? "Reading the invoice\u2026" : "Read " + imgs.length + (imgs.length === 1 ? " page" : " pages")
+            busy ? (progress || "Reading the invoice\u2026") : "Read " + imgs.length + (imgs.length === 1 ? " page" : " pages")
           ) : null,
           busy && !imgs.length ? /* @__PURE__ */ React.createElement("div", { className: "text-sm text-center py-4", style: { fontFamily: "Inter", color: "#7a6a5c" } }, "Processing photos\u2026") : null
         ) : /* @__PURE__ */ React.createElement(
