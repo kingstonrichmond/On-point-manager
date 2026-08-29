@@ -2921,7 +2921,7 @@ function crewForDate(data, iso, nowDate) {
     return { id: shift.id, person, position, time: shift.time, unfilled, off, win, status };
   });
 }
-function TodayTab({ data, persist, goTo, timers, now }) {
+function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
   const [text, setText] = useState("");
   const [showAllPrep, setShowAllPrep] = useState(false);
   const [addMe, setAddMe] = useState(false);
@@ -2951,14 +2951,11 @@ function TodayTab({ data, persist, goTo, timers, now }) {
   const status = shopStatusNow(data, today, nowDate);
   const hrs = hoursOn(data, today);
   const running = (timers || []).slice().sort((a, b) => a.endsAt - b.endsAt);
-  // Mozz sticks go in the fryer constantly, so that timer shouldn't cost a trip
-  // to another tab. Pinned presets get a one-tap button right here; if nothing
-  // has been pinned yet, mozz sticks is the one that shows.
+  // Star a preset in the Timers tab and it lives down here until it's unstarred.
+  // Nothing starred means nothing shows — no default.
   const allPresets = (data && data.timerPresets) || DEFAULT_TIMER_PRESETS;
-  let pinned = allPresets.filter((p) => p.onToday);
-  if (!pinned.length) pinned = allPresets.filter((p) => /mozz/i.test(p.label)).slice(0, 1);
-  pinned = pinned.slice(0, 3);
-  const startPreset = (p) => { if (setTimers) startTimer(setTimers, p.label, p.seconds); };
+  const pinned = allPresets.filter((p) => p.onToday).slice(0, 3);
+  const startPreset = (p) => startTimer(setTimers, p.label, p.seconds);
   const overdue = running.find((t) => t.endsAt <= (now || Date.now()));
   const CARD = { background: COLORS.card, borderRadius: 18, boxShadow: "0 1px 2px rgba(23,23,28,0.05), 0 6px 18px rgba(23,23,28,0.05)" };
 
@@ -4308,7 +4305,7 @@ function TimersTab({ data, persist, timers, setTimers, now }) {
                 React.createElement("span", { style: { color: COLORS.tomato, fontFamily: "Inter" } }, editing ? "\u25b4" : "\u25be")),
             editing ? (React.createElement("div", { className: "mt-3 space-y-1.5" },
                 React.createElement("div", { className: "text-sm px-2.5 pb-1", style: { fontFamily: "Inter", color: "#6D6D78" } },
-                    "Tap a star to put that timer on the Today page \u2014 up to three." + (pinnedCount === 0 ? " Right now Mozz Sticks shows there by default." : "")),
+                    "Tap a star to keep that timer on the Today page \u2014 up to three. It stays until you unstar it."),
                 presets.map((p) => (React.createElement("div", { key: p.id, className: "flex items-center gap-2 px-2.5 py-2 rounded", style: { background: COLORS.cream } },
                     React.createElement("button", { onClick: () => togglePin(p.id), title: "Show on the Today page",
                         style: { background: "transparent", border: "none", padding: "6px 4px", fontSize: 15, lineHeight: 1,
