@@ -2078,7 +2078,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo: setTab, timers, now: timerNow }), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist, canEdit: isAdmin }), tab === "timeoff" && /* @__PURE__ */ React.createElement(TimeOffTab, { data, persist }), tab === "tips" && /* @__PURE__ */ React.createElement(TipsTab, { data, persist }), tab === "timers" && /* @__PURE__ */ React.createElement(TimersTab, { data, persist, timers, setTimers, now: timerNow }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "foodorder" && /* @__PURE__ */ React.createElement(FoodOrderTab, { data, persist }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); }, data,
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo: setTab, timers, setTimers, now: timerNow }), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist, canEdit: isAdmin }), tab === "timeoff" && /* @__PURE__ */ React.createElement(TimeOffTab, { data, persist }), tab === "tips" && /* @__PURE__ */ React.createElement(TipsTab, { data, persist }), tab === "timers" && /* @__PURE__ */ React.createElement(TimersTab, { data, persist, timers, setTimers, now: timerNow }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "foodorder" && /* @__PURE__ */ React.createElement(FoodOrderTab, { data, persist }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); }, data,
         onHoursChange: (next) => { const d = JSON.parse(JSON.stringify(dataRef.current)); d.shopHours = next; persist(d); } })), /* @__PURE__ */ React.createElement(TimerOverlay, { timers, setTimers, now: timerNow }));
 }
 function AssistantAvatar({ state }) {
@@ -3158,19 +3158,10 @@ function TodayTab({ data, persist, goTo, timers, now }) {
     ),
 
     // 86 / low / timers, all in one strip
-    React.createElement(
+    (flags.length > 0 || running.length > 0) && React.createElement(
       "div",
       { className: "px-4 py-4 mb-3", style: CARD },
       label("Right now", flags.length ? link("prep", "86 board") : link("timers", "Timers")),
-      pinned.length ? React.createElement("div", { className: "flex flex-wrap gap-2 mb-3" }, pinned.map((pz) =>
-        React.createElement("button", { key: pz.id, onClick: () => startPreset(pz), className: "flex items-center gap-2",
-          style: { background: COLORS.crust, color: "#FFFFFF", border: "none", borderRadius: 13, minHeight: 50, padding: "0 18px",
-                   fontFamily: "Inter", fontSize: 15.5, fontWeight: 600 } },
-          React.createElement(Clock, { size: 16, color: "#FF5B5B" }), pz.label,
-          React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: 13, color: "#9A9AA6" } }, mmss(pz.seconds))))) : null,
-      (flags.length === 0 && running.length === 0)
-        ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Nothing flagged, no timers going.")
-        : null,
       React.createElement("div", { className: "flex flex-wrap gap-2" },
         eighty.map((f) => tapPill("86 \u00b7 " + f.item, "prep", COLORS.tomato, "#FFFFFF")),
         low.map((f) => tapPill("Low \u00b7 " + f.item, "prep", "#FFF6E8", "#8A5A00", "rgba(217,138,0,0.35)")),
@@ -3223,7 +3214,21 @@ function TodayTab({ data, persist, goTo, timers, now }) {
             style: { background: COLORS.card, border: "none", borderRadius: 14, minHeight: 52, fontFamily: "Inter", fontSize: 15, fontWeight: 600, color: COLORS.crust, boxShadow: "0 1px 2px rgba(23,23,28,0.08)" } },
           React.createElement(j[1], { size: 17, color: COLORS.tomato }), j[2],
           j[3] > 0 ? React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: 12.5, background: COLORS.tomato, color: "#FFFFFF", borderRadius: 7, padding: "2px 7px" } }, j[3]) : null))
-    )
+    ),
+
+    // Sits directly under the Timers button, because that's where your hand
+    // already is when you want one. One tap starts it.
+    pinned.length ? React.createElement(
+      "div",
+      { className: "flex flex-wrap gap-2 mt-2" },
+      pinned.map((pz) => React.createElement(
+        "button",
+        { key: pz.id, onClick: () => startPreset(pz), className: "flex items-center gap-2",
+          style: { background: COLORS.crust, color: "#FFFFFF", border: "none", borderRadius: 13, minHeight: 44, padding: "0 15px",
+                   fontFamily: "Inter", fontSize: 14.5, fontWeight: 600 } },
+        React.createElement(Clock, { size: 15, color: "#FF5B5B" }), pz.label,
+        React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: 12.5, color: "#9A9AA6" } }, mmss(pz.seconds))))
+    ) : null
   );
 }
 
