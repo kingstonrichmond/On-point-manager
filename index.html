@@ -498,8 +498,9 @@ const DEFAULT_DATA = {
     { id: "sm45", area: "Outdoor Storage Container \u2014 Left Side Shelf", items: 'Bulk 9x9 and 9x6 containers, souffl\xE9 cups & lids, deli containers & lids, clear hinged containers, 18" film, parfait cups & lids, misc. tools/junk/extra screens underneath' }
   ],
   standardPositions: ["Fryer", "Salad", "Sandwich", "Pizza", "Oven", "Oven 2", "Pizza 2", "Pie Spreading", "Dishwashing"],
+  timeClock: [],
   staff: [
-    { id: "st1", name: "Chris (owner)", phone: "", positions: [], notes: [] },
+    { id: "st1", name: "Chris (owner)", phone: "", pin: "", positions: [], notes: [] },
     { id: "st2", name: "Andy", phone: "", positions: [], notes: [] },
     { id: "st3", name: "Pop", phone: "", positions: [], notes: [] },
     { id: "st4", name: "Samoia", phone: "", positions: [{ id: "p1", name: "Front", skill: 3 }], notes: [] },
@@ -1803,6 +1804,8 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   var _a;
   const [data, setData] = useState(null);
   const [rawTab, setTab] = useState("today");
+  const [subTab, setSubTab] = useState("");
+  const goTo = (t, s) => { setTab(t); setSubTab(s || ""); };
   const [timers, setTimers] = useState(loadTimers);
   const [timerNow, setTimerNow] = useState(Date.now());
   useEffect(() => {
@@ -2006,25 +2009,17 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   // Settings deliberately stays open to staff: it holds the admin unlock, the
   // per-tablet preferences, and nothing worth hiding. The rows inside it that
   // do matter are gated by role instead.
-  const ADMIN_TABS = { tips: 1, staff: 1, foodorder: 1, liveops: 1 };
+  const ADMIN_TABS = { tips: 1, liveops: 1 };
   const tabs = [
     { id: "today", label: "Today", icon: Activity },
     { id: "assistant", label: "Ask the Manager", icon: MessageSquare },
-    { id: "schedule", label: "Schedule", icon: Users },
-    { id: "timeoff", label: "Time Off", icon: Calendar, badge: offSoon },
-    { id: "tips", label: "Tips", icon: DollarSign },
+    { id: "crew", label: "Crew", icon: Users, badge: offSoon },
+    { id: "tips", label: "Tips & Time Clock", icon: DollarSign },
     { id: "timers", label: "Timers", icon: Clock, badge: (timers || []).length },
-    { id: "staff", label: "Staff", icon: Users },
-    { id: "inventory", label: "Inventory", icon: Package, badge: lowStockCount },
-    { id: "preplist", label: "Prep List", icon: ClipboardList, badge: prepTodo },
-    { id: "foodorder", label: "Food Order", icon: ShoppingCart, badge: foodOrderNeed },
-    { id: "belmont", label: "Belmont Order", icon: ShoppingCart, badge: belmontNeed },
-    { id: "prep", label: "86 Board", icon: AlertTriangle, badge: boardFlags },
-    { id: "recipes", label: "Recipes", icon: Pizza },
-    { id: "guides", label: "Guides", icon: Camera },
-    { id: "menu", label: "Menu", icon: BookOpen },
+    { id: "invorders", label: "Inventory & Orders", icon: Package, badge: lowStockCount + foodOrderNeed + belmontNeed + boardFlags },
+    { id: "preptasks", label: "Prep & Tasks", icon: ClipboardList, badge: prepTodo + openTasks },
+    { id: "reference", label: "Reference", icon: BookOpen },
     { id: "liveops", label: "Live Ops", icon: Activity },
-    { id: "tasks", label: "Tasks", icon: ClipboardList, badge: openTasks },
     { id: "settings", label: "Settings", icon: Activity, badge: 0 }
   ].filter((t) => isAdmin || !ADMIN_TABS[t.id]);
   // If this tablet was left on a tab its role can't see, fall back during
@@ -2078,7 +2073,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo: setTab, timers, setTimers, now: timerNow }), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "schedule" && /* @__PURE__ */ React.createElement(ScheduleTab, { data, persist, canEdit: isAdmin }), tab === "timeoff" && /* @__PURE__ */ React.createElement(TimeOffTab, { data, persist }), tab === "tips" && /* @__PURE__ */ React.createElement(TipsTab, { data, persist }), tab === "timers" && /* @__PURE__ */ React.createElement(TimersTab, { data, persist, timers, setTimers, now: timerNow }), tab === "staff" && /* @__PURE__ */ React.createElement(StaffTab, { data, persist }), tab === "inventory" && /* @__PURE__ */ React.createElement(InventoryTab, { data, persist }), tab === "preplist" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "par" }), tab === "foodorder" && /* @__PURE__ */ React.createElement(FoodOrderTab, { data, persist }), tab === "belmont" && /* @__PURE__ */ React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }), tab === "prep" && /* @__PURE__ */ React.createElement(PrepParTab, { data, persist }), tab === "recipes" && /* @__PURE__ */ React.createElement(RecipesTab, { data, persist }), tab === "guides" && /* @__PURE__ */ React.createElement(GuidesTab, { data, persist }), tab === "menu" && /* @__PURE__ */ React.createElement(MenuTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "tasks" && /* @__PURE__ */ React.createElement(TasksTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); }, data,
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab }), tab === "tips" && /* @__PURE__ */ React.createElement(TipsTab, { data, persist, isAdmin }), tab === "timers" && /* @__PURE__ */ React.createElement(TimersTab, { data, persist, timers, setTimers, now: timerNow }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, initialSub: subTab }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); }, data,
         onHoursChange: (next) => { const d = JSON.parse(JSON.stringify(dataRef.current)); d.shopHours = next; persist(d); } })), /* @__PURE__ */ React.createElement(TimerOverlay, { timers, setTimers, now: timerNow }));
 }
 function AssistantAvatar({ state }) {
@@ -2732,6 +2727,151 @@ function num(v) {
     const n = parseFloat(String(v == null ? "" : v).replace(/[^0-9.\-]/g, ""));
     return isFinite(n) ? n : 0;
 }
+// ===================== TIME CLOCK =====================
+// PINs are 4 digits, set per-person in Staff. Matching is exact-string so a
+// blank PIN never matches a blank entry attempt.
+function findStaffByPin(data, pin) {
+    const p = String(pin || "").trim();
+    if (!p)
+        return null;
+    return ((data && data.staff) || []).find((s) => s.pin && String(s.pin).trim() === p) || null;
+}
+function openClockEntry(data, staffId, iso) {
+    return ((data && data.timeClock) || []).find((e) => e.staffId === staffId && e.date === iso && !e.clockOut) || null;
+}
+function fmtClockTime(iso) {
+    try {
+        const d = new Date(iso);
+        let h = d.getHours(), ap = h >= 12 ? "pm" : "am";
+        h = h % 12 || 12;
+        return h + ":" + String(d.getMinutes()).padStart(2, "0") + ap;
+    } catch (e) { return ""; }
+}
+function clockDuration(clockIn, clockOut) {
+    const ms = new Date(clockOut || Date.now()).getTime() - new Date(clockIn).getTime();
+    const mins = Math.max(0, Math.round(ms / 60000));
+    return Math.floor(mins / 60) + "h " + String(mins % 60).padStart(2, "0") + "m";
+}
+// Builds a shift-span string ("16:32-21:04", or "16:32-close" if still clocked
+// in) from real clock times, for pre-filling the Tips hours split. 24-hour,
+// zero-padded — parseClock only special-cases bare 1-7 as PM, so this reads
+// unambiguously for anything at or after 8 o'clock.
+function timeClockSpanFor(data, iso, name) {
+    const entries = ((data && data.timeClock) || []).filter(
+        (e) => e.date === iso && normPerson(e.name) === normPerson(name)
+    );
+    if (!entries.length)
+        return null;
+    entries.sort((a, b) => (a.clockIn < b.clockIn ? -1 : 1));
+    const first = entries[0], last = entries[entries.length - 1];
+    const hhmm = (iso2) => {
+        const d = new Date(iso2);
+        return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+    };
+    return hhmm(first.clockIn) + "-" + (last.clockOut ? hhmm(last.clockOut) : "close");
+}
+function TimeClockPanel({ data, persist, isAdmin }) {
+    const [digits, setDigits] = useState("");
+    const [msg, setMsg] = useState(null); // { text, tone }
+    const iso = todayISO();
+    const openNow = ((data && data.timeClock) || []).filter((e) => e.date === iso && !e.clockOut)
+        .sort((a, b) => (a.clockIn < b.clockIn ? -1 : 1));
+    const flashMsg = (text, tone) => {
+        setMsg({ text, tone });
+        setTimeout(() => setMsg((m) => (m && m.text === text ? null : m)), 2600);
+    };
+    const punch = (pin) => {
+        const s = findStaffByPin(data, pin);
+        if (!s) {
+            flashMsg("PIN not recognized", "bad");
+            return;
+        }
+        const next = JSON.parse(JSON.stringify(data));
+        next.timeClock = next.timeClock || [];
+        const open = openClockEntry(next, s.id, iso);
+        const firstName = String(s.name || "").split("(")[0].trim();
+        if (open) {
+            open.clockOut = new Date().toISOString();
+            persist(next);
+            flashMsg("Clocked out \u2014 " + firstName + " \u00b7 " + fmtClockTime(open.clockOut), "good");
+        } else {
+            next.timeClock.push({ id: uid(), staffId: s.id, name: firstName, date: iso, clockIn: new Date().toISOString(), clockOut: null });
+            persist(next);
+            flashMsg("Clocked in \u2014 " + firstName + " \u00b7 " + fmtClockTime((/* @__PURE__ */ new Date()).toISOString()), "good");
+        }
+    };
+    const press = (d) => {
+        const next = (digits + d).slice(0, 4);
+        setDigits(next);
+        if (next.length === 4) {
+            punch(next);
+            setDigits("");
+        }
+    };
+    const adminClockOut = (entryId) => {
+        const next = JSON.parse(JSON.stringify(data));
+        const e = (next.timeClock || []).find((x) => x.id === entryId);
+        if (e)
+            e.clockOut = new Date().toISOString();
+        persist(next);
+    };
+    const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "\u232b"];
+    return React.createElement(
+        "div",
+        { className: "opp-card px-4 py-4 mb-4", style: { background: COLORS.card } },
+        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#888", textTransform: "uppercase" } }, "Time Clock"),
+        React.createElement(
+            "div",
+            { className: "flex items-center justify-center gap-3 my-3" },
+            [0, 1, 2, 3].map((i) => React.createElement("span", {
+                key: i,
+                style: {
+                    width: 14, height: 14, borderRadius: 999,
+                    background: i < digits.length ? COLORS.tomato : "transparent",
+                    border: `2px solid ${i < digits.length ? COLORS.tomato : COLORS.line}`
+                }
+            }))
+        ),
+        msg && React.createElement("div", {
+            className: "text-center mb-3",
+            style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: msg.tone === "bad" ? COLORS.tomatoDark : COLORS.basil }
+        }, msg.text),
+        React.createElement(
+            "div",
+            { className: "grid grid-cols-3 gap-2 mx-auto", style: { maxWidth: 220 } },
+            KEYS.map((k, i) => k === "" ? React.createElement("div", { key: i }) : React.createElement(
+                "button",
+                {
+                    key: i,
+                    onClick: () => (k === "\u232b" ? setDigits(digits.slice(0, -1)) : press(k)),
+                    style: {
+                        height: 52, borderRadius: 14, border: `1px solid ${COLORS.line}`, background: "#FFFFFF",
+                        fontFamily: "Inter", fontSize: 19, fontWeight: 600, color: COLORS.crust
+                    }
+                },
+                k
+            ))
+        ),
+        openNow.length > 0 && React.createElement(
+            "div",
+            { className: "mt-4 pt-3", style: { borderTop: `1px solid ${COLORS.line}` } },
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 11.5, fontWeight: 700, letterSpacing: "0.06em", color: "#888", textTransform: "uppercase", marginBottom: 6 } }, "Clocked in now"),
+            openNow.map((e) => React.createElement(
+                "div",
+                { key: e.id, className: "flex items-center justify-between", style: { padding: "6px 0" } },
+                React.createElement("div", null,
+                    React.createElement("span", { style: { fontFamily: "Inter", fontSize: 14.5, fontWeight: 600, color: COLORS.crust } }, e.name),
+                    React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#888", marginLeft: 8 } }, "since " + fmtClockTime(e.clockIn) + " \u00b7 " + clockDuration(e.clockIn))
+                ),
+                isAdmin && React.createElement("button", {
+                    onClick: () => adminClockOut(e.id),
+                    className: "text-xs px-2 py-1 rounded",
+                    style: { fontFamily: "Inter", border: `1px solid ${COLORS.line}`, color: COLORS.tomatoDark }
+                }, "Clock out")
+            ))
+        )
+    );
+}
 // ===================== TIME OFF TAB =====================
 function TimeOffTab({ data, persist }) {
     const t0 = new Date();
@@ -3048,11 +3188,11 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
   const label = (t, right) => React.createElement("div", { className: "flex items-baseline justify-between mb-2.5" },
     React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, t),
     right || null);
-  const link = (tab, txt) => React.createElement("button", { onClick: () => goTo(tab), style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, color: COLORS.tomato, padding: 0 } }, txt);
+  const link = (tab, sub, txt) => React.createElement("button", { onClick: () => goTo(tab, sub), style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, color: COLORS.tomato, padding: 0 } }, txt);
   const pill = (txt, bg, fg, bd) => React.createElement("span", { key: txt, style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, background: bg, color: fg, border: bd ? "1px solid " + bd : "none", borderRadius: 999, padding: "5px 12px" } }, txt);
   // 86 and low chips are the shortest route to the board — tapping one should
   // take you there, the same way "Full list" does for prep.
-  const tapPill = (txt, tab, bg, fg, bd) => React.createElement("button", { key: txt, onClick: () => goTo(tab),
+  const tapPill = (txt, tab, sub, bg, fg, bd) => React.createElement("button", { key: txt, onClick: () => goTo(tab, sub),
     style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, background: bg, color: fg, border: bd ? "1px solid " + bd : "none", borderRadius: 999, padding: "6px 13px", minHeight: 34 } }, txt);
 
   const shownPrep = showAllPrep ? prepLeft : prepLeft.slice(0, 4);
@@ -3078,7 +3218,7 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
     React.createElement(
       "div",
       { className: "px-4 py-4 mb-3", style: CARD },
-      label("On the floor", link("schedule", "Full schedule")),
+      label("On the floor", link("crew", "schedule", "Full schedule")),
       crew.length === 0
         ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Nobody on today's schedule.")
         : React.createElement("div", { className: "flex flex-wrap gap-2" },
@@ -3140,7 +3280,7 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
     React.createElement(
       "div",
       { className: "px-4 py-4 mb-3", style: CARD },
-      label("Prep left", link("preplist", "Full list")),
+      label("Prep left", link("preptasks", "preplist", "Full list")),
       prepLeft.length === 0
         ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, prepDone > 0 ? "All " + prepDone + " done." : "Nothing set for today yet.")
         : React.createElement("div", null,
@@ -3158,10 +3298,10 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
     (flags.length > 0 || running.length > 0) && React.createElement(
       "div",
       { className: "px-4 py-4 mb-3", style: CARD },
-      label("Right now", flags.length ? link("prep", "86 board") : link("timers", "Timers")),
+      label("Right now", flags.length ? link("invorders", "board86", "86 board") : link("timers", null, "Timers")),
       React.createElement("div", { className: "flex flex-wrap gap-2" },
-        eighty.map((f) => tapPill("86 \u00b7 " + f.item, "prep", COLORS.tomato, "#FFFFFF")),
-        low.map((f) => tapPill("Low \u00b7 " + f.item, "prep", "#FFF6E8", "#8A5A00", "rgba(217,138,0,0.35)")),
+        eighty.map((f) => tapPill("86 \u00b7 " + f.item, "invorders", "board86", COLORS.tomato, "#FFFFFF")),
+        low.map((f) => tapPill("Low \u00b7 " + f.item, "invorders", "board86", "#FFF6E8", "#8A5A00", "rgba(217,138,0,0.35)")),
         running.slice(0, 3).map((t) => {
           const leftMs = t.endsAt - (now || Date.now());
           const over = leftMs <= 0;
@@ -3206,11 +3346,11 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
     React.createElement(
       "div",
       { className: "flex gap-2" },
-      [["timers", Clock, "Timers", running.length], ["tasks", ClipboardList, "Tasks", openTasks.length], ["assistant", MessageSquare, "Ask", 0]].map((j) =>
-        React.createElement("button", { key: j[0], onClick: () => goTo(j[0]), className: "flex items-center justify-center gap-2 flex-1",
+      [["timers", null, Clock, "Timers", running.length], ["preptasks", "tasks", ClipboardList, "Tasks", openTasks.length], ["assistant", null, MessageSquare, "Ask", 0]].map((j) =>
+        React.createElement("button", { key: j[0] + (j[1] || ""), onClick: () => goTo(j[0], j[1]), className: "flex items-center justify-center gap-2 flex-1",
             style: { background: COLORS.card, border: "none", borderRadius: 14, minHeight: 52, fontFamily: "Inter", fontSize: 15, fontWeight: 600, color: COLORS.crust, boxShadow: "0 1px 2px rgba(23,23,28,0.08)" } },
-          React.createElement(j[1], { size: 17, color: COLORS.tomato }), j[2],
-          j[3] > 0 ? React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: 12.5, background: COLORS.tomato, color: "#FFFFFF", borderRadius: 7, padding: "2px 7px" } }, j[3]) : null))
+          React.createElement(j[2], { size: 17, color: COLORS.tomato }), j[3],
+          j[4] > 0 ? React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: 12.5, background: COLORS.tomato, color: "#FFFFFF", borderRadius: 7, padding: "2px 7px" } }, j[4]) : null))
     ),
 
     // Sits directly under the Timers button, because that's where your hand
@@ -3472,11 +3612,14 @@ function PayoutTable({ split, pot, byHours, times, setTimes, shares, setShares, 
                 left < 0 ? "over by " : "left over ",
                 React.createElement("strong", { style: { fontFamily: "JetBrains Mono" } }, money(Math.abs(left)))))));
 }
-function SplitModeToggle({ byHours, setByHours, defSpan, split }) {
+function SplitModeToggle({ byHours, setByHours, defSpan, split, onUseClocked }) {
     const simple = !byHours && split.allFull && split.rows.length > 0;
     return (React.createElement("div", { className: "flex flex-wrap items-center gap-2 mt-3" },
         React.createElement("button", { onClick: () => setByHours(false), className: "px-3 py-2 rounded text-sm", style: { background: byHours ? COLORS.cream : COLORS.crust, color: byHours ? COLORS.crust : COLORS.cream, border: "1px solid " + COLORS.line, fontFamily: "Inter" } }, "Even split"),
         React.createElement("button", { onClick: () => setByHours(true), className: "px-3 py-2 rounded text-sm", style: { background: byHours ? COLORS.crust : COLORS.cream, color: byHours ? COLORS.cream : COLORS.crust, border: "1px solid " + COLORS.line, fontFamily: "Inter" } }, "By hours"),
+        onUseClocked && (React.createElement("button", { onClick: onUseClocked, className: "px-3 py-2 rounded text-sm flex items-center gap-1", style: { background: "#FFFFFF", color: COLORS.tomato, border: "1px solid " + COLORS.line, fontFamily: "Inter" } },
+            React.createElement(Clock, { size: 13 }),
+            " Use clocked hours")),
         byHours && (React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#9A9AA6" } },
             "blank = whole shift (",
             defSpan,
@@ -3531,7 +3674,7 @@ function tipEntryText(e) {
         L.push("Note: " + e.note);
     return L.join("\n");
 }
-function TipsTab({ data, persist }) {
+function TipsTab({ data, persist, isAdmin }) {
     // The half-finished sheet lives in the shared data, not in component state.
     // Day tips get entered mid-afternoon and the night side hours later, often on
     // a different tablet — switching tabs used to throw the whole thing away.
@@ -3750,6 +3893,7 @@ function TipsTab({ data, persist }) {
     const dayBlocked = emptyDay || (daySaved && !okReplaceDay);
     const nightBlocked = emptyNight || (nightSaved && !okReplaceNight);
     return (React.createElement("div", { className: "space-y-4" },
+        React.createElement(TimeClockPanel, { data, persist, isAdmin }),
         React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("div", { className: "flex flex-wrap items-end gap-3" },
                 React.createElement("div", null,
@@ -3777,7 +3921,12 @@ function TipsTab({ data, persist }) {
                     React.createElement("div", { className: "text-base px-2.5 py-2 rounded", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono" } }, money(dayTotal)))),
             num(dayDelivery) > 0 ? React.createElement("div", { className: "mt-3 text-sm px-2.5 py-2 rounded", style: { background: "#F8F8FB", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono", color: COLORS.crust } },
                 money(num(dayCash)), " + ", money(num(dayCC)), " \u2212 ", money(num(dayDelivery)), " = ", React.createElement("strong", null, money(dayTotal))) : null,
-            React.createElement(SplitModeToggle, { byHours: dayByHours, setByHours: setDayByHours, defSpan: DAY_SPAN, split: daySplit }),
+            React.createElement(SplitModeToggle, { byHours: dayByHours, setByHours: setDayByHours, defSpan: DAY_SPAN, split: daySplit, onUseClocked: dayCrew.length ? () => {
+                const nextTimes = Object.assign({}, dayTimes);
+                dayCrew.forEach((n) => { const span = timeClockSpanFor(data, date, n); if (span && !dayTimes[n]) nextTimes[n] = span; });
+                setDayTimes(nextTimes);
+                setDayByHours(true);
+            } : null }),
             React.createElement(PayoutTable, { split: daySplit, pot: dayTotal, byHours: dayByHours, times: dayTimes, setTimes: setDayTimes, shares: dayShares, setShares: setDayShares, defSpan: DAY_SPAN, paidMap: dayPaidMap, setPaidMap: setDayPaidMap }),
             // The day crew cash out and go home, so their Save sits with their
             // own numbers instead of at the bottom of the night's sheet.
@@ -3820,7 +3969,12 @@ function TipsTab({ data, persist }) {
                 money(num(nightCash)),
                 " = ",
                 React.createElement("strong", null, money(nightTotal))),
-            React.createElement(SplitModeToggle, { byHours: nightByHours, setByHours: setNightByHours, defSpan: NIGHT_SPAN, split: nightSplit }),
+            React.createElement(SplitModeToggle, { byHours: nightByHours, setByHours: setNightByHours, defSpan: NIGHT_SPAN, split: nightSplit, onUseClocked: nightCrew.length ? () => {
+                const nextTimes = Object.assign({}, nightTimes);
+                nightCrew.forEach((n) => { const span = timeClockSpanFor(data, date, n); if (span && !nightTimes[n]) nextTimes[n] = span; });
+                setNightTimes(nextTimes);
+                setNightByHours(true);
+            } : null }),
             React.createElement(PayoutTable, { split: nightSplit, pot: nightTotal, byHours: nightByHours, times: nightTimes, setTimes: setNightTimes, shares: nightShares, setShares: setNightShares, defSpan: NIGHT_SPAN, paidMap: nightPaidMap, setPaidMap: setNightPaidMap })),
         React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("input", { placeholder: "Note for Val (who was off, anything unusual)", value: note, onChange: (e) => setNote(e.target.value), className: "px-3 py-2.5 rounded outline-none opp-field w-full mb-3", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
@@ -4341,7 +4495,7 @@ function Stars({ value, onChange }) {
 function StaffTab({ data, persist }) {
   const staff = data.staff || [];
   const [editingId, setEditingId] = useState(null);
-  const [draft, setDraft] = useState({ name: "", phone: "" });
+  const [draft, setDraft] = useState({ name: "", phone: "", pin: "" });
   const [adding, setAdding] = useState(false);
   const [posDraft, setPosDraft] = useState({});
   const [noteDraft, setNoteDraft] = useState({});
@@ -4354,18 +4508,19 @@ function StaffTab({ data, persist }) {
   };
   const startEdit = (s) => {
     setEditingId(s.id);
-    setDraft({ name: s.name, phone: s.phone || "" });
+    setDraft({ name: s.name, phone: s.phone || "", pin: s.pin || "" });
   };
+  const pinTaken = (pin, exceptId) => !!pin && staff.some((s) => s.id !== exceptId && s.pin && String(s.pin) === String(pin));
   const saveEdit = () => {
-    save(staff.map((s) => s.id === editingId ? { ...s, name: draft.name, phone: draft.phone } : s));
+    save(staff.map((s) => s.id === editingId ? { ...s, name: draft.name, phone: draft.phone, pin: draft.pin } : s));
     setEditingId(null);
-    setDraft({ name: "", phone: "" });
+    setDraft({ name: "", phone: "", pin: "" });
   };
   const addStaff = () => {
     if (!draft.name.trim()) return;
-    save([...staff, { id: uid(), name: draft.name.trim(), phone: draft.phone, positions: [], notes: [] }]);
+    save([...staff, { id: uid(), name: draft.name.trim(), phone: draft.phone, pin: draft.pin || "", positions: [], notes: [] }]);
     setAdding(false);
-    setDraft({ name: "", phone: "" });
+    setDraft({ name: "", phone: "", pin: "" });
   };
   const remove = (id) => save(staff.filter((s) => s.id !== id));
   const addPosition = (staffId) => {
@@ -4416,14 +4571,14 @@ function StaffTab({ data, persist }) {
     },
     /* @__PURE__ */ React.createElement("option", { value: "" }, "Select a position..."),
     allPositions.map((p) => /* @__PURE__ */ React.createElement("option", { key: p, value: p }, p))
-  ), fillPosition && (fillCandidates.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "No one's listed for ", fillPosition, " yet.") : /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, fillCandidates.map(({ s, p }) => /* @__PURE__ */ React.createElement("div", { key: s.id, className: "flex items-center justify-between text-sm", style: { fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(Stars, { value: p.skill }), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { color: "#888" } }, s.phone || "no number"))))))), adding && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-3 rounded space-y-1.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("input", { placeholder: "Name", value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: addStaff, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => {
+  ), fillPosition && (fillCandidates.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "No one's listed for ", fillPosition, " yet.") : /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, fillCandidates.map(({ s, p }) => /* @__PURE__ */ React.createElement("div", { key: s.id, className: "flex items-center justify-between text-sm", style: { fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(Stars, { value: p.skill }), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { color: "#888" } }, s.phone || "no number"))))))), adding && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-3 rounded space-y-1.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("input", { placeholder: "Name", value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "4-digit PIN (time clock)", inputMode: "numeric", maxLength: 4, value: draft.pin, onChange: (e) => setDraft({ ...draft, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${pinTaken(draft.pin, null) ? COLORS.tomato : COLORS.line}`, fontFamily: "JetBrains Mono" } }), pinTaken(draft.pin, null) && /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.tomatoDark } }, "Someone else already has that PIN."), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: addStaff, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => {
     setAdding(false);
     setDraft({ name: "", phone: "" });
   }, color: "#888" }, "Cancel"))), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, staff.map((s) => {
     const editing = editingId === s.id;
     const open = expanded === s.id;
     const pd = posDraft[s.id] || { name: "", skill: 3 };
-    return /* @__PURE__ */ React.createElement("div", { key: s.id, className: "rounded px-3 py-2.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, editing ? /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, /* @__PURE__ */ React.createElement("input", { value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: saveEdit, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => setEditingId(null), color: "#888" }, "Cancel"))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "flex items-start justify-between gap-2 cursor-pointer", onClick: () => setExpanded(open ? null : s.id) }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#888" } }, s.phone || "no number on file", (s.positions || []).length > 0 && " \xB7 " + s.positions.map((p) => p.name).join(", "))), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 shrink-0" }, /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+    return /* @__PURE__ */ React.createElement("div", { key: s.id, className: "rounded px-3 py-2.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, editing ? /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, /* @__PURE__ */ React.createElement("input", { value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "4-digit PIN (time clock)", inputMode: "numeric", maxLength: 4, value: draft.pin, onChange: (e) => setDraft({ ...draft, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${pinTaken(draft.pin, editingId) ? COLORS.tomato : COLORS.line}`, fontFamily: "JetBrains Mono" } }), pinTaken(draft.pin, editingId) && /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.tomatoDark } }, "Someone else already has that PIN."), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: saveEdit, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => setEditingId(null), color: "#888" }, "Cancel"))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "flex items-start justify-between gap-2 cursor-pointer", onClick: () => setExpanded(open ? null : s.id) }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#888" } }, s.phone || "no number on file", " \xB7 ", s.pin ? "PIN set" : "no PIN", (s.positions || []).length > 0 && " \xB7 " + s.positions.map((p) => p.name).join(", "))), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 shrink-0" }, /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
       e.stopPropagation();
       startEdit(s);
     }, className: "text-xs px-2 py-0.5 rounded", style: { fontFamily: "Inter", border: `1px solid ${COLORS.line}`, color: COLORS.crust } }, "Edit"), /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
@@ -7048,6 +7203,117 @@ function GuidesTab({ data, persist }) {
         )
       : null
   );
+}
+// ===================== MERGED TAB WRAPPERS (condensed nav, Phase 2) =====================
+// A small pill sub-nav shared by the four merged tabs below. Each item can
+// carry an optional badge count and an admin-only flag; admin-only items are
+// filtered out by the caller before they ever reach this component.
+function SubNav({ items, active, setActive }) {
+    return React.createElement(
+        "div",
+        { className: "flex flex-wrap gap-1.5 mb-3" },
+        items.map((it) => {
+            const on = active === it.id;
+            const Icon = it.icon;
+            return React.createElement(
+                "button",
+                {
+                    key: it.id,
+                    onClick: () => setActive(it.id),
+                    className: "flex items-center gap-1.5 px-3 py-2 rounded-full text-sm",
+                    style: {
+                        fontFamily: "Inter", fontWeight: 600,
+                        background: on ? COLORS.crust : "#FFFFFF",
+                        color: on ? COLORS.cream : COLORS.crust,
+                        border: `1px solid ${on ? COLORS.crust : COLORS.line}`
+                    }
+                },
+                Icon && React.createElement(Icon, { size: 13 }),
+                it.label,
+                !!it.badge && React.createElement("span", {
+                    style: {
+                        fontFamily: "JetBrains Mono", fontSize: 10.5, fontWeight: 700,
+                        background: on ? COLORS.cream : COLORS.tomato, color: on ? COLORS.crust : "#FFFFFF",
+                        borderRadius: 999, padding: "1px 6px", marginLeft: 2
+                    }
+                }, it.badge)
+            );
+        })
+    );
+}
+// Schedule + Time Off + Staff Directory. Staff Directory holds phone numbers
+// and time-clock PINs, so it stays admin-only inside here just like it was
+// as its own top-level tab.
+function CrewTab({ data, persist, isAdmin, offSoon, initialSub }) {
+    const items = [
+        { id: "schedule", label: "Schedule", icon: Users },
+        { id: "timeoff", label: "Time Off", icon: Calendar, badge: offSoon },
+        isAdmin && { id: "staff", label: "Staff", icon: Users }
+    ].filter(Boolean);
+    const [sub, setSub] = useState(initialSub || "schedule");
+    const active = items.some((i) => i.id === sub) ? sub : items[0].id;
+    return React.createElement(
+        "div",
+        null,
+        React.createElement(SubNav, { items, active, setActive: setSub }),
+        active === "schedule" && React.createElement(ScheduleTab, { data, persist, canEdit: isAdmin }),
+        active === "timeoff" && React.createElement(TimeOffTab, { data, persist }),
+        active === "staff" && isAdmin && React.createElement(StaffTab, { data, persist })
+    );
+}
+// Inventory (incl. Storage Map) + Food Order + Belmont Order + 86 Board. Food
+// Order stays admin-only, matching its previous top-level gating.
+function InventoryOrdersTab({ data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub }) {
+    const items = [
+        { id: "inventory", label: "Inventory", icon: Package, badge: lowStockCount },
+        isAdmin && { id: "foodorder", label: "Food Order", icon: ShoppingCart, badge: foodOrderNeed },
+        { id: "belmont", label: "Belmont", icon: ShoppingCart, badge: belmontNeed },
+        { id: "board86", label: "86 Board", icon: AlertTriangle, badge: boardFlags }
+    ].filter(Boolean);
+    const [sub, setSub] = useState(initialSub || "inventory");
+    const active = items.some((i) => i.id === sub) ? sub : items[0].id;
+    return React.createElement(
+        "div",
+        null,
+        React.createElement(SubNav, { items, active, setActive: setSub }),
+        active === "inventory" && React.createElement(InventoryTab, { data, persist }),
+        active === "foodorder" && isAdmin && React.createElement(FoodOrderTab, { data, persist }),
+        active === "belmont" && React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }),
+        active === "board86" && React.createElement(PrepParTab, { data, persist })
+    );
+}
+// Prep List (par levels) + Tasks — both "what needs doing today" lists.
+function PrepTasksTab({ data, persist, prepTodo, openTasks, initialSub }) {
+    const items = [
+        { id: "preplist", label: "Prep List", icon: ClipboardList, badge: prepTodo },
+        { id: "tasks", label: "Tasks", icon: ClipboardList, badge: openTasks }
+    ];
+    const [sub, setSub] = useState(initialSub || "preplist");
+    const active = items.some((i) => i.id === sub) ? sub : items[0].id;
+    return React.createElement(
+        "div",
+        null,
+        React.createElement(SubNav, { items, active, setActive: setSub }),
+        active === "preplist" && React.createElement(PrepListTab, { data, persist, listKey: "par" }),
+        active === "tasks" && React.createElement(TasksTab, { data, persist })
+    );
+}
+// Menu + Recipes + Guides — the look-up material, not daily-action tabs.
+function ReferenceTab({ data, persist }) {
+    const items = [
+        { id: "menu", label: "Menu", icon: BookOpen },
+        { id: "recipes", label: "Recipes", icon: Pizza },
+        { id: "guides", label: "Guides", icon: Camera }
+    ];
+    const [sub, setSub] = useState("menu");
+    return React.createElement(
+        "div",
+        null,
+        React.createElement(SubNav, { items, active: sub, setActive: setSub }),
+        sub === "menu" && React.createElement(MenuTab, { data, persist }),
+        sub === "recipes" && React.createElement(RecipesTab, { data, persist }),
+        sub === "guides" && React.createElement(GuidesTab, { data, persist })
+    );
 }
 function TasksTab({ data, persist }) {
   const [text, setText] = useState("");
