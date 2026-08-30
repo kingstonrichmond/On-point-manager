@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Add Crew — On Point Pizza</title>
+<style>
+  :root {
+    --crust: #17171C;
+    --cream: #FFFFFF;
+    --tomato: #E20001;
+    --tomatoDark: #A30100;
+    --basil: #12855A;
+    --line: #E1E1E8;
+    --bg: #F7F7FA;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--crust);
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 20px 16px 60px; }
+  .hero { background: var(--crust); color: #fff; border-radius: 16px; padding: 20px 20px 18px; margin-bottom: 18px; }
+  .hero .brand { font-size: 13px; letter-spacing: 0.08em; font-weight: 700; opacity: 0.7; text-transform: uppercase; }
+  .hero h1 { margin: 4px 0 0; font-size: 22px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 2px rgba(23,23,28,0.05); }
+  .card h2 { font-size: 12px; letter-spacing: 0.07em; text-transform: uppercase; color: #888; margin: 0 0 12px; font-weight: 700; }
+  label.field { display: block; margin-bottom: 12px; }
+  label.field .lbl { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 5px; color: var(--crust); }
+  input[type="text"], input[type="tel"], textarea {
+    width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line);
+    font-size: 16px; font-family: inherit; background: #FAFAFC; outline: none;
+  }
+  input:focus, textarea:focus { border-color: var(--tomato); background: #fff; }
+  textarea { resize: vertical; min-height: 60px; }
+  .hint { font-size: 12px; color: #999; margin-top: 4px; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border: 1px solid var(--line); border-radius: 999px; padding: 9px 14px; font-size: 14px; cursor: pointer; background: #fff; user-select: none; }
+  .chip.on { background: var(--crust); color: #fff; border-color: var(--crust); }
+  .day-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #F0F0F3; }
+  .day-row:last-child { border-bottom: none; }
+  .day-row .day-name { width: 42px; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+  .day-row input[type="text"] { flex: 1; padding: 8px 10px; font-size: 15px; }
+  .day-toggle { width: 60px; flex-shrink: 0; }
+  .day-toggle button {
+    width: 100%; padding: 7px 0; border-radius: 8px; border: 1px solid var(--line);
+    background: #F1F1F5; font-size: 13px; font-weight: 600; color: var(--crust);
+  }
+  .day-toggle button.on { background: var(--basil); color: #fff; border-color: var(--basil); }
+  button.submit {
+    width: 100%; padding: 15px; border-radius: 12px; border: none; background: var(--tomato);
+    color: #fff; font-size: 17px; font-weight: 700; margin-top: 4px;
+  }
+  button.submit:disabled { opacity: 0.5; }
+  .msg { padding: 12px 14px; border-radius: 10px; font-size: 14px; margin-bottom: 14px; }
+  .msg.err { background: #FFF1F1; color: var(--tomatoDark); }
+  .msg.ok { background: #EDF9F3; color: var(--basil); }
+  .advanced { font-size: 12.5px; color: #999; }
+  .advanced summary { cursor: pointer; padding: 4px 0; }
+  .success-card { text-align: center; padding: 30px 20px; }
+  .success-card .pin { font-family: "SF Mono", Consolas, monospace; font-size: 32px; font-weight: 700; letter-spacing: 0.1em; color: var(--tomato); margin: 10px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="brand">On Point Pizza</div>
+    <h1>Add New Crew Member</h1>
+  </div>
+
+  <div id="loadMsg" class="msg" style="background:#F1F1F5;color:#666;">Loading current setup…</div>
+  <div id="app" style="display:none;"></div>
+</div>
+
+<script>
+(function () {
+  var SYNC_URL = "/.netlify/functions/data";
+  var DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var POSITION_LABELS = ["Cooking", "Front", "Prep", "Oven", "Fryer", "Dishes", "Pie Spreading"];
+
+  var loadMsg = document.getElementById("loadMsg");
+  var app = document.getElementById("app");
+  var state = { doc: null, standardPositions: [], selectedStations: {}, selectedDays: {}, positionLabel: "Cooking" };
+
+  function uid(prefix) {
+    return prefix + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+  function todayISO() {
+    var t = new Date();
+    return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+  }
+  function authHeaders(extra) {
+    var h = Object.assign({}, extra || {});
+    var code = localStorage.getItem("opp:key");
+    if (code) h["x-opp-key"] = code;
+    return h;
+  }
+  function freePin(staff) {
+    var used = {};
+    (staff || []).forEach(function (s) { if (s.pin) used[String(s.pin)] = true; });
+    // Try random first (nicer spread), then fall back to a straight sweep.
+    for (var i = 0; i < 50; i++) {
+      var candidate = String(Math.floor(1000 + Math.random() * 9000));
+      if (!used[candidate]) return candidate;
+    }
+    for (var n = 1000; n <= 9999; n++) {
+      if (!used[String(n)]) return String(n);
+    }
+    return "";
+  }
+
+  function fetchDoc() {
+    return fetch(SYNC_URL, { headers: authHeaders({ "cache-control": "no-cache" }) })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (doc) {
+        if (doc.error) throw new Error(doc.error);
+        if (!doc.data) throw new Error("No shop data on the server yet — open the main app on a tablet first.");
+        return doc;
+      });
+  }
+
+  function render() {
+    var stations = state.standardPositions.length ? state.standardPositions : ["Fryer", "Salad", "Sandwich", "Pizza", "Oven", "Oven 2", "Pizza 2", "Pie Spreading", "Dishwashing"];
+    var html = "";
+    html += '<div class="card"><h2>Basic Info</h2>';
+    html += '<label class="field"><span class="lbl">Full name *</span><input type="text" id="f_name"></label>';
+    html += '<label class="field"><span class="lbl">Phone number</span><input type="tel" id="f_phone"></label>';
+    html += '<label class="field"><span class="lbl">4-digit PIN (for time clock)</span><input type="text" id="f_pin" maxlength="4" inputmode="numeric" placeholder="leave blank to auto-assign"></label>';
+    html += '<div class="hint">Leave the PIN blank and we\'ll pick a free one automatically.</div>';
+    html += '</div>';
+
+    html += '<div class="card"><h2>Schedule position label</h2><div class="chip-row" id="posLabelRow">';
+    POSITION_LABELS.forEach(function (p) {
+      html += '<div class="chip' + (p === state.positionLabel ? ' on' : '') + '" data-label="' + p + '">' + p + '</div>';
+    });
+    html += '</div><div class="hint">Shows next to their name on the schedule, e.g. "Andy (cooking)".</div></div>';
+
+    html += '<div class="card"><h2>Stations trained on</h2><div class="chip-row" id="stationRow">';
+    stations.forEach(function (s) {
+      html += '<div class="chip" data-station="' + s + '">' + s + '</div>';
+    });
+    html += '</div></div>';
+
+    html += '<div class="card"><h2>Weekly schedule</h2>';
+    DAYS.forEach(function (d) {
+      html += '<div class="day-row">';
+      html += '<div class="day-toggle"><button type="button" data-day="' + d + '">' + d + '</button></div>';
+      html += '<input type="text" placeholder="e.g. 4pm–close" id="time_' + d + '" style="display:none;">';
+      html += '</div>';
+    });
+    html += '<div class="hint" style="margin-top:8px;">Tap a day to add it, then type their usual shift time.</div>';
+    html += '</div>';
+
+    html += '<div class="card"><h2>Notes</h2>';
+    html += '<textarea id="f_notes" placeholder="reliability, always paired with someone, seasonal only, etc."></textarea>';
+    html += '</div>';
+
+    html += '<div id="formMsg"></div>';
+    html += '<button class="submit" id="submitBtn">Add to Crew</button>';
+
+    html += '<details class="advanced" style="margin-top:16px;"><summary>Advanced</summary>';
+    html += '<label class="field" style="margin-top:8px;"><span class="lbl" style="font-weight:500;">Setup code (only needed if the app asks for one)</span><input type="text" id="f_code"></label>';
+    html += '</details>';
+
+    app.innerHTML = html;
+    app.style.display = "block";
+    loadMsg.style.display = "none";
+
+    var savedCode = localStorage.getItem("opp:key");
+    if (savedCode) document.getElementById("f_code").value = savedCode;
+
+    document.getElementById("posLabelRow").addEventListener("click", function (e) {
+      var t = e.target.closest(".chip");
+      if (!t) return;
+      state.positionLabel = t.getAttribute("data-label");
+      Array.prototype.forEach.call(document.querySelectorAll("#posLabelRow .chip"), function (c) {
+        c.classList.toggle("on", c === t);
+      });
+    });
+    document.getElementById("stationRow").addEventListener("click", function (e) {
+      var t = e.target.closest(".chip");
+      if (!t) return;
+      var name = t.getAttribute("data-station");
+      state.selectedStations[name] = !state.selectedStations[name];
+      t.classList.toggle("on", !!state.selectedStations[name]);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".day-toggle button"), function (btn) {
+      btn.addEventListener("click", function () {
+        var d = btn.getAttribute("data-day");
+        state.selectedDays[d] = !state.selectedDays[d];
+        btn.classList.toggle("on", !!state.selectedDays[d]);
+        document.getElementById("time_" + d).style.display = state.selectedDays[d] ? "block" : "none";
+      });
+    });
+    document.getElementById("submitBtn").addEventListener("click", onSubmit);
+  }
+
+  function buildStaffAndMutate(data) {
+    var name = document.getElementById("f_name").value.trim();
+    var phone = document.getElementById("f_phone").value.trim();
+    var pinInput = document.getElementById("f_pin").value.trim();
+    var notesText = document.getElementById("f_notes").value.trim();
+
+    var pin = pinInput || freePin(data.staff);
+    var positions = Object.keys(state.selectedStations).filter(function (k) { return state.selectedStations[k]; })
+      .map(function (k) { return { id: uid("p"), name: k, skill: 3 }; });
+    var notes = notesText ? [{ id: uid("n"), date: todayISO(), text: notesText }] : [];
+
+    var newStaff = { id: uid("st"), name: name, phone: phone, pin: pin, positions: positions, notes: notes };
+    data.staff = (data.staff || []).concat([newStaff]);
+
+    var label = state.positionLabel.toLowerCase();
+    DAYS.forEach(function (d) {
+      if (!state.selectedDays[d]) return;
+      var time = (document.getElementById("time_" + d).value || "").trim() || "hours TBD";
+      data.schedule = data.schedule || {};
+      data.schedule[d] = (data.schedule[d] || []).concat([{ id: uid("sc"), name: name + " (" + label + ")", time: time }]);
+    });
+
+    return { newStaff: newStaff, data: data };
+  }
+
+  function postDoc(data, baseRev, triesLeft) {
+    var codeField = document.getElementById("f_code");
+    if (codeField && codeField.value.trim()) localStorage.setItem("opp:key", codeField.value.trim());
+    return fetch(SYNC_URL, {
+      method: "POST",
+      headers: authHeaders({ "content-type": "application/json" }),
+      body: JSON.stringify({ data: data, baseRev: baseRev, by: "New Crew Form" })
+    }).then(function (res) {
+      if (res.status === 409) {
+        if (triesLeft <= 0) throw new Error("Someone else was saving at the same time — please try again.");
+        return fetchDoc().then(function (fresh) {
+          var result = buildStaffAndMutate(fresh.data);
+          return postDoc(result.data, fresh.rev, triesLeft - 1).then(function (out) {
+            return { out: out, newStaff: result.newStaff };
+          });
+        });
+      }
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json().then(function (out) {
+        if (out.error) throw new Error(out.error);
+        return { out: out };
+      });
+    });
+  }
+
+  function onSubmit() {
+    var name = document.getElementById("f_name").value.trim();
+    var msgBox = document.getElementById("formMsg");
+    msgBox.innerHTML = "";
+    if (!name) {
+      msgBox.innerHTML = '<div class="msg err">Name is required.</div>';
+      return;
+    }
+    var pinInput = document.getElementById("f_pin").value.trim();
+    if (pinInput && !/^\d{4}$/.test(pinInput)) {
+      msgBox.innerHTML = '<div class="msg err">PIN needs to be exactly 4 digits, or left blank.</div>';
+      return;
+    }
+    var btn = document.getElementById("submitBtn");
+    btn.disabled = true;
+    btn.textContent = "Adding…";
+
+    var result = buildStaffAndMutate(JSON.parse(JSON.stringify(state.doc.data)));
+
+    postDoc(result.data, state.doc.rev, 2).then(function (res) {
+      var addedStaff = (res.newStaff || result.newStaff);
+      app.innerHTML =
+        '<div class="card success-card">' +
+        '<div style="font-size:15px;color:#888;">Added to Crew</div>' +
+        '<h1 style="margin:6px 0 0;">' + addedStaff.name + '</h1>' +
+        (addedStaff.pin ? ('<div class="pin">' + addedStaff.pin + '</div><div class="hint">Their time clock PIN — let them know it.</div>') : '') +
+        '<div class="hint" style="margin-top:14px;">They\'re now in Crew → Staff' +
+        (Object.values(state.selectedDays).some(Boolean) ? ' and on the schedule for the days you set.' : '.') +
+        '</div></div>';
+    }).catch(function (err) {
+      btn.disabled = false;
+      btn.textContent = "Add to Crew";
+      msgBox.innerHTML = '<div class="msg err">Couldn\'t save: ' + (err && err.message ? err.message : "unknown error") + '. Check your connection and try again.</div>';
+    });
+  }
+
+  fetchDoc().then(function (doc) {
+    state.doc = doc;
+    state.standardPositions = doc.data.standardPositions || [];
+    render();
+  }).catch(function (err) {
+    loadMsg.className = "msg err";
+    loadMsg.textContent = "Couldn't load the shop data: " + (err && err.message ? err.message : "unknown error") + ". Make sure you're connected, then reload this page.";
+  });
+})();
+</script>
+</body>
+</html>
