@@ -5792,9 +5792,13 @@ function FoodOrderTab({ data, persist }) {
         Object.assign(row, changes);
         persist(next);
     };
+    // Notes are for this order only — anything that clears an item's quantity
+    // (untoggling it, "Reset", the trash button) wipes its note too, so a note
+    // from a past order never quietly rides along into the next one.
+    const clearNeed = (id) => patch(id, { orderNeed: null, orderNote: "" });
     const reset = () => {
         const next = JSON.parse(JSON.stringify(data));
-        next.inventory.forEach((r) => { r.orderNeed = null; });
+        next.inventory.forEach((r) => { r.orderNeed = null; r.orderNote = ""; });
         persist(next);
     };
     const vendorOf = (i) => i.orderVendor || i.vendor || "QFC";
@@ -5823,12 +5827,12 @@ function FoodOrderTab({ data, persist }) {
         if (!onList.length)
             return;
         const lines = [];
+        // Still walked in station order (so the sequence matches how you'll
+        // shop it), just no zone header text taking up lines in the pasted text.
         groupByStation(onList).forEach((g) => {
-            lines.push("");
-            lines.push(g.name.toUpperCase());
             g.items.forEach((i) => {
                 const sku = skuFor(i, numbersFor);
-                lines.push("  \u2022 " + i.item + "  \u00d7 " + i.orderNeed + " " + (i.unit || "") + (sku ? "   #" + sku : ""));
+                lines.push("\u2022 " + i.item + "  \u00d7 " + i.orderNeed + (i.orderNote ? "  (" + i.orderNote + ")" : "") + (sku ? "   #" + sku : ""));
             });
         });
         const header = "On Point Pizza \u2014 order  \u00b7  " + onList.length +
@@ -5860,19 +5864,18 @@ function FoodOrderTab({ data, persist }) {
                     React.createElement("button", { onClick: copyOrder, className: "text-sm px-3 py-1.5 rounded-full flex items-center gap-1.5 ml-1", style: { background: COLORS.basil, color: COLORS.cream, border: "none", fontFamily: "Inter", fontWeight: 600 } },
                         React.createElement(Copy, { size: 14 }),
                         copied === "order" ? "Copied" : "Copy order"))),
-            cats.map((g) => (React.createElement("div", { key: g.name },
-                React.createElement(StationHeader, { g: g }),
-                React.createElement("div", { className: "space-y-1.5" }, g.items.map((i) => (React.createElement("div", { key: i.id, className: "px-3 py-3 rounded", style: { background: COLORS.card, border: "1px solid " + COLORS.line, borderLeft: "5px solid " + COLORS.tomato } },
+            React.createElement("div", { className: "space-y-1.5" }, cats.flatMap((g) => g.items).map((i) => (React.createElement("div", { key: i.id, className: "px-3 py-3 rounded", style: { background: COLORS.card, border: "1px solid " + COLORS.line, borderLeft: "5px solid " + COLORS.tomato } },
                     React.createElement("div", { className: "flex items-center gap-3" },
                         React.createElement("button", { onClick: () => toggleOpen(i.id), className: "flex-1 min-w-0 text-left" },
                             React.createElement("div", { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } }, i.item),
+                            i.orderNote ? React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", fontWeight: 500, color: "#8A6116" } }, i.orderNote) : null,
                             React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#6D6D78" } },
                                 (numbersFor !== "none" && skuFor(i, numbersFor) ? "#" + skuFor(i, numbersFor) + "  \u00b7  " : "") + dualPriceLine(i),
                                 React.createElement("span", { style: { color: COLORS.tomato } }, openId === i.id ? "  \u25b4" : "  \u25be"))),
                         React.createElement("span", { className: "text-lg px-2.5 py-0.5 rounded-full flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.cream, background: COLORS.tomato } }, "\u00d7" + i.orderNeed),
-                        React.createElement("button", { onClick: () => patch(i.id, { orderNeed: null }), className: "px-2 py-2 flex-shrink-0", style: { border: "none", background: "transparent" } },
+                        React.createElement("button", { onClick: () => patch(i.id, { orderNeed: null, orderNote: "" }), className: "px-2 py-2 flex-shrink-0", style: { border: "none", background: "transparent" } },
                             React.createElement(Trash2, { size: 15, color: "#9A9AA6" }))),
-                    openId === i.id ? React.createElement(PriceDetail, { i: i, vendorOf: vendorOf, patch: patch }) : null)))))))));
+                    openId === i.id ? React.createElement(PriceDetail, { i: i, vendorOf: vendorOf, patch: patch }) : null))))));
     };
     // ---- go down every item and say what you need ----
     const setupView = () => {
@@ -5898,13 +5901,13 @@ function FoodOrderTab({ data, persist }) {
                                 React.createElement("span", { style: { color: COLORS.tomato } }, openId === i.id ? "  \u25b4" : "  \u25be"))),
                         on ? (React.createElement("span", { className: "text-sm flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.tomato } }, "need " + need)) : isSet ? (React.createElement("span", { className: "text-sm flex-shrink-0", style: { fontFamily: "Inter", color: COLORS.basil } }, "all set")) : null),
                     React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap" },
-                        React.createElement("button", { onClick: () => patch(i.id, { orderNeed: isSet ? null : 0 }), className: "text-sm px-3 py-2 rounded-full", style: {
+                        React.createElement("button", { onClick: () => (isSet ? clearNeed(i.id) : patch(i.id, { orderNeed: 0 })), className: "text-sm px-3 py-2 rounded-full", style: {
                                 fontFamily: "Inter",
                                 border: "1px solid " + (isSet ? COLORS.basil : COLORS.line),
                                 background: isSet ? COLORS.basil : "transparent",
                                 color: isSet ? COLORS.cream : COLORS.crust
                             } }, "All set"),
-                        [1, 2, 3, 4].map((n) => (React.createElement("button", { key: n, onClick: () => patch(i.id, { orderNeed: need === n ? null : n }), className: "text-base px-3.5 py-2 rounded-full", style: {
+                        [1, 2, 3, 4].map((n) => (React.createElement("button", { key: n, onClick: () => (need === n ? clearNeed(i.id) : patch(i.id, { orderNeed: n })), className: "text-base px-3.5 py-2 rounded-full", style: {
                                 fontFamily: "JetBrains Mono",
                                 fontWeight: 700,
                                 border: "1px solid " + (need === n ? COLORS.tomato : COLORS.line),
@@ -5915,6 +5918,7 @@ function FoodOrderTab({ data, persist }) {
                             React.createElement(Plus, { size: 16, color: COLORS.crust })),
                         on ? React.createElement("div", { className: "ml-auto" },
                             React.createElement(VendorPick, { i: i, vendorOf: vendorOf, patch: patch })) : null),
+                    on ? React.createElement("input", { placeholder: "Note \u2014 e.g. half a case, one piece only", value: i.orderNote || "", onChange: (e) => patch(i.id, { orderNote: e.target.value }), className: "w-full mt-2 px-3 py-2 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#F8F8FB" } }) : null,
                     (packMode || openId === i.id) ? React.createElement(PriceDetail, { i: i, vendorOf: vendorOf, patch: patch }) : null));
             })))));
     };
@@ -5975,6 +5979,9 @@ function PrepListTab({ data, persist, listKey, mode }) {
         Object.assign(row, changes);
         persist(next);
     };
+    // Same rule as the food order: a note belongs to the cycle it was written
+    // for. Anything that clears a quantity clears the note that went with it.
+    const clearNeed = (id) => patch(id, { need: null, done: false, note: "" });
     const addItem = () => {
         const name = newItem.trim();
         if (!name) return;
@@ -5995,7 +6002,7 @@ function PrepListTab({ data, persist, listKey, mode }) {
     };
     const resetDay = () => {
         const next = JSON.parse(JSON.stringify(data));
-        next.prep[key].forEach((r) => { r.need = null; r.done = false; });
+        next.prep[key].forEach((r) => { r.need = null; r.done = false; r.note = ""; });
         persist(next);
     };
     const onList = list.filter((r) => Number(r.need) > 0);
@@ -6068,19 +6075,19 @@ function PrepListTab({ data, persist, listKey, mode }) {
                     : React.createElement("button", { onClick: () => { setConfirmDel(r.id); setTimeout(() => setConfirmDel(""), 4000); }, style: { background: "transparent", border: "none", padding: 10 } },
                         React.createElement(Trash2, { size: 17, color: INK3 }))),
             React.createElement("div", { className: "flex items-center gap-2 flex-wrap mb-3" },
-                React.createElement("button", { onClick: () => patch(r.id, { need: isSet ? null : 0, done: false }), style: {
+                React.createElement("button", { onClick: () => (isSet ? clearNeed(r.id) : patch(r.id, { need: 0, done: false })), style: {
                         fontFamily: "Inter", fontSize: 15, fontWeight: 600, borderRadius: 999, padding: "11px 18px", minHeight: 44,
                         border: "none",
                         background: isSet ? COLORS.basil : "#F1F1F5",
                         color: isSet ? "#FFFFFF" : COLORS.crust
                     } }, "All set"),
-                [1, 2, 3, 4].map((n) => (React.createElement("button", { key: n, onClick: () => patch(r.id, { need: need === n ? null : n, done: false }), style: {
+                [1, 2, 3, 4].map((n) => (React.createElement("button", { key: n, onClick: () => (need === n ? clearNeed(r.id) : patch(r.id, { need: n, done: false })), style: {
                         fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: 16, borderRadius: 999,
                         width: 48, height: 44, border: "none",
                         background: need === n ? COLORS.tomato : "#F1F1F5",
                         color: need === n ? "#FFFFFF" : COLORS.crust
                     } }, n))),
-                React.createElement("input", { inputMode: "numeric", placeholder: "#", value: on && need > 4 ? need : "", onChange: (e) => patch(r.id, { need: e.target.value === "" ? null : Number(e.target.value), done: false }), className: "text-center outline-none", style: { width: 60, height: 44, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono", fontWeight: 700, background: "#F8F8FB" } })),
+                React.createElement("input", { inputMode: "numeric", placeholder: "#", value: on && need > 4 ? need : "", onChange: (e) => (e.target.value === "" ? clearNeed(r.id) : patch(r.id, { need: Number(e.target.value), done: false })), className: "text-center outline-none", style: { width: 60, height: 44, border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono", fontWeight: 700, background: "#F8F8FB" } })),
             React.createElement("input", { placeholder: "Note \u2014 how much, which tub, anything to pass on", value: r.note || "", onChange: (e) => patch(r.id, { note: e.target.value }), className: "w-full px-3 py-3 outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 16, background: "#F8F8FB" } })));
     };
 
