@@ -2009,13 +2009,10 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   // Settings deliberately stays open to staff: it holds the admin unlock, the
   // per-tablet preferences, and nothing worth hiding. The rows inside it that
   // do matter are gated by role instead.
-  const ADMIN_TABS = { tips: 1, liveops: 1 };
+  const ADMIN_TABS = { liveops: 1 };
   const tabs = [
     { id: "today", label: "Today", icon: Activity },
-    { id: "assistant", label: "Ask the Manager", icon: MessageSquare },
     { id: "crew", label: "Crew", icon: Users, badge: offSoon },
-    { id: "tips", label: "Tips & Time Clock", icon: DollarSign },
-    { id: "timers", label: "Timers", icon: Clock, badge: (timers || []).length },
     { id: "invorders", label: "Inventory & Orders", icon: Package, badge: lowStockCount + foodOrderNeed + belmontNeed + boardFlags },
     { id: "preptasks", label: "Prep & Tasks", icon: ClipboardList, badge: prepTodo + openTasks },
     { id: "reference", label: "Reference", icon: BookOpen },
@@ -2073,7 +2070,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "assistant" && /* @__PURE__ */ React.createElement(AssistantTab, { data, persist }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab }), tab === "tips" && /* @__PURE__ */ React.createElement(TipsTab, { data, persist, isAdmin }), tab === "timers" && /* @__PURE__ */ React.createElement(TimersTab, { data, persist, timers, setTimers, now: timerNow }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, initialSub: subTab }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); }, data,
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); }, data,
         onHoursChange: (next) => { const d = JSON.parse(JSON.stringify(dataRef.current)); d.shopHours = next; persist(d); } })), /* @__PURE__ */ React.createElement(TimerOverlay, { timers, setTimers, now: timerNow }));
 }
 function AssistantAvatar({ state }) {
@@ -3083,6 +3080,7 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
   const carry = focusAll.filter((f) => f.date !== today && !f.done);
   const openFocus = mine.filter((f) => !f.done);
   const openTasks = (data.tasks || []).filter((t) => !t.done);
+  const { bad: badTemps } = useWalkInTemps(data);
   const crew = crewForDate(data, today, nowDate);
   const onNow = crew.filter((c) => c.status === "now");
   const later = crew.filter((c) => c.status === "later");
@@ -3294,12 +3292,13 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
               showAllPrep ? "Show fewer" : "+" + (prepLeft.length - 4) + " more"))
     ),
 
-    // 86 / low / timers, all in one strip
-    (flags.length > 0 || running.length > 0) && React.createElement(
+    // 86 / low / timers / cooler-temp problems, all in one strip
+    (flags.length > 0 || running.length > 0 || badTemps.length > 0) && React.createElement(
       "div",
       { className: "px-4 py-4 mb-3", style: CARD },
-      label("Right now", flags.length ? link("invorders", "board86", "86 board") : link("timers", null, "Timers")),
+      label("Right now", badTemps.length ? link("liveops", null, "Walk-in temps") : (flags.length ? link("invorders", "board86", "86 board") : link("preptasks", "timers", "Timers"))),
       React.createElement("div", { className: "flex flex-wrap gap-2" },
+        badTemps.map((s) => tapPill("\uD83C\uDF21\uFE0F " + s.name + " \u00b7 " + s.tempF + "\u00b0", "liveops", null, COLORS.tomato, "#FFFFFF")),
         eighty.map((f) => tapPill("86 \u00b7 " + f.item, "invorders", "board86", COLORS.tomato, "#FFFFFF")),
         low.map((f) => tapPill("Low \u00b7 " + f.item, "invorders", "board86", "#FFF6E8", "#8A5A00", "rgba(217,138,0,0.35)")),
         running.slice(0, 3).map((t) => {
@@ -3346,7 +3345,7 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
     React.createElement(
       "div",
       { className: "flex gap-2" },
-      [["timers", null, Clock, "Timers", running.length], ["preptasks", "tasks", ClipboardList, "Tasks", openTasks.length], ["assistant", null, MessageSquare, "Ask", 0]].map((j) =>
+      [["preptasks", "timers", Clock, "Timers", running.length], ["preptasks", "tasks", ClipboardList, "Tasks", openTasks.length], ["reference", "assistant", MessageSquare, "Ask", 0]].map((j) =>
         React.createElement("button", { key: j[0] + (j[1] || ""), onClick: () => goTo(j[0], j[1]), className: "flex items-center justify-center gap-2 flex-1",
             style: { background: COLORS.card, border: "none", borderRadius: 14, minHeight: 52, fontFamily: "Inter", fontSize: 15, fontWeight: 600, color: COLORS.crust, boxShadow: "0 1px 2px rgba(23,23,28,0.08)" } },
           React.createElement(j[2], { size: 17, color: COLORS.tomato }), j[3],
@@ -3674,7 +3673,7 @@ function tipEntryText(e) {
         L.push("Note: " + e.note);
     return L.join("\n");
 }
-function TipsTab({ data, persist, isAdmin }) {
+function TipsTab({ data, persist }) {
     // The half-finished sheet lives in the shared data, not in component state.
     // Day tips get entered mid-afternoon and the night side hours later, often on
     // a different tablet — switching tabs used to throw the whole thing away.
@@ -3893,7 +3892,6 @@ function TipsTab({ data, persist, isAdmin }) {
     const dayBlocked = emptyDay || (daySaved && !okReplaceDay);
     const nightBlocked = emptyNight || (nightSaved && !okReplaceNight);
     return (React.createElement("div", { className: "space-y-4" },
-        React.createElement(TimeClockPanel, { data, persist, isAdmin }),
         React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("div", { className: "flex flex-wrap items-end gap-3" },
                 React.createElement("div", null,
@@ -6303,71 +6301,85 @@ function MenuTab({ data, persist }) {
 // under 0F. Anything a few degrees past that is worth someone walking over.
 const TEMP_DEFAULTS = { cooler: { min: 33, max: 41 }, freezer: { min: -20, max: 5 } };
 
-function TempPanel({ data, persist }) {
-  const [sensors, setSensors] = useState([]);
-  const [at, setAt] = useState(null);
-  const [err, setErr] = useState("");
-  const [setup, setSetup] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const cfg = (data && data.tempSensors) || {};
-
-  const load = async (force) => {
-    setBusy(true);
-    try {
-      const res = await fetch(YOLINK_URL + (force ? "?force=1" : ""));
-      const out = await res.json();
-      if (out.error && !out.sensors) {
-        setErr(out.error);
-        setSetup(!!out.setup);
-        setSensors([]);
-      } else {
-        setErr(out.stale ? "Showing the last reading — " + (out.error || "couldn't refresh.") : "");
-        setSetup(false);
-        setSensors(out.sensors || []);
-        setAt(out.at || null);
-      }
-    } catch (e) {
-      setErr("Couldn't reach the temperature service.");
-    }
-    setBusy(false);
-  };
-
-  useEffect(() => {
-    load();
-    const id = setInterval(() => {
-      if (!document.hidden) load();
-    }, 120000);
-    return () => clearInterval(id);
-  }, []);
-
-  const kindOf = (s) => (cfg[s.id] && cfg[s.id].kind) || "cooler";
-  const rangeOf = (s) => {
-    const c = cfg[s.id] || {};
-    const d = TEMP_DEFAULTS[kindOf(s)] || TEMP_DEFAULTS.cooler;
+function tempRangeOf(cfg, s) {
+    const c = (cfg && cfg[s.id]) || {};
+    const kind = c.kind || "cooler";
+    const d = TEMP_DEFAULTS[kind] || TEMP_DEFAULTS.cooler;
     return { min: typeof c.min === "number" ? c.min : d.min, max: typeof c.max === "number" ? c.max : d.max };
-  };
-  const setCfg = (id, patch) => {
-    const next = JSON.parse(JSON.stringify(data));
-    if (!next.tempSensors) next.tempSensors = {};
-    next.tempSensors[id] = { ...(next.tempSensors[id] || {}), ...patch };
-    persist(next);
-  };
+}
+function badSensorsOf(sensors, cfg) {
+    return (sensors || []).filter((s) => {
+        if (typeof s.tempF !== "number") return false;
+        const r = tempRangeOf(cfg, s);
+        return s.tempF < r.min || s.tempF > r.max;
+    });
+}
+// Shared by TempPanel (Live Ops) and Today's "Right now" strip so there's one
+// fetch/poll implementation instead of two copies drifting apart. Only one of
+// those tabs is ever mounted at a time, so polling from either is cheap —
+// yolink.mjs caches the real YoLink call server-side regardless.
+function useWalkInTemps(data) {
+    const [sensors, setSensors] = useState([]);
+    const [at, setAt] = useState(null);
+    const [err, setErr] = useState("");
+    const [setup, setSetup] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const cfg = (data && data.tempSensors) || {};
+    const load = async (force) => {
+        setBusy(true);
+        try {
+            const res = await fetch(YOLINK_URL + (force ? "?force=1" : ""));
+            const out = await res.json();
+            if (out.error && !out.sensors) {
+                setErr(out.error);
+                setSetup(!!out.setup);
+                setSensors([]);
+            } else {
+                setErr(out.stale ? "Showing the last reading \u2014 " + (out.error || "couldn't refresh.") : "");
+                setSetup(false);
+                setSensors(out.sensors || []);
+                setAt(out.at || null);
+            }
+        } catch (e) {
+            setErr("Couldn't reach the temperature service.");
+        }
+        setBusy(false);
+    };
+    useEffect(() => {
+        load();
+        const id = setInterval(() => {
+            if (!document.hidden)
+                load();
+        }, 120000);
+        return () => clearInterval(id);
+    }, []);
+    const bad = badSensorsOf(sensors, cfg);
+    return { sensors, bad, at, err, setup, busy, reload: load };
+}
 
-  const ago = (t) => {
-    if (!t) return "";
-    const s = Math.round((Date.now() - t) / 1000);
-    if (s < 60) return "just now";
-    const m = Math.round(s / 60);
-    if (m < 60) return m + "m ago";
-    return Math.round(m / 60) + "h ago";
-  };
+function TempPanel({ data, persist }) {
+    const { sensors, bad, at, err, setup, busy, reload } = useWalkInTemps(data);
+    const [editing, setEditing] = useState(false);
+    const cfg = (data && data.tempSensors) || {};
+    const load = reload;
 
-  const bad = sensors.filter((s) => {
-    if (typeof s.tempF !== "number") return false;
-    const r = rangeOf(s);
-    return s.tempF < r.min || s.tempF > r.max;
-  });
+    const kindOf = (s) => (cfg[s.id] && cfg[s.id].kind) || "cooler";
+    const rangeOf = (s) => tempRangeOf(cfg, s);
+    const setCfg = (id, patch) => {
+        const next = JSON.parse(JSON.stringify(data));
+        if (!next.tempSensors) next.tempSensors = {};
+        next.tempSensors[id] = { ...(next.tempSensors[id] || {}), ...patch };
+        persist(next);
+    };
+
+    const ago = (t) => {
+        if (!t) return "";
+        const s = Math.round((Date.now() - t) / 1000);
+        if (s < 60) return "just now";
+        const m = Math.round(s / 60);
+        if (m < 60) return m + "m ago";
+        return Math.round(m / 60) + "h ago";
+    };
 
   return /* @__PURE__ */ React.createElement(
     "div",
@@ -7253,16 +7265,20 @@ function SubNav({ items, active, setActive }) {
 // as its own top-level tab.
 function CrewTab({ data, persist, isAdmin, offSoon, initialSub }) {
     const items = [
+        { id: "timeclock", label: "Time Clock", icon: Clock },
+        isAdmin && { id: "tips", label: "Tips", icon: DollarSign },
         { id: "schedule", label: "Schedule", icon: Users },
         { id: "timeoff", label: "Time Off", icon: Calendar, badge: offSoon },
         isAdmin && { id: "staff", label: "Staff", icon: Users }
     ].filter(Boolean);
-    const [sub, setSub] = useState(initialSub || "schedule");
+    const [sub, setSub] = useState(initialSub || "timeclock");
     const active = items.some((i) => i.id === sub) ? sub : items[0].id;
     return React.createElement(
         "div",
         null,
         React.createElement(SubNav, { items, active, setActive: setSub }),
+        active === "timeclock" && React.createElement(TimeClockPanel, { data, persist, isAdmin }),
+        active === "tips" && isAdmin && React.createElement(TipsTab, { data, persist }),
         active === "schedule" && React.createElement(ScheduleTab, { data, persist, canEdit: isAdmin }),
         active === "timeoff" && React.createElement(TimeOffTab, { data, persist }),
         active === "staff" && isAdmin && React.createElement(StaffTab, { data, persist })
@@ -7290,10 +7306,11 @@ function InventoryOrdersTab({ data, persist, isAdmin, lowStockCount, foodOrderNe
     );
 }
 // Prep List (par levels) + Tasks — both "what needs doing today" lists.
-function PrepTasksTab({ data, persist, prepTodo, openTasks, initialSub }) {
+function PrepTasksTab({ data, persist, prepTodo, openTasks, timers, setTimers, now, initialSub }) {
     const items = [
         { id: "preplist", label: "Prep List", icon: ClipboardList, badge: prepTodo },
-        { id: "tasks", label: "Tasks", icon: ClipboardList, badge: openTasks }
+        { id: "tasks", label: "Tasks", icon: ClipboardList, badge: openTasks },
+        { id: "timers", label: "Timers", icon: Clock, badge: (timers || []).length }
     ];
     const [sub, setSub] = useState(initialSub || "preplist");
     const active = items.some((i) => i.id === sub) ? sub : items[0].id;
@@ -7302,24 +7319,27 @@ function PrepTasksTab({ data, persist, prepTodo, openTasks, initialSub }) {
         null,
         React.createElement(SubNav, { items, active, setActive: setSub }),
         active === "preplist" && React.createElement(PrepListTab, { data, persist, listKey: "par" }),
-        active === "tasks" && React.createElement(TasksTab, { data, persist })
+        active === "tasks" && React.createElement(TasksTab, { data, persist }),
+        active === "timers" && React.createElement(TimersTab, { data, persist, timers, setTimers, now })
     );
 }
 // Menu + Recipes + Guides — the look-up material, not daily-action tabs.
-function ReferenceTab({ data, persist }) {
+function ReferenceTab({ data, persist, initialSub }) {
     const items = [
-        { id: "menu", label: "Menu", icon: BookOpen },
+        { id: "assistant", label: "Ask the Manager", icon: MessageSquare },
         { id: "recipes", label: "Recipes", icon: Pizza },
-        { id: "guides", label: "Guides", icon: Camera }
+        { id: "guides", label: "Guides", icon: Camera },
+        { id: "menu", label: "Menu", icon: BookOpen }
     ];
-    const [sub, setSub] = useState("menu");
+    const [sub, setSub] = useState(initialSub || "assistant");
     return React.createElement(
         "div",
         null,
         React.createElement(SubNav, { items, active: sub, setActive: setSub }),
-        sub === "menu" && React.createElement(MenuTab, { data, persist }),
+        sub === "assistant" && React.createElement(AssistantTab, { data, persist }),
         sub === "recipes" && React.createElement(RecipesTab, { data, persist }),
-        sub === "guides" && React.createElement(GuidesTab, { data, persist })
+        sub === "guides" && React.createElement(GuidesTab, { data, persist }),
+        sub === "menu" && React.createElement(MenuTab, { data, persist })
     );
 }
 function TasksTab({ data, persist }) {
