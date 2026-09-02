@@ -190,6 +190,9 @@ const DollarSign = makeIcon(
 const Clock = makeIcon(
   /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "9" }), /* @__PURE__ */ React.createElement("path", { d: "M12 7v5l3.5 2" }))
 );
+const X = makeIcon(
+  /* @__PURE__ */ React.createElement("path", { d: "M18 6 6 18M6 6l12 12" })
+);
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 // Hours live in the shared data, never in the code. A beach town changes its
 // hours with the season, they stay open late on a good night, and the day crew
@@ -861,6 +864,107 @@ const DENSITY = {
 const INK2 = "#6D6D78";
 const INK3 = "#9A9AA6";
 const TASK_STATIONS = ["Front", "Line", "Pizza", "Oven", "Fryer", "Salad", "Sandwich", "Prep", "Dish", "Back of House", "Manager"];
+// Starter library of reusable task templates — a shop this size does these
+// often enough that they're worth picking from a list rather than retyping.
+// station: "" means General (no zone). Fully editable/removable once seeded;
+// TASK_TEMPLATE_VERSION only controls the ONE-TIME seed on a device that has
+// none yet, same pattern as the schedule/inventory/recipe migrations.
+const DEFAULT_TASK_TEMPLATES = [
+  { text: "Take out the trash", station: "" },
+  { text: "Sweep and mop the front and back floors", station: "" },
+  { text: "Restock all napkins and to-go containers", station: "" },
+  { text: "Check and restock bathroom supplies", station: "" },
+  { text: "Break down and recycle cardboard", station: "" },
+  { text: "Wipe down front counter and register", station: "Front" },
+  { text: "Restock cups, lids, and straws", station: "Front" },
+  { text: "Clean front door and windows", station: "Front" },
+  { text: "Straighten menus and to-go bags", station: "Front" },
+  { text: "Wipe down and organize the line", station: "Line" },
+  { text: "Restock topping bins", station: "Line" },
+  { text: "Rotate sauces and check dates (FIFO)", station: "Line" },
+  { text: "Clean pizza prep table", station: "Pizza" },
+  { text: "Wipe down and organize pizza peels", station: "Pizza" },
+  { text: "Check dough levels for the next shift", station: "Pizza" },
+  { text: "Brush and clean the oven deck", station: "Oven" },
+  { text: "Wipe down oven exterior and hood", station: "Oven" },
+  { text: "Filter the fryer oil", station: "Fryer" },
+  { text: "Wipe down fryer station and baskets", station: "Fryer" },
+  { text: "Check fryer oil level", station: "Fryer" },
+  { text: "Restock and rotate salad bar ingredients", station: "Salad" },
+  { text: "Check dressing dates", station: "Salad" },
+  { text: "Wipe down sandwich prep station", station: "Sandwich" },
+  { text: "Restock sandwich toppings and bread", station: "Sandwich" },
+  { text: "Make dough for tomorrow", station: "Prep" },
+  { text: "Portion and label toppings for tomorrow", station: "Prep" },
+  { text: "Prep sauces for the next shift", station: "Prep" },
+  { text: "Run the dishwasher and put away clean dishes", station: "Dish" },
+  { text: "Wash and sanitize prep tools", station: "Dish" },
+  { text: "Empty and degrease the dish pit", station: "Dish" },
+  { text: "Sweep and mop the back kitchen", station: "Back of House" },
+  { text: "Check and log walk-in temps", station: "Back of House" },
+  { text: "Take inventory count in the walk-in", station: "Back of House" },
+  { text: "Count the register and prep the deposit", station: "Manager" },
+  { text: "Confirm tomorrow's schedule is posted", station: "Manager" },
+  { text: "Lock up \u2014 doors, lights, alarm", station: "Manager" }
+];
+// v2 (his front-of-house walkthrough): specific surfaces and the bathroom
+// checklist, added on top of whatever v1 already seeded. Appended only if
+// missing by exact text, so this never duplicates or resurrects one he's
+// deliberately deleted after this version has already run once.
+const TASK_TEMPLATES_V2_ADD = [
+  { text: "Wipe down touchscreens", station: "Front" },
+  { text: "Wipe down front counter", station: "Front" },
+  { text: "Wipe down tables", station: "Front" },
+  { text: "Wipe down condiment table", station: "Front" },
+  { text: "Wipe down slice case glass", station: "Front" },
+  { text: "Wipe down cooler glass", station: "Front" },
+  { text: "Clean front door glass", station: "Front" },
+  { text: "Wipe down outdoor tables", station: "Front" },
+  { text: "Clean the toilet and sink", station: "Front" },
+  { text: "Check bathroom trash", station: "Front" },
+  { text: "Check hand soap", station: "Front" },
+  { text: "Empty the water bucket under the slice case", station: "Front" }
+];
+const TASK_TEMPLATE_VERSION = 2;
+function migrateTaskLibrary(d) {
+  if (!d || typeof d !== "object") return { data: d, changed: false };
+  if ((d.taskLibraryVersion || 0) >= TASK_TEMPLATE_VERSION) return { data: d, changed: false };
+  let changed = false;
+  if (!Array.isArray(d.taskStations)) { d.taskStations = TASK_STATIONS.slice(); changed = true; }
+  if (!Array.isArray(d.taskTemplates)) {
+    d.taskTemplates = DEFAULT_TASK_TEMPLATES.map((t) => ({ id: uid(), text: t.text, station: t.station }));
+    changed = true;
+  }
+  const haveTexts = d.taskTemplates.map((t) => t.text);
+  TASK_TEMPLATES_V2_ADD.forEach((t) => {
+    if (haveTexts.indexOf(t.text) === -1) {
+      d.taskTemplates.push({ id: uid(), text: t.text, station: t.station });
+      changed = true;
+    }
+  });
+  d.taskLibraryVersion = TASK_TEMPLATE_VERSION;
+  return { data: d, changed };
+}
+// Shop identity + brand voice, used by Ask the Manager (both the Q&A system
+// prompt and the social caption writer) instead of hardcoded facts about this
+// one shop. Editable in Settings — this is the field that makes a tailored
+// copy of the app for a different shop sound like THAT shop, not this one.
+const SHOP_PROFILE_VERSION = 1;
+function migrateShopProfile(d) {
+  if (!d || typeof d !== "object") return { data: d, changed: false };
+  if ((d.shopProfileVersion || 0) >= SHOP_PROFILE_VERSION) return { data: d, changed: false };
+  let changed = false;
+  if (!d.shopProfile || typeof d.shopProfile !== "object") {
+    d.shopProfile = {
+      name: "On Point Pizza",
+      location: "Narragansett, RI",
+      brandNotes: "The sauce is five ingredients: tomatoes, olive oil, fresh garlic, salt, and pepper. The pizza cheese is shredded in-house from a block \u2014 just cheese, nothing else. Dough is made fresh every day and cold-proofs for over 24 hours. Produce comes from Belmont Fruit, a local distributor. Detroit-style pies: the shells start two days ahead from that same slow-fermented dough, then rise again in the pan \u2014 talk about the time invested, never explain the technique step by step. Same crew, every time \u2014 they treat their people right and keep them around. Round thin crust is the shop's main seller; Detroit is the one that goes viral but isn't the volume item. Never name specific big distributors the shop doesn't use, and don't make chain comparisons."
+    };
+    changed = true;
+  }
+  d.shopProfileVersion = SHOP_PROFILE_VERSION;
+  return { data: d, changed };
+}
 const GUIDES = [
   { id: "g1", file: "/guides/pizza-sauce.jpg", title: "Pizza Sauce", sub: "3 cases Tomato Magic \u2014 full build", group: "Recipes" },
   { id: "g2", file: "/guides/dough-recipe.jpg", title: "Dough", sub: "Mixer steps, level 1, 8 minutes", group: "Recipes" },
@@ -1365,7 +1469,7 @@ function TicketButton({ children, onClick, color = COLORS.tomato, style = {}, ..
     children
   );
 }
-function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServer, rev, role, enforced, onRoleChange, onSignOut, data, onHoursChange }) {
+function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServer, rev, role, enforced, onRoleChange, onSignOut, data, persist, onHoursChange }) {
   const [who, setWhoState] = useState(getWho);
   const [adminCode, setAdminCode] = useState("");
   const [adminErr, setAdminErr] = useState("");
@@ -1629,6 +1733,41 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
       )
     ),
 
+    role === "admin" && /* @__PURE__ */ React.createElement(SectionHeader, null, "Shop profile & assistant voice"),
+    role === "admin" && Row(
+      "Shop name",
+      "What Ask the Manager calls this shop when answering questions or writing a social post.",
+      /* @__PURE__ */ React.createElement("input", { value: (data && data.shopProfile && data.shopProfile.name) || "", onChange: (e) => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { shopProfile: Object.assign({}, data.shopProfile, { name: e.target.value }) })), className: "w-full px-3 outline-none opp-field" })
+    ),
+    role === "admin" && Row(
+      "Location",
+      "City and state (or wherever fits) \u2014 used the same way as the shop name.",
+      /* @__PURE__ */ React.createElement("input", { value: (data && data.shopProfile && data.shopProfile.location) || "", onChange: (e) => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { shopProfile: Object.assign({}, data.shopProfile, { location: e.target.value }) })), className: "w-full px-3 outline-none opp-field" })
+    ),
+    role === "admin" && Row(
+      "Brand notes",
+      "Facts and voice the assistant can draw on when it writes something \u2014 what makes the food and the place what it is. It only pulls in what fits, so more detail here is never wasted.",
+      /* @__PURE__ */ React.createElement("textarea", { value: (data && data.shopProfile && data.shopProfile.brandNotes) || "", onChange: (e) => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { shopProfile: Object.assign({}, data.shopProfile, { brandNotes: e.target.value }) })), rows: 5, className: "w-full px-3 py-2 outline-none opp-field", style: { fontFamily: "Inter", fontSize: 14, lineHeight: 1.5 } })
+    ),
+
+    role === "admin" && /* @__PURE__ */ React.createElement(SectionHeader, null, "Payroll (ADP)"),
+    role === "admin" && Row(
+      "ADP Company Code",
+      "From your RUN account \u2014 stamped on every row of the payroll export so it lands under the right company.",
+      /* @__PURE__ */ React.createElement("input", { value: (data && data.adpCoCode) || "", onChange: (e) => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { adpCoCode: e.target.value })), className: "w-full px-3 outline-none opp-field", placeholder: "e.g. ABC", style: { fontFamily: "JetBrains Mono" } })
+    ),
+    role === "admin" && Row(
+      "Payroll week starts on",
+      "Which day starts a new workweek for overtime math (over 40 hours in that week counts as O.T.). Ask your ADP rep if you're not sure \u2014 this has to match what RUN uses.",
+      /* @__PURE__ */ React.createElement(
+        "select",
+        { value: (data && data.adpWeekStart) != null ? data.adpWeekStart : 0, onChange: (e) => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { adpWeekStart: Number(e.target.value) })), className: "w-full px-3 outline-none opp-field" },
+        ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((d, i) => /* @__PURE__ */ React.createElement("option", { key: i, value: i }, d))
+      )
+    ),
+    role === "admin" && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: "#9A9AA6" } },
+      "Each person also needs their ADP employee ID set in Crew \u2192 Staff before they'll show up in the export."),
+
     /* @__PURE__ */ React.createElement(SectionHeader, null, "This screen"),
     Row(
       "Assistant voice",
@@ -1882,7 +2021,9 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
       const mi2 = migrateInventory(ms2.data);
       const mr2 = migrateRecipes(mi2.data);
       const mt2 = migrateTimeOff(mr2.data);
-      const mig = { data: mt2.data, changed: ms2.changed || mi2.changed || mr2.changed || mt2.changed };
+      const ml2 = migrateTaskLibrary(mt2.data);
+      const msp2 = migrateShopProfile(ml2.data);
+      const mig = { data: msp2.data, changed: ms2.changed || mi2.changed || mr2.changed || mt2.changed || ml2.changed || msp2.changed };
       revRef.current = doc.rev;
       baseRef.current = JSON.parse(JSON.stringify(doc.data));
       dataRef.current = mig.data;
@@ -1961,7 +2102,9 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
         const mi = migrateInventory(ms.data);
         const mr = migrateRecipes(mi.data);
         const mt = migrateTimeOff(mr.data);
-        const mig = { data: mt.data, changed: ms.changed || mi.changed || mr.changed || mt.changed };
+        const ml = migrateTaskLibrary(mt.data);
+        const msp = migrateShopProfile(ml.data);
+        const mig = { data: msp.data, changed: ms.changed || mi.changed || mr.changed || mt.changed || ml.changed || msp.changed };
         dataRef.current = mig.data;
         setData(mig.data);
       } catch (e) {
@@ -2070,7 +2213,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); }, data,
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FFF1F1", color: COLORS.tomatoDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); }, data, persist,
         onHoursChange: (next) => { const d = JSON.parse(JSON.stringify(dataRef.current)); d.shopHours = next; persist(d); } })), /* @__PURE__ */ React.createElement(TimerOverlay, { timers, setTimers, now: timerNow }));
 }
 function AssistantAvatar({ state }) {
@@ -2144,6 +2287,12 @@ function AssistantTab({ data, persist }) {
   const [speaking, setSpeaking] = useState(false);
   const [wakeArmed, setWakeArmed] = useState(false);
   const [voiceError, setVoiceError] = useState("");
+  const [socialOpen, setSocialOpen] = useState(false);
+  const [socialImg, setSocialImg] = useState(null); // { b64, type, preview }
+  const [socialPlatform, setSocialPlatform] = useState("instagram");
+  const [socialBusy, setSocialBusy] = useState(false);
+  const [socialResult, setSocialResult] = useState("");
+  const [socialCopied, setSocialCopied] = useState(false);
   const [pauseSecs, setPauseSecs] = useState(0);
   const recogRef = useRef(null);
   const inputRef = useRef("");
@@ -2411,7 +2560,9 @@ function AssistantTab({ data, persist }) {
     const nextMessages = [...messages, { role: "user", text }];
     setMessages(nextMessages);
     setBusy(true);
-    const systemPrompt = `You are the shift-manager assistant for On Point Pizza in Narragansett, RI. You help staff with scheduling, inventory, and tasks.
+    const shopName = (data.shopProfile && data.shopProfile.name) || "the shop";
+    const shopLoc = (data.shopProfile && data.shopProfile.location) || "";
+    const systemPrompt = `You are the shift-manager assistant for ${shopName}${shopLoc ? " in " + shopLoc : ""}. You help staff with scheduling, inventory, and tasks.
 
 Current data (JSON):
 ${JSON.stringify({ schedule: data.schedule, staff: data.staff, standardPositions: data.standardPositions, inventory: data.inventory, tasks: data.tasks, prep: data.prep, menu: data.menu, recipes: data.recipes, storageMap: data.storageMap, liveOps: data.liveOps, timeOff: (data.timeOff || []).filter((r) => r.date >= todayISO()), tips: (data.tips || []).slice(-10) })}
@@ -2594,6 +2745,72 @@ If the user is just asking a question, return an empty actions array. Never inve
       setBusy(false);
     }
   };
+  const onSocialFile = (file) => {
+    if (!file) return;
+    setSocialResult("");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      const b64 = dataUrl.split(",")[1];
+      setSocialImg({ b64, type: file.type || "image/jpeg", preview: dataUrl });
+    };
+    reader.readAsDataURL(file);
+  };
+  // Brand voice baked in so the caption sounds like the shop from the first
+  // try, instead of him having to re-explain it every time.
+  const writeCaption = async () => {
+    if (!socialImg || socialBusy) return;
+    setSocialBusy(true);
+    setSocialResult("");
+    setSocialCopied(false);
+    const shopName = (data.shopProfile && data.shopProfile.name) || "the shop";
+    const shopLoc = (data.shopProfile && data.shopProfile.location) || "";
+    const brandNotes = (data.shopProfile && data.shopProfile.brandNotes) || "";
+    const platformInstructions = socialPlatform === "tiktok"
+        ? `Write it for TikTok: short and punchy, 1-2 sentences max, casual and a little playful, like a hook that would sit under a quick video \u2014 not a polished paragraph. Then a blank line, then 3-5 hashtags (TikTok posts don't need many). Emojis are fine here if they fit naturally.`
+        : `Write it for Instagram: warm, casual, first-person shop-owner voice, 1-3 sentences \u2014 not corporate, not emoji-stuffed. Then a blank line, then 5-8 relevant hashtags.`;
+    const prompt = `Look at this photo from ${shopName}${shopLoc ? ", an independent pizza shop in " + shopLoc : ""}. Write a caption for it to post on ${socialPlatform === "tiktok" ? "TikTok" : "Instagram"}.
+
+${platformInstructions}
+
+Brand facts to draw on ONLY when they actually fit this specific photo \u2014 don't force all of them in:
+${brandNotes || "(No brand notes on file yet \u2014 just write something warm and specific to what's actually in the photo.)"}
+
+Reply with ONLY the caption and hashtags \u2014 no preamble, no "here's a caption", no quotation marks around it.`;
+    try {
+      const response = await fetch(window.CHAT_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 500,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: socialImg.type, data: socialImg.b64 } },
+              { type: "text", text: prompt }
+            ]
+          }]
+        })
+      });
+      const raw = await response.text();
+      if (!response.ok) throw new Error("Server said " + response.status);
+      const out = JSON.parse(raw);
+      if (out.error) throw new Error(out.error.message || "API error");
+      const text = (out.content || []).map((c) => c.text || "").join("\n").trim();
+      setSocialResult(text || "Couldn't come up with anything for that one \u2014 try a different photo.");
+    } catch (e) {
+      setSocialResult("Couldn't write that: " + (e.message || "unknown error"));
+    }
+    setSocialBusy(false);
+  };
+  const copySocial = () => {
+    if (!socialResult) return;
+    navigator.clipboard.writeText(socialResult).then(() => {
+      setSocialCopied(true);
+      setTimeout(() => setSocialCopied(false), 2000);
+    });
+  };
   return /* @__PURE__ */ React.createElement("div", { className: "flex flex-col", style: { height: "62vh" } }, voiceMode !== "off" && /* @__PURE__ */ React.createElement(AssistantAvatar, { state: busy ? "thinking" : speaking ? "speaking" : (voiceMode === "wake" && !wakeArmed) ? "waiting" : listening ? "listening" : "idle" }), /* @__PURE__ */ React.createElement("div", { ref: scrollRef, className: "flex-1 overflow-y-auto px-1 py-2 space-y-3" }, messages.map(
     (m, i) => m.role === "user" ? /* @__PURE__ */ React.createElement("div", { key: i, className: "flex justify-end" }, /* @__PURE__ */ React.createElement(
       "div",
@@ -2648,7 +2865,32 @@ If the user is just asking a question, return an empty actions array. Never inve
     },
     /* @__PURE__ */ React.createElement("option", { value: "computer" }, '"computer"'),
     /* @__PURE__ */ React.createElement("option", { value: "opps" }, '"opps"')
-  )), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 pt-1" }, /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement("div", { className: "pt-2", style: { borderTop: `1px solid ${COLORS.line}` } },
+    /* @__PURE__ */ React.createElement("button", { onClick: () => setSocialOpen(!socialOpen),
+        className: "flex items-center gap-1.5", style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, color: COLORS.tomato, padding: "4px 0" } },
+      /* @__PURE__ */ React.createElement(Camera, { size: 14 }),
+      socialOpen ? "Hide social post writer" : "Write a social post from a photo"),
+    socialOpen && /* @__PURE__ */ React.createElement("div", { className: "pt-2 pb-1" },
+      /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 mb-2.5" },
+        ["instagram", "tiktok"].map((p) => /* @__PURE__ */ React.createElement("button", {
+            key: p, onClick: () => { setSocialPlatform(p); setSocialResult(""); },
+            className: "px-3 py-1.5 rounded-full text-xs",
+            style: { fontFamily: "Inter", fontWeight: 600, border: `1px solid ${socialPlatform === p ? COLORS.tomato : COLORS.line}`, background: socialPlatform === p ? COLORS.tomato : "transparent", color: socialPlatform === p ? "#FFFFFF" : COLORS.crust }
+          }, p === "instagram" ? "Instagram" : "TikTok"))),
+      /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-3 flex-wrap" },
+        /* @__PURE__ */ React.createElement("label", { className: "px-3.5 py-2.5 rounded cursor-pointer", style: { background: COLORS.crust, color: "#FFFFFF", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600 } },
+          socialImg ? "Choose a different photo" : "Choose a photo",
+          /* @__PURE__ */ React.createElement("input", { type: "file", accept: "image/*", capture: "environment", style: { display: "none" }, onChange: (e) => onSocialFile(e.target.files && e.target.files[0]) })),
+        socialImg && /* @__PURE__ */ React.createElement("img", { src: socialImg.preview, style: { width: 52, height: 52, objectFit: "cover", borderRadius: 8, border: `1px solid ${COLORS.line}` } }),
+        socialImg && /* @__PURE__ */ React.createElement("button", { onClick: writeCaption, disabled: socialBusy,
+            className: "px-3.5 py-2.5 rounded flex items-center gap-1.5", style: { background: COLORS.tomato, color: "#FFFFFF", border: "none", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, opacity: socialBusy ? 0.6 : 1 } },
+          socialBusy && /* @__PURE__ */ React.createElement(Loader2, { size: 13, className: "animate-spin" }),
+          socialBusy ? "Writing\u2026" : "Write caption")),
+      socialResult && /* @__PURE__ */ React.createElement("div", { className: "mt-3 px-3.5 py-3 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } },
+        /* @__PURE__ */ React.createElement("div", { className: "text-sm whitespace-pre-wrap", style: { fontFamily: "Inter", color: COLORS.crust, lineHeight: 1.5 } }, socialResult),
+        /* @__PURE__ */ React.createElement("button", { onClick: copySocial, className: "mt-2.5 px-3 py-1.5 rounded text-xs", style: { background: socialCopied ? COLORS.basil : "transparent", color: socialCopied ? "#FFFFFF" : COLORS.tomato, border: `1px solid ${socialCopied ? COLORS.basil : COLORS.line}`, fontFamily: "Inter", fontWeight: 600 } },
+          socialCopied ? "Copied" : "Copy for " + (socialPlatform === "tiktok" ? "TikTok" : "Instagram"))))
+  ), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 pt-1" }, /* @__PURE__ */ React.createElement(
     "input",
     {
       value: input,
@@ -2767,9 +3009,103 @@ function timeClockSpanFor(data, iso, name) {
     };
     return hhmm(first.clockIn) + "-" + (last.clockOut ? hhmm(last.clockOut) : "close");
 }
+function weekKeyFor(iso, weekStart) {
+    const d = isoToDate(iso);
+    const dow = d.getDay();
+    const diff = (dow - (weekStart || 0) + 7) % 7;
+    d.setDate(d.getDate() - diff);
+    return isoOf(d.getFullYear(), d.getMonth(), d.getDate());
+}
+// Regular/OT hours from real clock punches, plus each person's exact
+// credit-card tip slice (already stored per-row on saved tip entries), summed
+// over a date range for one payroll export. Cash tips are NOT included here —
+// he enters those into ADP by hand, same as always.
+function computeAdpPayroll(data, startISO, endISO) {
+    const weekStart = (data && data.adpWeekStart != null) ? data.adpWeekStart : 0;
+    const weekHoursByPerson = {};
+    ((data && data.timeClock) || []).forEach((e) => {
+        if (!e.clockOut || e.date < startISO || e.date > endISO)
+            return;
+        const n = normPerson(e.name);
+        if (!n)
+            return;
+        const hrs = (new Date(e.clockOut).getTime() - new Date(e.clockIn).getTime()) / 3600000;
+        if (!(hrs > 0))
+            return;
+        const wk = weekKeyFor(e.date, weekStart);
+        weekHoursByPerson[n] = weekHoursByPerson[n] || {};
+        weekHoursByPerson[n][wk] = (weekHoursByPerson[n][wk] || 0) + hrs;
+    });
+    const regByPerson = {}, otByPerson = {};
+    Object.keys(weekHoursByPerson).forEach((n) => {
+        let reg = 0, ot = 0;
+        Object.values(weekHoursByPerson[n]).forEach((wkHours) => {
+            reg += Math.min(wkHours, 40);
+            ot += Math.max(0, wkHours - 40);
+        });
+        regByPerson[n] = reg;
+        otByPerson[n] = ot;
+    });
+    const ccByPerson = {};
+    ((data && data.tips) || []).forEach((entry) => {
+        if (entry.date < startISO || entry.date > endISO)
+            return;
+        [entry.day, entry.night].forEach((shift) => {
+            if (!shift || !Array.isArray(shift.rows))
+                return;
+            shift.rows.forEach((r) => {
+                const n = normPerson(r.name);
+                if (!n)
+                    return;
+                ccByPerson[n] = (ccByPerson[n] || 0) + (Number(r.ccExact) || 0);
+            });
+        });
+    });
+    const allNorms = Array.from(new Set(Object.keys(regByPerson).concat(Object.keys(ccByPerson))));
+    const rows = [];
+    const unlinked = [];
+    allNorms.forEach((n) => {
+        const staff = ((data && data.staff) || []).find((s) => normPerson(s.name) === n);
+        const reg = Math.round((regByPerson[n] || 0) * 100) / 100;
+        const ot = Math.round((otByPerson[n] || 0) * 100) / 100;
+        const cc = Math.round((ccByPerson[n] || 0) * 100) / 100;
+        const displayName = staff ? String(staff.name).split("(")[0].trim() : n;
+        if (staff && staff.adpId) {
+            rows.push({ adpId: staff.adpId, name: displayName, reg, ot, cc });
+        } else {
+            unlinked.push(displayName);
+        }
+    });
+    rows.sort((a, b) => a.name.localeCompare(b.name));
+    return { rows, unlinked: Array.from(new Set(unlinked)).sort() };
+}
+function adpCsvText(data, startISO, endISO) {
+    const { rows } = computeAdpPayroll(data, startISO, endISO);
+    const coCode = (data && data.adpCoCode) || "";
+    const header = ["Co Code", "File #", "Employee Name", "Reg Hours", "O.T. Hours", "CC Tips"];
+    const lines = [header.join(",")];
+    rows.forEach((r) => {
+        lines.push([coCode, r.adpId, '"' + r.name.replace(/"/g, '""') + '"', r.reg.toFixed(2), r.ot.toFixed(2), r.cc.toFixed(2)].join(","));
+    });
+    return lines.join("\r\n");
+}
+function downloadTextFile(filename, text, mime) {
+    const blob = new Blob([text], { type: mime || "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 function TimeClockPanel({ data, persist, isAdmin }) {
     const [digits, setDigits] = useState("");
     const [msg, setMsg] = useState(null); // { text, tone }
+    const [exportOpen, setExportOpen] = useState(false);
+    const [rangeStart, setRangeStart] = useState(addDaysISO(todayISO(), -6));
+    const [rangeEnd, setRangeEnd] = useState(todayISO());
     const iso = todayISO();
     const openNow = ((data && data.timeClock) || []).filter((e) => e.date === iso && !e.clockOut)
         .sort((a, b) => (a.clockIn < b.clockIn ? -1 : 1));
@@ -2866,6 +3202,39 @@ function TimeClockPanel({ data, persist, isAdmin }) {
                     style: { fontFamily: "Inter", border: `1px solid ${COLORS.line}`, color: COLORS.tomatoDark }
                 }, "Clock out")
             ))
+        ),
+        isAdmin && React.createElement(
+            "div",
+            { className: "mt-4 pt-3", style: { borderTop: `1px solid ${COLORS.line}` } },
+            React.createElement("button", { onClick: () => setExportOpen(!exportOpen),
+                className: "flex items-center gap-1.5", style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.tomato, padding: "2px 0" } },
+              exportOpen ? "\u25b4 Hide payroll export" : "\u25be Export for ADP"),
+            exportOpen && React.createElement(
+                "div",
+                { className: "mt-3" },
+                React.createElement("div", { className: "flex items-center gap-2 mb-3 flex-wrap" },
+                    React.createElement("input", { type: "date", value: rangeStart, onChange: (e) => setRangeStart(e.target.value), className: "px-2 py-2 rounded outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#F8F8FB" } }),
+                    React.createElement("span", { style: { fontFamily: "Inter", fontSize: 13, color: "#888" } }, "to"),
+                    React.createElement("input", { type: "date", value: rangeEnd, onChange: (e) => setRangeEnd(e.target.value), className: "px-2 py-2 rounded outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#F8F8FB" } })
+                ),
+                (() => {
+                    const { rows, unlinked } = computeAdpPayroll(data, rangeStart, rangeEnd);
+                    return React.createElement(React.Fragment, null,
+                        rows.length === 0 ? React.createElement("div", { className: "text-sm italic mb-3", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "No clock or tip activity in that range yet.")
+                            : React.createElement("div", { className: "text-sm mb-3", style: { fontFamily: "Inter", color: COLORS.crust } },
+                                rows.length + " " + (rows.length === 1 ? "person" : "people") + " ready to export"),
+                        unlinked.length > 0 && React.createElement("div", { className: "text-xs mb-3 px-3 py-2 rounded", style: { fontFamily: "Inter", background: "#FFF6E8", color: "#8A5A00" } },
+                            "No ADP ID on file, so left out of the file: " + unlinked.join(", ") + ". Add their ADP employee ID in Crew \u2192 Staff to include them next time."),
+                        React.createElement("button", {
+                            onClick: () => downloadTextFile("adp-timesheet-" + rangeStart + "-to-" + rangeEnd + ".csv", adpCsvText(data, rangeStart, rangeEnd), "text/csv"),
+                            disabled: rows.length === 0,
+                            className: "px-4 py-2.5 rounded", style: { background: rows.length ? COLORS.tomato : "#E1E1E8", color: "#FFFFFF", border: "none", fontFamily: "Inter", fontSize: 14.5, fontWeight: 600 }
+                        }, "Download CSV"),
+                        React.createElement("div", { className: "text-xs mt-2", style: { fontFamily: "Inter", color: "#9A9AA6" } },
+                            "Regular/O.T. hours from the time clock, plus each person's exact credit-card tip slice. Cash tips still go into ADP by hand.")
+                    );
+                })()
+            )
         )
     );
 }
@@ -4493,7 +4862,7 @@ function Stars({ value, onChange }) {
 function StaffTab({ data, persist }) {
   const staff = data.staff || [];
   const [editingId, setEditingId] = useState(null);
-  const [draft, setDraft] = useState({ name: "", phone: "", pin: "" });
+  const [draft, setDraft] = useState({ name: "", phone: "", pin: "", adpId: "" });
   const [adding, setAdding] = useState(false);
   const [posDraft, setPosDraft] = useState({});
   const [noteDraft, setNoteDraft] = useState({});
@@ -4506,19 +4875,19 @@ function StaffTab({ data, persist }) {
   };
   const startEdit = (s) => {
     setEditingId(s.id);
-    setDraft({ name: s.name, phone: s.phone || "", pin: s.pin || "" });
+    setDraft({ name: s.name, phone: s.phone || "", pin: s.pin || "", adpId: s.adpId || "" });
   };
   const pinTaken = (pin, exceptId) => !!pin && staff.some((s) => s.id !== exceptId && s.pin && String(s.pin) === String(pin));
   const saveEdit = () => {
-    save(staff.map((s) => s.id === editingId ? { ...s, name: draft.name, phone: draft.phone, pin: draft.pin } : s));
+    save(staff.map((s) => s.id === editingId ? { ...s, name: draft.name, phone: draft.phone, pin: draft.pin, adpId: draft.adpId } : s));
     setEditingId(null);
-    setDraft({ name: "", phone: "", pin: "" });
+    setDraft({ name: "", phone: "", pin: "", adpId: "" });
   };
   const addStaff = () => {
     if (!draft.name.trim()) return;
-    save([...staff, { id: uid(), name: draft.name.trim(), phone: draft.phone, pin: draft.pin || "", positions: [], notes: [] }]);
+    save([...staff, { id: uid(), name: draft.name.trim(), phone: draft.phone, pin: draft.pin || "", adpId: draft.adpId || "", positions: [], notes: [] }]);
     setAdding(false);
-    setDraft({ name: "", phone: "", pin: "" });
+    setDraft({ name: "", phone: "", pin: "", adpId: "" });
   };
   const remove = (id) => save(staff.filter((s) => s.id !== id));
   const addPosition = (staffId) => {
@@ -4569,14 +4938,14 @@ function StaffTab({ data, persist }) {
     },
     /* @__PURE__ */ React.createElement("option", { value: "" }, "Select a position..."),
     allPositions.map((p) => /* @__PURE__ */ React.createElement("option", { key: p, value: p }, p))
-  ), fillPosition && (fillCandidates.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "No one's listed for ", fillPosition, " yet.") : /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, fillCandidates.map(({ s, p }) => /* @__PURE__ */ React.createElement("div", { key: s.id, className: "flex items-center justify-between text-sm", style: { fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(Stars, { value: p.skill }), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { color: "#888" } }, s.phone || "no number"))))))), adding && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-3 rounded space-y-1.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("input", { placeholder: "Name", value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "4-digit PIN (time clock)", inputMode: "numeric", maxLength: 4, value: draft.pin, onChange: (e) => setDraft({ ...draft, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${pinTaken(draft.pin, null) ? COLORS.tomato : COLORS.line}`, fontFamily: "JetBrains Mono" } }), pinTaken(draft.pin, null) && /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.tomatoDark } }, "Someone else already has that PIN."), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: addStaff, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => {
+  ), fillPosition && (fillCandidates.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "No one's listed for ", fillPosition, " yet.") : /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, fillCandidates.map(({ s, p }) => /* @__PURE__ */ React.createElement("div", { key: s.id, className: "flex items-center justify-between text-sm", style: { fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(Stars, { value: p.skill }), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { color: "#888" } }, s.phone || "no number"))))))), adding && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-3 rounded space-y-1.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("input", { placeholder: "Name", value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "4-digit PIN (time clock)", inputMode: "numeric", maxLength: 4, value: draft.pin, onChange: (e) => setDraft({ ...draft, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${pinTaken(draft.pin, null) ? COLORS.tomato : COLORS.line}`, fontFamily: "JetBrains Mono" } }), pinTaken(draft.pin, null) && /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.tomatoDark } }, "Someone else already has that PIN."), /* @__PURE__ */ React.createElement("input", { placeholder: "ADP employee ID (for payroll export)", value: draft.adpId, onChange: (e) => setDraft({ ...draft, adpId: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" } }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: addStaff, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => {
     setAdding(false);
     setDraft({ name: "", phone: "" });
   }, color: "#888" }, "Cancel"))), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, staff.map((s) => {
     const editing = editingId === s.id;
     const open = expanded === s.id;
     const pd = posDraft[s.id] || { name: "", skill: 3 };
-    return /* @__PURE__ */ React.createElement("div", { key: s.id, className: "rounded px-3 py-2.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, editing ? /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, /* @__PURE__ */ React.createElement("input", { value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "4-digit PIN (time clock)", inputMode: "numeric", maxLength: 4, value: draft.pin, onChange: (e) => setDraft({ ...draft, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${pinTaken(draft.pin, editingId) ? COLORS.tomato : COLORS.line}`, fontFamily: "JetBrains Mono" } }), pinTaken(draft.pin, editingId) && /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.tomatoDark } }, "Someone else already has that PIN."), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: saveEdit, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => setEditingId(null), color: "#888" }, "Cancel"))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "flex items-start justify-between gap-2 cursor-pointer", onClick: () => setExpanded(open ? null : s.id) }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#888" } }, s.phone || "no number on file", " \xB7 ", s.pin ? "PIN set" : "no PIN", (s.positions || []).length > 0 && " \xB7 " + s.positions.map((p) => p.name).join(", "))), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 shrink-0" }, /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+    return /* @__PURE__ */ React.createElement("div", { key: s.id, className: "rounded px-3 py-2.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, editing ? /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, /* @__PURE__ */ React.createElement("input", { value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "4-digit PIN (time clock)", inputMode: "numeric", maxLength: 4, value: draft.pin, onChange: (e) => setDraft({ ...draft, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${pinTaken(draft.pin, editingId) ? COLORS.tomato : COLORS.line}`, fontFamily: "JetBrains Mono" } }), pinTaken(draft.pin, editingId) && /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.tomatoDark } }, "Someone else already has that PIN."), /* @__PURE__ */ React.createElement("input", { placeholder: "ADP employee ID (for payroll export)", value: draft.adpId, onChange: (e) => setDraft({ ...draft, adpId: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" } }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: saveEdit, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => setEditingId(null), color: "#888" }, "Cancel"))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "flex items-start justify-between gap-2 cursor-pointer", onClick: () => setExpanded(open ? null : s.id) }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#888" } }, s.phone || "no number on file", " \xB7 ", s.pin ? "PIN set" : "no PIN", " \xB7 ", s.adpId ? "ADP linked" : "no ADP ID", (s.positions || []).length > 0 && " \xB7 " + s.positions.map((p) => p.name).join(", "))), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 shrink-0" }, /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
       e.stopPropagation();
       startEdit(s);
     }, className: "text-xs px-2 py-0.5 rounded", style: { fontFamily: "Inter", border: `1px solid ${COLORS.line}`, color: COLORS.crust } }, "Edit"), /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
@@ -7345,9 +7714,14 @@ function ReferenceTab({ data, persist, initialSub }) {
 function TasksTab({ data, persist }) {
   const [text, setText] = useState("");
   const [assignee, setAssignee] = useState("");
-  const [station, setStation] = useState(TASK_STATIONS[0]);
+  const zones = (data.taskStations && data.taskStations.length) ? data.taskStations : TASK_STATIONS;
+  const [station, setStation] = useState(zones[0]);
   const [filter, setFilter] = useState("All");
-  const stationOf = (t) => t.station || "Unsorted";
+  const [manageOpen, setManageOpen] = useState(false);
+  const [zoneText, setZoneText] = useState("");
+  const [tplText, setTplText] = useState("");
+  const [tplStation, setTplStation] = useState("General");
+  const stationOf = (t) => t.station || "General";
   const toggle = (id) => {
     const next = JSON.parse(JSON.stringify(data));
     const t = next.tasks.find((t2) => t2.id === id);
@@ -7379,10 +7753,59 @@ function TasksTab({ data, persist }) {
     setAssignee("");
   };
 
-  const allStations = TASK_STATIONS.slice();
+  // ---- Zones (the list of places a task can belong to) ----
+  const addZone = () => {
+    const name = zoneText.trim();
+    if (!name || zones.indexOf(name) !== -1) return;
+    const next = JSON.parse(JSON.stringify(data));
+    next.taskStations = zones.concat([name]);
+    persist(next);
+    setZoneText("");
+  };
+  const removeZone = (name) => {
+    const next = JSON.parse(JSON.stringify(data));
+    next.taskStations = zones.filter((z) => z !== name);
+    // Anything living in the removed zone falls back to General rather than
+    // vanishing or hanging onto a zone that no longer exists in the picker.
+    (next.tasks || []).forEach((t) => { if (t.station === name) t.station = "General"; });
+    (next.taskTemplates || []).forEach((tpl) => { if (tpl.station === name) tpl.station = "General"; });
+    persist(next);
+    if (station === name) setStation((next.taskStations[0]) || "General");
+  };
+
+  // ---- Task library (reusable templates, not tied to today's actual list) ----
+  const templates = data.taskTemplates || [];
+  const addTemplate = () => {
+    if (!tplText.trim()) return;
+    const next = JSON.parse(JSON.stringify(data));
+    next.taskTemplates = (next.taskTemplates || []).concat([{ id: uid(), text: tplText.trim(), station: tplStation }]);
+    persist(next);
+    setTplText("");
+  };
+  const removeTemplate = (id) => {
+    const next = JSON.parse(JSON.stringify(data));
+    next.taskTemplates = (next.taskTemplates || []).filter((t) => t.id !== id);
+    persist(next);
+  };
+  const moveTemplate = (id, newStation) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const t = (next.taskTemplates || []).find((t2) => t2.id === id);
+    if (t) t.station = newStation;
+    persist(next);
+  };
+  const addToToday = (tpl) => {
+    const next = JSON.parse(JSON.stringify(data));
+    next.tasks.push({ id: uid(), text: tpl.text, station: tpl.station || "General", assignee: "Anyone", done: false });
+    persist(next);
+  };
+
+  const allStations = zones.slice();
   data.tasks.forEach((t) => {
     if (allStations.indexOf(stationOf(t)) === -1) allStations.push(stationOf(t));
   });
+  // Always offer General in the pickers, even before anything's using it —
+  // unlike allStations (for filter chips), which only shows it once it is.
+  const pickableStations = ["General"].concat(zones);
   const openCount = (s) => data.tasks.filter((t) => !t.done && stationOf(t) === s).length;
   const shown = filter === "All" ? allStations : [filter];
   const doneTasks = data.tasks.filter((t) => t.done && (filter === "All" || stationOf(t) === filter));
@@ -7436,7 +7859,7 @@ function TasksTab({ data, persist }) {
           value: stationOf(t), onChange: (e) => move(t.id, e.target.value),
           className: "outline-none",
           style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 13, fontWeight: 500, color: INK2, background: "#F8F8FB", maxWidth: 104, minHeight: 36, padding: "0 6px" }
-        }, allStations.map((s) => React.createElement("option", { key: s, value: s }, s))),
+        }, pickableStations.map((s) => React.createElement("option", { key: s, value: s }, s))),
       React.createElement("button", { onClick: () => remove(t.id), style: { background: "transparent", border: "none", padding: 10 } },
         React.createElement(Trash2, { size: 16, color: INK3 }))
     )
@@ -7473,7 +7896,7 @@ function TasksTab({ data, persist }) {
       React.createElement("select", {
           value: station, onChange: (e) => setStation(e.target.value),
           className: "px-3 outline-none", style: Object.assign({}, FIELD, { fontSize: 15 })
-        }, TASK_STATIONS.map((s) => React.createElement("option", { key: s, value: s }, s))),
+        }, pickableStations.map((s) => React.createElement("option", { key: s, value: s }, s))),
       React.createElement("input", {
         placeholder: "Who", value: assignee,
         onChange: (e) => setAssignee(e.target.value),
@@ -7530,6 +7953,61 @@ function TasksTab({ data, persist }) {
             React.createElement("button", { onClick: () => remove(t.id), style: { background: "transparent", border: "none", padding: 10 } },
               React.createElement(Trash2, { size: 15, color: INK3 })))
         ))
+      )
+    ),
+    React.createElement(
+      "div",
+      { className: "mt-6" },
+      React.createElement("button", { onClick: () => setManageOpen(!manageOpen),
+          className: "flex items-center gap-1.5", style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.tomato, padding: "6px 2px" } },
+        manageOpen ? "\u25b4 Hide zones & task library" : "\u25be Manage zones & task library"),
+      manageOpen && React.createElement(
+        "div",
+        { className: "mt-3 space-y-4" },
+
+        // ---- Zones ----
+        React.createElement(
+          "div",
+          { className: "px-4 py-4", style: { background: COLORS.card, borderRadius: 16, boxShadow: CARD_SHADOW } },
+          React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#888", textTransform: "uppercase", marginBottom: 10 } }, "Zones"),
+          React.createElement("div", { className: "flex flex-wrap gap-2 mb-3" },
+            zones.map((z) => React.createElement("span", { key: z, className: "flex items-center gap-1.5", style: { fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, color: COLORS.crust, background: "#F1F1F5", borderRadius: 999, padding: "6px 6px 6px 12px" } },
+              z,
+              React.createElement("button", { onClick: () => removeZone(z), style: { background: "transparent", border: "none", padding: 2, display: "flex" } },
+                React.createElement(X, { size: 13, color: INK3 }))))),
+          React.createElement("div", { className: "flex gap-2" },
+            React.createElement("input", { placeholder: "New zone\u2026", value: zoneText, onChange: (e) => setZoneText(e.target.value), onKeyDown: (e) => e.key === "Enter" && addZone(),
+              className: "flex-1 px-3 py-2 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#F8F8FB" } }),
+            React.createElement("button", { onClick: addZone, className: "px-4 rounded", style: { background: COLORS.crust, color: "#FFFFFF", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600 } }, "Add")),
+          React.createElement("div", { className: "text-xs mt-2", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "Removing a zone moves anything on it to General \u2014 nothing gets deleted.")
+        ),
+
+        // ---- Task library ----
+        React.createElement(
+          "div",
+          { className: "px-4 py-4", style: { background: COLORS.card, borderRadius: 16, boxShadow: CARD_SHADOW } },
+          React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#888", textTransform: "uppercase", marginBottom: 10 } }, "Task library"),
+          React.createElement("div", { className: "text-xs mb-3", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "Reusable tasks. Add one to today's list without retyping it, or leave it here for whenever it comes up."),
+          templates.length === 0 && React.createElement("div", { className: "text-sm italic py-3", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "No saved tasks yet."),
+          React.createElement("div", { className: "space-y-1.5 mb-3" }, templates.map((tpl) => React.createElement(
+            "div",
+            { key: tpl.id, className: "flex items-center gap-2 py-1.5", style: { borderBottom: "1px solid " + COLORS.line } },
+            React.createElement("span", { className: "flex-1 min-w-0 truncate", style: { fontFamily: "Inter", fontSize: 14.5, color: COLORS.crust } }, tpl.text),
+            React.createElement("select", { value: tpl.station || "General", onChange: (e) => moveTemplate(tpl.id, e.target.value), className: "outline-none",
+                style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 12.5, color: INK2, background: "#F8F8FB", maxWidth: 96, minHeight: 32, padding: "0 4px" } },
+              pickableStations.map((s) => React.createElement("option", { key: s, value: s }, s))),
+            React.createElement("button", { onClick: () => addToToday(tpl), className: "px-2.5 py-1.5 rounded flex-shrink-0", style: { background: COLORS.basil, color: "#FFFFFF", border: "none", fontFamily: "Inter", fontSize: 12.5, fontWeight: 600 } }, "+ Today"),
+            React.createElement("button", { onClick: () => removeTemplate(tpl.id), style: { background: "transparent", border: "none", padding: 6, flexShrink: 0 } },
+              React.createElement(Trash2, { size: 14, color: INK3 }))
+          ))),
+          React.createElement("div", { className: "flex gap-2 flex-wrap" },
+            React.createElement("input", { placeholder: "New reusable task\u2026", value: tplText, onChange: (e) => setTplText(e.target.value), onKeyDown: (e) => e.key === "Enter" && addTemplate(),
+              className: "flex-1 px-3 py-2 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#F8F8FB", minWidth: 140 } }),
+            React.createElement("select", { value: tplStation, onChange: (e) => setTplStation(e.target.value), className: "px-2 outline-none rounded",
+                style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#F8F8FB", minHeight: 40 } },
+              pickableStations.map((s) => React.createElement("option", { key: s, value: s }, s))),
+            React.createElement("button", { onClick: addTemplate, className: "px-4 rounded", style: { background: COLORS.crust, color: "#FFFFFF", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600 } }, "Add"))
+        )
       )
     )
   );
