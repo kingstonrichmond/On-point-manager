@@ -1093,7 +1093,11 @@ function setWho(v) { try { v ? localStorage.setItem(AUTH_WHO, v) : localStorage.
     const opts = Object.assign({}, init || {});
     const h = new Headers((opts && opts.headers) || (typeof input !== "string" && input.headers) || {});
     const k = getAuthKey();
-    if (k) h.set("x-opp-key", k);
+    // Only fill in the stored device code if the caller hasn't supplied one.
+    // checkKey() deliberately passes a different code to ask the server "what
+    // role is THIS?" — overwriting it here made the admin unlock always test
+    // the device code instead, so 5678 came back as staff.
+    if (k && !h.has("x-opp-key")) h.set("x-opp-key", k);
     const who = getWho();
     if (who) h.set("x-opp-who", who);
     opts.headers = h;
@@ -3100,12 +3104,109 @@ function downloadTextFile(filename, text, mime) {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+// One person's punches, grouped into weeks, newest first. Used by the "My
+// hours" view so someone can check their own week without asking.
+// Open shifts (clocked in, not yet out) are counted as running time so the
+// number doesn't look wrong to someone standing there mid-shift.
+function hoursHistoryFor(data, staffId, weeksBack) {
+    const weekStart = (data && data.adpWeekStart != null) ? data.adpWeekStart : 0;
+    const entries = ((data && data.timeClock) || []).filter((e) => e.staffId === staffId);
+    const cutoff = Date.now() - (weeksBack || 5) * 7 * 86400000;
+    const weeks = {};
+    entries.forEach((e) => {
+        const started = new Date(e.clockIn).getTime();
+        if (!isFinite(started) || started < cutoff) return;
+        const endMs = e.clockOut ? new Date(e.clockOut).getTime() : Date.now();
+        const hrs = (endMs - started) / 3600000;
+        if (!(hrs > 0)) return;
+        const wk = weekKeyFor(e.date, weekStart);
+        if (!weeks[wk]) weeks[wk] = { week: wk, hours: 0, days: {}, open: false };
+        weeks[wk].hours += hrs;
+        if (!e.clockOut) weeks[wk].open = true;
+        const d = weeks[wk].days[e.date] || { date: e.date, hours: 0, shifts: [] };
+        d.hours += hrs;
+        d.shifts.push({ in: e.clockIn, out: e.clockOut || null });
+        weeks[wk].days[e.date] = d;
+    });
+    return Object.values(weeks)
+        .map((w) => ({
+            ...w,
+            hours: Math.round(w.hours * 100) / 100,
+            days: Object.values(w.days)
+                .map((d) => ({ ...d, hours: Math.round(d.hours * 100) / 100 }))
+                .sort((a, b) => (a.date < b.date ? 1 : -1))
+        }))
+        .sort((a, b) => (a.week < b.week ? 1 : -1));
+}
+function fmtHours(h) {
+    const mins = Math.round(h * 60);
+    return Math.floor(mins / 60) + "h " + String(mins % 60).padStart(2, "0") + "m";
+}
+function weekLabel(iso) {
+    const d = isoToDate(iso);
+    const end = new Date(d.getTime() + 6 * 86400000);
+    const m = (x) => (x.getMonth() + 1) + "/" + x.getDate();
+    return m(d) + " \u2013 " + m(end);
+}
+// One person's hours: this week big at the top, earlier weeks below, and the
+// current week broken out by day. Five weeks back — enough to settle "what did
+// I work last pay period" without turning into a filing cabinet.
+function HoursReport({ data, staff, onBack }) {
+    const weeks = hoursHistoryFor(data, staff.id, 5);
+    const firstName = String(staff.name || "").split("(")[0].trim();
+    const current = weeks[0] || null;
+    return React.createElement(
+        "div",
+        { className: "mt-1" },
+        React.createElement("button", {
+            onClick: onBack,
+            className: "text-sm mb-2",
+            style: { background: "transparent", border: "none", fontFamily: "Inter", fontWeight: 600, color: COLORS.tomato, padding: 0 }
+        }, "\u2039 Done"),
+        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 17, fontWeight: 700, color: COLORS.crust } }, firstName),
+        !current && React.createElement("div", { className: "text-sm mt-2", style: { fontFamily: "Inter", color: "#888" } }, "No hours recorded in the last few weeks."),
+        current && React.createElement(
+            "div",
+            { className: "mt-2" },
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, color: "#888" } }, "This week \u00b7 " + weekLabel(current.week)),
+            React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: 30, fontWeight: 700, color: COLORS.tomato, lineHeight: 1.1 } }, fmtHours(current.hours)),
+            current.open && React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: COLORS.basil, fontWeight: 600 } }, "Still clocked in \u2014 this keeps counting"),
+            React.createElement("div", { className: "mt-3" }, current.days.map((d) => React.createElement(
+                "div",
+                { key: d.date, className: "flex items-center justify-between py-1.5", style: { borderBottom: `1px solid ${COLORS.line}` } },
+                React.createElement("div", null,
+                    React.createElement("span", { style: { fontFamily: "Inter", fontSize: 14, color: COLORS.crust } }, dayLabel(d.date)),
+                    React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, color: "#9A9AA6", marginLeft: 8 } },
+                        d.shifts.map((s) => fmtClockTime(s.in) + "\u2013" + (s.out ? fmtClockTime(s.out) : "now")).join(", "))),
+                React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13.5, color: COLORS.crust } }, fmtHours(d.hours))
+            )))
+        ),
+        weeks.length > 1 && React.createElement(
+            "div",
+            { className: "mt-4 pt-3", style: { borderTop: `1px solid ${COLORS.line}` } },
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 11.5, fontWeight: 700, letterSpacing: "0.06em", color: "#888", textTransform: "uppercase", marginBottom: 6 } }, "Earlier weeks"),
+            weeks.slice(1).map((w) => React.createElement(
+                "div",
+                { key: w.week, className: "flex items-center justify-between py-1.5" },
+                React.createElement("span", { style: { fontFamily: "Inter", fontSize: 14, color: COLORS.crust } }, weekLabel(w.week)),
+                React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13.5, color: COLORS.crust } }, fmtHours(w.hours))
+            ))
+        )
+    );
+}
+function dayLabel(iso) {
+    const d = isoToDate(iso);
+    return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()] + " " + (d.getMonth() + 1) + "/" + d.getDate();
+}
 function TimeClockPanel({ data, persist, isAdmin }) {
     const [digits, setDigits] = useState("");
     const [msg, setMsg] = useState(null); // { text, tone }
     const [exportOpen, setExportOpen] = useState(false);
     const [rangeStart, setRangeStart] = useState(addDaysISO(todayISO(), -6));
     const [rangeEnd, setRangeEnd] = useState(todayISO());
+    const [mode, setMode] = useState("punch"); // "punch" | "hours"
+    const [viewing, setViewing] = useState(null); // staff record whose hours are shown
+    const [allHours, setAllHours] = useState(false); // admin: everyone at once
     const iso = todayISO();
     const openNow = ((data && data.timeClock) || []).filter((e) => e.date === iso && !e.clockOut)
         .sort((a, b) => (a.clockIn < b.clockIn ? -1 : 1));
@@ -3133,11 +3234,20 @@ function TimeClockPanel({ data, persist, isAdmin }) {
             flashMsg("Clocked in \u2014 " + firstName + " \u00b7 " + fmtClockTime((/* @__PURE__ */ new Date()).toISOString()), "good");
         }
     };
+    const lookupHours = (pin) => {
+        const s = findStaffByPin(data, pin);
+        if (!s) {
+            flashMsg("PIN not recognized", "bad");
+            return;
+        }
+        setViewing(s);
+    };
     const press = (d) => {
         const next = (digits + d).slice(0, 4);
         setDigits(next);
         if (next.length === 4) {
-            punch(next);
+            if (mode === "hours") lookupHours(next);
+            else punch(next);
             setDigits("");
         }
     };
@@ -3155,6 +3265,20 @@ function TimeClockPanel({ data, persist, isAdmin }) {
         React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#888", textTransform: "uppercase" } }, "Time Clock"),
         React.createElement(
             "div",
+            { className: "flex gap-1.5 mt-2 mb-1" },
+            [["punch", "Clock in / out"], ["hours", "My hours"]].map((m) => React.createElement("button", {
+                key: m[0],
+                onClick: () => { setMode(m[0]); setDigits(""); setViewing(null); setAllHours(false); setMsg(null); },
+                className: "px-3 py-1.5 rounded-full text-xs",
+                style: {
+                    fontFamily: "Inter", fontWeight: 600,
+                    border: `1px solid ${mode === m[0] ? COLORS.crust : COLORS.line}`,
+                    background: mode === m[0] ? COLORS.crust : "transparent",
+                    color: mode === m[0] ? "#FFFFFF" : COLORS.crust
+                }
+            }, m[1]))),
+        !viewing && !allHours && React.createElement(
+            "div",
             { className: "flex items-center justify-center gap-3 my-3" },
             [0, 1, 2, 3].map((i) => React.createElement("span", {
                 key: i,
@@ -3165,11 +3289,15 @@ function TimeClockPanel({ data, persist, isAdmin }) {
                 }
             }))
         ),
+        !viewing && !allHours && mode === "hours" && React.createElement("div", {
+            className: "text-center mb-2",
+            style: { fontFamily: "Inter", fontSize: 13, color: "#888" }
+        }, "Enter your PIN to see your hours"),
         msg && React.createElement("div", {
             className: "text-center mb-3",
             style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: msg.tone === "bad" ? COLORS.tomatoDark : COLORS.basil }
         }, msg.text),
-        React.createElement(
+        !viewing && !allHours && React.createElement(
             "div",
             { className: "grid grid-cols-3 gap-2 mx-auto", style: { maxWidth: 220 } },
             KEYS.map((k, i) => k === "" ? React.createElement("div", { key: i }) : React.createElement(
@@ -3184,6 +3312,42 @@ function TimeClockPanel({ data, persist, isAdmin }) {
                 },
                 k
             ))
+        ),
+        // Admin shortcut: skip the PIN and see the whole crew.
+        !viewing && !allHours && mode === "hours" && isAdmin && React.createElement("button", {
+            onClick: () => setAllHours(true),
+            className: "block mx-auto mt-3 text-sm",
+            style: { background: "transparent", border: "none", fontFamily: "Inter", fontWeight: 600, color: COLORS.tomato }
+        }, "See everyone's hours"),
+
+        // ---- One person's hours ----
+        viewing && React.createElement(HoursReport, {
+            data,
+            staff: viewing,
+            onBack: () => { setViewing(null); setDigits(""); }
+        }),
+
+        // ---- Everyone (admin only) ----
+        allHours && isAdmin && React.createElement(
+            "div",
+            { className: "mt-2" },
+            React.createElement("button", {
+                onClick: () => setAllHours(false),
+                className: "text-sm mb-3",
+                style: { background: "transparent", border: "none", fontFamily: "Inter", fontWeight: 600, color: COLORS.tomato, padding: 0 }
+            }, "\u2039 Back"),
+            ((data && data.staff) || []).map((s) => {
+                const wks = hoursHistoryFor(data, s.id, 5);
+                if (!wks.length) return null;
+                return React.createElement(
+                    "div",
+                    { key: s.id, className: "flex items-center justify-between py-2", style: { borderBottom: `1px solid ${COLORS.line}` } },
+                    React.createElement("span", { style: { fontFamily: "Inter", fontSize: 14.5, fontWeight: 600, color: COLORS.crust } }, String(s.name).split("(")[0].trim()),
+                    React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13.5, color: COLORS.crust } },
+                        fmtHours(wks[0].hours) + (wks[0].open ? " \u00b7 on now" : ""))
+                );
+            }),
+            React.createElement("div", { className: "text-xs mt-2", style: { fontFamily: "Inter", color: "#9A9AA6" } }, "Current week. Tap a PIN on the previous screen for one person's full history.")
         ),
         openNow.length > 0 && React.createElement(
             "div",
