@@ -1,4 +1,5 @@
 import { getStore } from "@netlify/blobs";
+import { checkAuth, authHeaders, denied } from "./_auth.mjs";
 
 // Walk-in / freezer temperatures from YoLink.
 //
@@ -12,16 +13,20 @@ import { getStore } from "@netlify/blobs";
 // results are cached in Blobs and shared: ten tablets polling still costs one
 // upstream refresh. The sensors themselves only report every so often anyway,
 // so a short cache loses nothing real.
+//
+// Auth also protects that rate limit: without a code, anyone hitting this URL
+// with ?force=1 in a loop could burn the shop's YoLink quota and blank out the
+// temperature readings during service.
 
 const HOST = "https://api.yosmart.com";
 const TOKEN_KEY = "yolink-token";
 const CACHE_KEY = "yolink-cache";
 const CACHE_SECONDS = 120;
 
-const json = (body, status = 200) =>
+const json = (body, status = 200, extra = {}) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json", "cache-control": "no-store" },
+    headers: { "content-type": "application/json", "cache-control": "no-store", ...extra },
   });
 
 const cToF = (c) => (typeof c === "number" ? Math.round((c * 9) / 5 + 32) : null);
@@ -82,20 +87,26 @@ async function call(token, payload) {
 const TEMP_TYPES = ["THSensor", "LeakSensor", "Thermostat"];
 
 export default async (req) => {
+  const auth = checkAuth(req);
+  if (auth.enforced && !auth.role) return denied();
+  const ah = authHeaders(auth);
+
   let store;
   try {
     store = getStore({ name: "onpoint-yolink", consistency: "strong" });
   } catch (e) {
-    return json({ error: "Storage unavailable: " + e.message }, 500);
+    return json({ error: "Storage unavailable: " + e.message }, 500, ah);
   }
 
   const url = new URL(req.url);
-  const force = url.searchParams.get("force") === "1";
+  // Only an owner should be able to skip the shared cache and force an upstream
+  // refresh — that's the call that eats the YoLink rate limit.
+  const force = url.searchParams.get("force") === "1" && auth.role === "admin";
 
   const cached = await store.get(CACHE_KEY, { type: "json" }).catch(() => null);
   const fresh = cached && Date.now() - cached.at < CACHE_SECONDS * 1000;
   if (cached && fresh && !force) {
-    return json({ sensors: cached.sensors, at: cached.at, cached: true });
+    return json({ sensors: cached.sensors, at: cached.at, cached: true }, 200, ah);
   }
 
   try {
@@ -137,7 +148,7 @@ export default async (req) => {
 
     const at = Date.now();
     await store.setJSON(CACHE_KEY, { at, sensors }).catch(() => {});
-    return json({ sensors, at, cached: false });
+    return json({ sensors, at, cached: false }, 200, ah);
   } catch (e) {
     // Serve whatever we had rather than showing nothing during an outage.
     if (cached) {
@@ -147,8 +158,8 @@ export default async (req) => {
         cached: true,
         stale: true,
         error: e.message,
-      });
+      }, 200, ah);
     }
-    return json({ error: e.message, setup: !!e.setup }, e.setup ? 200 : 502);
+    return json({ error: e.message, setup: !!e.setup }, e.setup ? 200 : 502, ah);
   }
 };
