@@ -1543,6 +1543,56 @@ function migratePrices(d) {
   return { data: d, changed: true };
 }
 const NEW_ITEM_DROP = [{"id": "i128", "item": "Mustard", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Back Room \u2014 Next Shelf", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i129", "item": "Sugar", "qty": 0, "unit": "bag", "low": 1, "vendor": "Thomsen", "station": "Back Room \u2014 Next Shelf", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i130", "item": "Italian Dressing Mix", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Back Room \u2014 Next Shelf", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i131", "item": "Yeast", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Back Room \u2014 Next Shelf", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i132", "item": "Ice Cream", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Second Freezer", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i133", "item": "Brick Cheese", "qty": 0, "unit": "lb", "low": 5, "vendor": "Thomsen", "station": "Walk-In \u2014 Cheeses", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i134", "item": "Molded Fiber Tray 5x7", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Storage Unit", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i135", "item": "Clear Plastic Cups 12 oz", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Storage Unit", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i136", "item": "Souffle Cups 2 oz", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Storage Unit", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i137", "item": "Souffle Lids 2 oz", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Storage Unit", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i138", "item": "Foil Sheets", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Storage Unit", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i139", "item": "Parchment Paper", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Storage Unit", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i140", "item": "Sanitizer", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Chemical Cabinet", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i141", "item": "Ketchup Packets", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Out Front", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i142", "item": "Mayo Packets", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Out Front", "names": {"qfc": null, "thomsen": null}, "prices": {"qfc": null, "thomsen": null}}, {"id": "i143", "item": "Soda \u2014 Cola", "qty": 0, "unit": "case", "low": 1, "vendor": "Thomsen", "station": "Out Front", "names": {"qfc": null, "thomsen": "Soda Cola"}, "prices": {"qfc": null, "thomsen": {"amt": 33.94, "unit": "case", "date": "2026-08-02"}}, "thomsenSku": "90513"}];
+// ---- Per-vendor orders --------------------------------------------------
+// One order per distributor, open at the same time. An item sits on a
+// vendor's order as inventory[i].order[vendorId] = { need, note }. The old
+// single-order fields (orderNeed / orderVendor / orderNote) migrate in once.
+const VENDORS = [
+  { id: "QFC", label: "Quality Food", short: "Quality", key: "qfc", kind: "food" },
+  { id: "Thomsen", label: "Thomsen", short: "Thomsen", key: "thomsen", kind: "food" },
+  { id: "Pepsi", label: "PepsiCo Partners", short: "Pepsi", key: "pepsi", kind: "drinks" }
+];
+const VENDOR_BY_ID = {}; VENDORS.forEach((v) => { VENDOR_BY_ID[v.id] = v; });
+function vendorKey(vid) { const v = VENDOR_BY_ID[vid]; return v ? v.key : String(vid || "").toLowerCase(); }
+function vendorSku(i, vid) { return (i && i[vendorKey(vid) + "Sku"]) || ""; }
+function vendorPack(i, vid) { return (i && i[vendorKey(vid) + "Pack"]) || ""; }
+// Whether this distributor sells us this item at all: an item number or a price on file.
+function carriedBy(i, vid) { return !!(vendorSku(i, vid) || vendorPriceOf(i, vendorKey(vid))); }
+function orderOf(i, vid) { const o = i && i.order && i.order[vid]; return o && typeof o === "object" ? o : null; }
+function orderNeedOf(i, vid) { const o = orderOf(i, vid); return o && o.need != null ? o.need : null; }
+function usualOf(i, vid) { const n = i && i.usual && Number(i.usual[vid]); return n > 0 ? n : null; }
+function onAnyOrder(i) { return VENDORS.some((v) => Number(orderNeedOf(i, v.id)) > 0); }
+function totalOnOrders(d) { return ((d && d.inventory) || []).filter(onAnyOrder).length; }
+// Who to send it to. Seeded with what's known; everything is editable on the tab.
+const DEFAULT_VENDOR_CONTACTS = {
+  QFC: { rep: "Mike Gillooly", phone: "401-226-8344", email: "", notes: "" },
+  Thomsen: { rep: "Mary", phone: "1-401-497-6927", email: "", notes: "" },
+  Pepsi: { rep: "PepsiCo Partners (online)", phone: "1-800-963-2424", email: "", notes: "Account 6159351. Order by Wed 7am for Thu delivery." }
+};
+// Everything ordered from Pepsi across the 7/23, 8/6, 8/13 and 9/3 confirmations,
+// with the quantity that usually goes. Aquafina came as a free case, so no price.
+const PEPSI_ITEMS = [{"id":"p325667","item":"Tropicana Apple","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"325667","pepsiPack":"12 × 11oz Bottle","names":{"qfc":null,"thomsen":null,"pepsi":"Tropicana Apple"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":19.93,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p325666","item":"Tropicana Cranberry Cocktail","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"325666","pepsiPack":"12 × 11oz Bottle","names":{"qfc":null,"thomsen":null,"pepsi":"Tropicana Cranberry Cocktail"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":19.93,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":true},{"id":"p325663","item":"Tropicana Orange Juice","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"325663","pepsiPack":"12 × 11oz Bottle","names":{"qfc":null,"thomsen":null,"pepsi":"Tropicana Pure Premium Original Orange Juice"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":19.93,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p134073","item":"Pure Leaf Lemon","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"134073","pepsiPack":"12 × 18.5oz Bottle","names":{"qfc":null,"thomsen":null,"pepsi":"Pure Leaf Lemon"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":23.1,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p134072","item":"Pure Leaf Unsweetened","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"134072","pepsiPack":"12 × 18.5oz Bottle","names":{"qfc":null,"thomsen":null,"pepsi":"Pure Leaf Unsweetened"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":23.1,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p133064","item":"Crush Orange","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"133064","pepsiPack":"24 × 20oz Bottle","names":{"qfc":null,"thomsen":null,"pepsi":"Crush Orange"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":30.45,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p166134","item":"Diet Pepsi (20oz)","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"166134","pepsiPack":"24 × 20oz Bottle","names":{"qfc":null,"thomsen":null,"pepsi":"Diet Pepsi"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":30.45,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":true},{"id":"p19553","item":"Dr Pepper","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"19553","pepsiPack":"24 × 20oz Bottle","names":{"qfc":null,"thomsen":null,"pepsi":"Dr Pepper"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":30.45,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":2},"everyWeek":false},{"id":"p5877","item":"Mountain Dew (20oz)","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"5877","pepsiPack":"24 × 20oz Bottle","names":{"qfc":null,"thomsen":null,"pepsi":"Mountain Dew"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":30.45,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p19685","item":"Mug Root Beer","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"19685","pepsiPack":"24 × 20oz Bottle","names":{"qfc":null,"thomsen":null,"pepsi":"Mug Root Beer"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":30.45,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p5866","item":"Pepsi (20oz)","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"5866","pepsiPack":"24 × 20oz Bottle","names":{"qfc":null,"thomsen":null,"pepsi":"Pepsi"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":30.45,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":2},"everyWeek":false},{"id":"p32575","item":"Schweppes Ginger Ale","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"32575","pepsiPack":"24 × 20oz Bottle","names":{"qfc":null,"thomsen":null,"pepsi":"Schweppes Ginger Ale"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":30.45,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":true},{"id":"p166210","item":"Mountain Dew (7.5oz cans)","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"166210","pepsiPack":"30 × 7.5oz Can","names":{"qfc":null,"thomsen":null,"pepsi":"Mountain Dew"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":15.86,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p173510","item":"Pepsi Real Sugar (7.5oz cans)","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"173510","pepsiPack":"30 × 7.5oz Can","names":{"qfc":null,"thomsen":null,"pepsi":"Pepsi Made With Real Sugar"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":15.86,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":true},{"id":"p320181","item":"Celsius Peach Mango Green Tea","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"320181","pepsiPack":"12 × 12oz Can","names":{"qfc":null,"thomsen":null,"pepsi":"CELSIUS Peach Mango Green Tea"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":23.34,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":true},{"id":"p320126","item":"Celsius Fuji Apple Pear","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"320126","pepsiPack":"12 × 12oz Can","names":{"qfc":null,"thomsen":null,"pepsi":"CELSIUS Sparkling Fuji Apple Pear"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":23.34,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":true},{"id":"p320165","item":"Celsius Grape Rush","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"320165","pepsiPack":"12 × 12oz Can","names":{"qfc":null,"thomsen":null,"pepsi":"CELSIUS Sparkling Grape Rush"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":23.34,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":true},{"id":"p320146","item":"Celsius Orange","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"320146","pepsiPack":"12 × 12oz Can","names":{"qfc":null,"thomsen":null,"pepsi":"CELSIUS Sparkling Orange"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":23.34,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":true},{"id":"p320147","item":"Celsius Wild Berry","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"320147","pepsiPack":"12 × 12oz Can","names":{"qfc":null,"thomsen":null,"pepsi":"CELSIUS Sparkling Wild Berry"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":23.34,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p137647","item":"Schweppes Seltzer — Lemon Lime","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"137647","pepsiPack":"24 × 12oz Can","names":{"qfc":null,"thomsen":null,"pepsi":"Schweppes Lemon Lime Sparkling Seltzer Water (2/12 Packs)"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":19.44,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":true},{"id":"p137652","item":"Schweppes Seltzer","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"137652","pepsiPack":"24 × 12oz Can","names":{"qfc":null,"thomsen":null,"pepsi":"Schweppes Sparkling Seltzer Water (2/12 Packs)"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":19.44,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p165042","item":"Bubly Grapefruit","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"165042","pepsiPack":"24 × 12oz Can","names":{"qfc":null,"thomsen":null,"pepsi":"bubly grapefruit"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":16.06,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p130573","item":"Gatorade Fierce Grape","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"130573","pepsiPack":"24 × 20oz Wide Mouth","names":{"qfc":null,"thomsen":null,"pepsi":"Gatorade Fierce Grape"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":27.73,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p135865","item":"Gatorade Riptide Rush","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"135865","pepsiPack":"24 × 20oz Wide Mouth","names":{"qfc":null,"thomsen":null,"pepsi":"Gatorade Frost Riptide Rush"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":27.73,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p85526","item":"Gatorade Glacier Freeze","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"85526","pepsiPack":"24 × 20oz Wide Mouth","names":{"qfc":null,"thomsen":null,"pepsi":"Gatorade Glacier Freeze"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":37.28,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p85520","item":"Gatorade Lemon Lime","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"85520","pepsiPack":"24 × 20oz Wide Mouth","names":{"qfc":null,"thomsen":null,"pepsi":"Gatorade Lemon Lime"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":37.28,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p169373","item":"Gatorade Zero Glacier Cherry","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"169373","pepsiPack":"24 × 20oz Wide Mouth","names":{"qfc":null,"thomsen":null,"pepsi":"Gatorade Zero Glacier Cherry"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":37.28,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p209835","item":"Starry","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"209835","pepsiPack":"24 × 20oz Bottle","names":{"qfc":null,"thomsen":null,"pepsi":"Starry"},"prices":{"qfc":null,"thomsen":null,"pepsi":{"amt":30.45,"unit":"case","date":"2026-09-03"}},"usual":{"Pepsi":1},"everyWeek":false},{"id":"p300025","item":"Aquafina Water","qty":0,"unit":"case","low":1,"vendor":"Pepsi","station":"Out Front","pepsiSku":"300025","pepsiPack":"24 × 20oz Bottle","names":{"qfc":null,"thomsen":null,"pepsi":"Aquafina Water"},"prices":{"qfc":null,"thomsen":null,"pepsi":null},"usual":{"Pepsi":2},"everyWeek":false}];
+const ORDERS_VERSION = 1;
+function migrateOrders(d) {
+  if (!d || typeof d !== "object") return { data: d, changed: false };
+  if ((d.ordersVersion || 0) >= ORDERS_VERSION) return { data: d, changed: false };
+  d.inventory = d.inventory || [];
+  d.inventory.forEach((r) => {
+    if (r.orderNeed != null) {
+      const vid = r.orderVendor || r.vendor || "QFC";
+      r.order = r.order || {};
+      r.order[vid] = { need: r.orderNeed, note: r.orderNote || "" };
+    }
+    delete r.orderNeed; delete r.orderVendor; delete r.orderNote;
+  });
+  const haveSku = {};
+  d.inventory.forEach((r) => { if (r.pepsiSku) haveSku[r.pepsiSku] = true; });
+  PEPSI_ITEMS.forEach((p) => { if (!haveSku[p.pepsiSku] && !d.inventory.some((r) => r.id === p.id)) d.inventory.push(JSON.parse(JSON.stringify(p))); });
+  d.vendorContacts = d.vendorContacts || {};
+  VENDORS.forEach((v) => { if (!d.vendorContacts[v.id]) d.vendorContacts[v.id] = JSON.parse(JSON.stringify(DEFAULT_VENDOR_CONTACTS[v.id] || { rep: "", phone: "", email: "", notes: "" })); });
+  d.ordersVersion = ORDERS_VERSION;
+  return { data: d, changed: true };
+}
 const NEWITEMS_VERSION = 1;
 // Added from his walk-through. Anything he has already created by hand with the
 // same name is left alone, so this never doubles a row up.
@@ -1573,7 +1623,8 @@ function migrateTimeOff(d) {
     const w0 = migrateWalk(d);
     const p0 = migratePrices(w0.data);
     const n0 = migrateNewItems(p0.data);
-    return { data: n0.data, changed: w0.changed || p0.changed || n0.changed };
+    const o0 = migrateOrders(n0.data);
+    return { data: o0.data, changed: w0.changed || p0.changed || n0.changed || o0.changed };
   }
   const have = Array.isArray(d.timeOff) ? d.timeOff : [];
   const key = (r) => String(r.date) + "|" + String(r.name || "").toLowerCase().replace(/[^a-z]/g, "");
@@ -1587,6 +1638,7 @@ function migrateTimeOff(d) {
   const w = migrateWalk(d);
   migratePrices(w.data);
   migrateNewItems(w.data);
+  migrateOrders(w.data);
   return { data: w.data, changed: true };
 }
 
@@ -2314,7 +2366,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   const boardFlags = (((_a = data.prep) == null ? void 0 : _a.lowStock) || []).filter((i) => i.status === "low" || i.status === "86").length;
   const prepTodo = (((_a = data.prep) == null ? void 0 : _a.par) || []).filter((i) => Number(i.need) > 0 && !i.done).length;
   const belmontNeed = (((_a = data.prep) == null ? void 0 : _a.produce) || []).filter((i) => Number(i.need) > 0).length;
-  const foodOrderNeed = (data.inventory || []).filter((i) => Number(i.orderNeed) > 0).length;
+  const foodOrderNeed = totalOnOrders(data);
   const _t0 = todayISO(), _t7 = addDaysISO(_t0, 7);
   const offSoon = ((data.timeOff || []).filter((r) => r.date >= _t0 && r.date <= _t7).map((r) => r.date).filter((v, i, a) => a.indexOf(v) === i)).length;
   // Admin-only tabs are the ones holding money, people's details, or pictures
@@ -2757,11 +2809,11 @@ Keep "reply" concise \u2014 a few sentences at most \u2014 so the whole response
 - {"type": "complete_task", "text_match": "substring of an existing task's text"}
 - {"type": "update_inventory", "item_match": "substring of an existing inventory item name", "qty": number}
 - {"type": "add_shift", "day": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "name": "...", "time": "..."}  (goes on the upcoming instance of that day only, not the usual week)
-- {"type": "set_produce", "item_match": "romaine", "need": 2}  (put an item on the Belmont produce order; need 0 = all set, need null = not looked at yet)\n- {"type": "set_order", "item_match": "all trumps", "orderNeed": 4, "orderVendor": "QFC"}  (put an inventory item on the food order; orderNeed 0 = all set, null = clear it}
+- {"type": "set_produce", "item_match": "romaine", "need": 2}  (put an item on the Belmont produce order; need 0 = all set, need null = not looked at yet)\n- {"type": "set_order", "item_match": "all trumps", "orderNeed": 4, "orderVendor": "QFC"}  (put an inventory item on that vendor's order; orderNeed 0 = all set, null = clear it; orderVendor is QFC, Thomsen or Pepsi}
 - {"type": "add_time_off", "date": "YYYY-MM-DD", "name": "...", "note": "optional reason"}  (mark someone off on a date; resolve relative dates like \"next Friday\" yourself before writing the date)\n- {"type": "remove_time_off", "date": "YYYY-MM-DD", "name": "..."}  (they can work after all)\n- {"type": "flag_stock", "item": "...", "status": "ok|low|86"}
 - {"type": "set_queue", "size_match": "substring of an order queue size label, e.g. 'XL' or 'Medium'", "count": number}
 
-Inventory items also carry "orderNeed" (the FOOD ORDER list: null = not looked at, 0 = all set / none needed, N = that many are on the order) and "orderVendor" (which distributor we're buying that item from this time, "QFC" for Quality Food or "Thomsen"). When asked what's on the food order, list items with orderNeed > 0 grouped by vendor. Inventory items are ONE line per product, not one per brand \u2014 the two distributors often stock different brands of the same thing (e.g. ricotta is Grande at Thomsen and Supreme at Quality). "names" holds what each vendor calls it; use the vendor\u0027s own name when reading an order back. Never suggest adding a second row for a different brand of something already listed. Some inventory items carry "thomsenSku" (the Thomsen order-guide item number) and "thomsenUom" (Thomsen's unit of measure) \u2014 use these when asked for an item number or how Thomsen sells it. Inventory items carry two vendor prices under "prices": qfc (Quality Food) and thomsen. When quoting or costing, use the one with the more recent "date"; if only one is dated, use that one; if neither is dated, use qfc, and fall back to thomsen only when qfc is null. Each price has its own "unit" \u2014 if the two vendors' units differ, say so rather than comparing them directly. "vendor" is who we actually order the item from, which is separate from price comparison.
+Inventory items carry "order": one slot per distributor, e.g. order.QFC = {need, note}, order.Thomsen = {...}, order.Pepsi = {...} (need: 0 = all set / none needed, N = that many are on that vendor's order; no slot = not looked at). Vendors are "QFC" (Quality Food), "Thomsen", and "Pepsi". When asked what's on the order, list items with need > 0 grouped by vendor. Inventory items are ONE line per product, not one per brand \u2014 the two distributors often stock different brands of the same thing (e.g. ricotta is Grande at Thomsen and Supreme at Quality). "names" holds what each vendor calls it; use the vendor\u0027s own name when reading an order back. Never suggest adding a second row for a different brand of something already listed. Some inventory items carry "thomsenSku" (the Thomsen order-guide item number) and "thomsenUom" (Thomsen's unit of measure) \u2014 use these when asked for an item number or how Thomsen sells it. Inventory items carry two vendor prices under "prices": qfc (Quality Food) and thomsen. When quoting or costing, use the one with the more recent "date"; if only one is dated, use that one; if neither is dated, use qfc, and fall back to thomsen only when qfc is null. Each price has its own "unit" \u2014 if the two vendors' units differ, say so rather than comparing them directly. "vendor" is who we actually order the item from, which is separate from price comparison.
 
 If the user is just asking a question, return an empty actions array. Never invent inventory items, staff names, or tasks that aren't in the data when answering questions \u2014 only use actions to create new ones when explicitly asked. "thisWeek" is the actual schedule for the current Monday\u2013Sunday with real dates; "usualWeek" is the standing pattern each week starts from. Answer "who's working" questions from thisWeek.`;
     try {
@@ -2872,8 +2924,12 @@ If the user is just asking a question, return an empty actions array. Never inve
         } else if (action.type === "set_order") {
           const r = (next.inventory || []).find((r2) => r2.item.toLowerCase().includes((action.item_match || "").toLowerCase()));
           if (r) {
-            if (action.orderNeed !== void 0) r.orderNeed = action.orderNeed === null ? null : Number(action.orderNeed);
-            if (action.orderVendor !== void 0) r.orderVendor = action.orderVendor;
+            // Orders are per vendor now. No vendor named: the one that carries it,
+            // preferring the item's default.
+            const vid = action.orderVendor || (carriedBy(r, r.vendor) ? r.vendor : (VENDORS.find((v) => carriedBy(r, v.id)) || VENDORS[0]).id);
+            r.order = r.order || {};
+            if (action.orderNeed === null) delete r.order[vid];
+            else if (action.orderNeed !== void 0) r.order[vid] = { need: Number(action.orderNeed), note: (r.order[vid] && r.order[vid].note) || "" };
             changed = true;
           }
         } else if (action.type === "set_produce") {
@@ -4243,7 +4299,7 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
         : React.createElement("div", { className: "flex flex-wrap gap-2" },
             // Punched in is the strong green. Scheduled-now-but-not-punched is the
             // pale one, so if the clock's in use you can see who hasn't shown yet.
-            clockedIn.map((c) => pill(c.person + " \u00b7 in since " + fmtClockTime(c.since), COLORS.basil, "#FFFFFF")),
+            clockedIn.map((c) => pill(c.person + " \u00b7 in", COLORS.basil, "#FFFFFF")),
             onNow.map((c) => pill(c.person + (c.position ? " \u00b7 " + c.position : ""), clockedIn.length ? "#E4F1E6" : COLORS.basil, clockedIn.length ? "#1F6B34" : "#FFFFFF")),
             later.map((c) => pill(c.person + (c.win ? " from " + hourLabel(c.win.start) : ""), "#F2F2EF", COLORS.crust)),
             unfilled.map((c) => pill("Needs filling" + (c.time ? " \u00b7 " + c.time : ""), "#FFF6E8", "#8A5A00", "rgba(179,107,0,0.35)")),
@@ -6915,8 +6971,8 @@ function vendorProduct(i, vendor) {
 // One line per product, never one per brand. The two distributors stock
 // different brands of the same thing (ricotta is Supreme at Quality, Grande at
 // Thomsen), so the sheet stays thin and the brand detail lives behind a tap.
-const VENDOR_LABEL = { QFC: "Quality Food", Thomsen: "Thomsen" };
-const VENDOR_SHORT = { QFC: "Quality", Thomsen: "Thomsen" };
+const VENDOR_LABEL = {}; const VENDOR_SHORT = {};
+VENDORS.forEach((v) => { VENDOR_LABEL[v.id] = v.label; VENDOR_SHORT[v.id] = v.short; });
 // The sheet follows the route he actually walks, not the food-category buckets.
 // WALK_STATIONS is injected above; anything without a stop falls to the end.
 function stationOf(i) {
@@ -7132,173 +7188,280 @@ function PriceDetail({ i, vendorOf, patch }) {
             React.createElement("select", { value: stationOf(i), onChange: (e) => patch(i.id, { station: e.target.value }), className: "text-sm px-2 py-1.5 rounded outline-none flex-1", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", background: COLORS.cream } }, WALK_STATIONS.map((w) => React.createElement("option", { key: w.name, value: w.name }, w.name))))));
 }
 function FoodOrderTab({ data, persist }) {
+    const inv = (data && data.inventory) || [];
+    // Open on whichever vendor already has something on it, else Quality.
+    const firstOpen = VENDORS.find((v) => inv.some((i) => Number(orderNeedOf(i, v.id)) > 0));
+    const [vendor, setVendor] = useState(firstOpen ? firstOpen.id : "QFC");
     const [view, setView] = useState("order");
     const [q, setQ] = useState("");
     const [copied, setCopied] = useState("");
     const [openId, setOpenId] = useState("");
-    const [numbersFor, setNumbersFor] = useState("none");
-    const inv = (data && data.inventory) || [];
+    const [numbersOn, setNumbersOn] = useState(false);
+    const [repOpen, setRepOpen] = useState(false);
+    const [repDraft, setRepDraft] = useState(null);
+    const V = VENDOR_BY_ID[vendor] || VENDORS[0];
+    const contacts = (data.vendorContacts && data.vendorContacts[vendor]) || { rep: "", phone: "", email: "", notes: "" };
+
     const patch = (id, changes) => {
         const next = JSON.parse(JSON.stringify(data));
         const row = next.inventory.find((r) => r.id === id);
-        if (!row)
-            return;
+        if (!row) return;
         Object.assign(row, changes);
         persist(next);
     };
-    // Notes are for this order only — anything that clears an item's quantity
-    // (untoggling it, "Reset", the trash button) wipes its note too, so a note
-    // from a past order never quietly rides along into the next one.
-    const clearNeed = (id) => patch(id, { orderNeed: null, orderNote: "" });
-    const reset = () => {
+    // All order writes go through here: one vendor's slot on one item.
+    const setNeed = (id, vid, need, note) => {
         const next = JSON.parse(JSON.stringify(data));
-        next.inventory.forEach((r) => { r.orderNeed = null; r.orderNote = ""; });
+        const row = next.inventory.find((r) => r.id === id);
+        if (!row) return;
+        row.order = row.order || {};
+        if (need == null) delete row.order[vid];
+        else row.order[vid] = { need, note: note != null ? note : ((row.order[vid] && row.order[vid].note) || "") };
         persist(next);
     };
-    const vendorOf = (i) => i.orderVendor || i.vendor || "QFC";
-    const skuOf = (i) => (vendorOf(i) === "Thomsen" ? i.thomsenSku : i.qfcSku) || "";
-    const onList = inv.filter((i) => Number(i.orderNeed) > 0);
-    const allSet = inv.filter((i) => i.orderNeed === 0).length;
-    const untouched = inv.filter((i) => i.orderNeed == null).length;
+    const setNote = (id, note) => {
+        const cur = orderOf(inv.find((r) => r.id === id), vendor);
+        if (cur) setNeed(id, vendor, cur.need, note);
+    };
+    // Notes belong to one order. Clearing the quantity clears the note with it.
+    const clearNeed = (id) => setNeed(id, vendor, null);
+    const reset = () => {
+        const next = JSON.parse(JSON.stringify(data));
+        next.inventory.forEach((r) => { if (r.order) delete r.order[vendor]; });
+        persist(next);
+    };
+    // "Quality's cheaper — put it there": the quantity and note walk over to the
+    // other vendor's order and this one lets go of it.
+    const moveTo = (id, toVid) => {
+        const next = JSON.parse(JSON.stringify(data));
+        const row = next.inventory.find((r) => r.id === id);
+        if (!row || !row.order || !row.order[vendor]) return;
+        const o = row.order[vendor];
+        row.order[toVid] = { need: o.need, note: o.note || "" };
+        delete row.order[vendor];
+        persist(next);
+    };
+    // One tap builds the standing order; take off what isn't needed this time.
+    const fillUsual = () => {
+        const next = JSON.parse(JSON.stringify(data));
+        let n = 0;
+        next.inventory.forEach((r) => {
+            const u = usualOf(r, vendor);
+            if (u && carriedBy(r, vendor) && orderNeedOf(r, vendor) == null) { r.order = r.order || {}; r.order[vendor] = { need: u, note: "" }; n++; }
+        });
+        if (n) persist(next);
+    };
+    // Sending the order is when we learn what "usual" is for each item.
+    const learnUsual = (next) => {
+        next.inventory.forEach((r) => {
+            const need = orderNeedOf(r, vendor);
+            if (Number(need) > 0) { r.usual = r.usual || {}; r.usual[vendor] = Number(need); }
+        });
+    };
+
+    const carried = inv.filter((i) => carriedBy(i, vendor));
+    const onList = carried.filter((i) => Number(orderNeedOf(i, vendor)) > 0);
+    const allSet = carried.filter((i) => orderNeedOf(i, vendor) === 0).length;
+    const untouched = carried.filter((i) => orderNeedOf(i, vendor) == null).length;
+    const unlinked = inv.filter((i) => !VENDORS.some((v) => carriedBy(i, v.id))).length;
+    const usualAvail = carried.filter((i) => usualOf(i, vendor) && orderNeedOf(i, vendor) == null).length;
     const toggleOpen = (id) => setOpenId(openId === id ? "" : id);
-    // Any priced side we can't bring back to the count unit. It used to require
-    // BOTH vendors priced, which hid the Thomsen-only cases until the day a
-    // Quality price showed up and the comparison silently didn't work.
     const needsCompare = (i) => needsPack(i, "qfc") || needsPack(i, "thomsen");
     const packTodo = inv.filter(needsCompare).length;
-    // One order, one copy. Which distributor it goes to is a call made at the
-    // moment of ordering, not something the sheet needs to decide.
-    const skuFor = (i, tag) => {
-        if (tag === "QFC")
-            return i.qfcSku || "";
-        if (tag === "Thomsen")
-            return i.thomsenSku || "";
-        return "";
-    };
-    const copyOrder = () => {
-        if (!onList.length)
-            return;
-        const lines = [];
-        // Still walked in station order (so the sequence matches how you'll
-        // shop it), just no zone header text taking up lines in the pasted text.
-        groupByStation(onList).forEach((g) => {
-            g.items.forEach((i) => {
-                const sku = skuFor(i, numbersFor);
-                lines.push("\u2022 " + i.item + "  \u00d7 " + i.orderNeed + (i.orderNote ? "  (" + i.orderNote + ")" : "") + (sku ? "   #" + sku : ""));
-            });
-        });
-        const header = ((data.shopProfile && data.shopProfile.name) || "Shop") + " \u2014 order  \u00b7  " + onList.length +
-            (onList.length === 1 ? " item" : " items") +
-            (numbersFor === "none" ? "" : "  (" + VENDOR_LABEL[numbersFor] + " item numbers)");
-        if (navigator.clipboard)
-            navigator.clipboard.writeText(header + "\n" + lines.join("\n").trim());
-        setCopied("order");
-        setTimeout(() => setCopied(""), 1800);
-    };
+    const countFor = (vid) => inv.filter((i) => Number(orderNeedOf(i, vid)) > 0).length;
     const match = (i) => !q.trim() || i.item.toLowerCase().includes(q.trim().toLowerCase());
-    // ---- the working order: one list, whoever ends up filling it ----
+    const digits = (ph) => String(ph || "").replace(/[^\d+]/g, "");
+
+    // The other food vendor, if it's cheaper on this item and actually carries it.
+    const cheaperElsewhere = (i) => {
+        if (V.kind !== "food") return null;
+        const c = cheaperSide(i);
+        if (!c.comparable || c.side === "even") return null;
+        const win = c.side === "qfc" ? "QFC" : "Thomsen";
+        if (win === vendor || !carriedBy(i, win)) return null;
+        return { vid: win, diff: c.diff, base: i.unit || "ea" };
+    };
+
+    // What the rep sees. Names and quantities, notes in parentheses, item
+    // numbers only if asked for. No prices, no station names, no comparison.
+    const orderText = (withSku) => {
+        const lines = [];
+        groupByStation(onList).forEach((g) => g.items.forEach((i) => {
+            const o = orderOf(i, vendor);
+            const sku = withSku ? vendorSku(i, vendor) : "";
+            lines.push("\u2022 " + i.item + "  \u00d7 " + o.need + (o.note ? "  (" + o.note + ")" : "") + (sku ? "   #" + sku : ""));
+        }));
+        const shop = (data.shopProfile && data.shopProfile.name) || "Shop";
+        return shop + " \u2014 " + V.label + " order  \u00b7  " + onList.length + (onList.length === 1 ? " item" : " items") + "\n" + lines.join("\n");
+    };
+    const send = (how) => {
+        if (!onList.length) return;
+        const text = orderText(numbersOn);
+        const next = JSON.parse(JSON.stringify(data));
+        learnUsual(next);
+        persist(next);
+        if (how === "copy") {
+            if (navigator.clipboard) navigator.clipboard.writeText(text);
+            setCopied("order");
+            setTimeout(() => setCopied(""), 1800);
+            return;
+        }
+        // sms: wants ?&body on iOS and ?body on Android; the combined form works on both.
+        if (how === "text") window.location.href = "sms:" + digits(contacts.phone) + "?&body=" + encodeURIComponent(text);
+        if (how === "email") window.location.href = "mailto:" + (contacts.email || "") + "?subject=" + encodeURIComponent(V.label + " order \u2014 " + ((data.shopProfile && data.shopProfile.name) || "")) + "&body=" + encodeURIComponent(text);
+    };
+    const saveRep = () => {
+        const next = JSON.parse(JSON.stringify(data));
+        next.vendorContacts = next.vendorContacts || {};
+        next.vendorContacts[vendor] = { rep: repDraft.rep || "", phone: repDraft.phone || "", email: repDraft.email || "", notes: repDraft.notes || "" };
+        persist(next);
+        setRepDraft(null);
+    };
+
+    const pill = (active) => ({ fontFamily: "Inter", fontWeight: 600, border: "1px solid " + (active ? COLORS.cream : "#3A3A44"), background: active ? COLORS.cream : "transparent", color: active ? COLORS.crust : "#B8BDC2" });
+    const darkBtn = { background: "rgba(255,255,255,0.08)", color: "#FFFFFF", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 10, fontFamily: "Inter", fontSize: 13, fontWeight: 600, minHeight: 36, padding: "0 12px" };
+    const FIELD = { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#FAFAF8", borderRadius: 8, minHeight: 38 };
+
+    const priceLine = (i) => {
+        const bits = [];
+        VENDORS.forEach((v) => {
+            const p = vendorPriceOf(i, v.key);
+            if (p) bits.push((v.short[0]) + " $" + p.amt.toFixed(2) + "/" + (p.unit || "ea"));
+        });
+        return bits.length ? bits.join("  \u00b7  ") : "no price on file";
+    };
+    const moveBtn = (i) => {
+        const ce = cheaperElsewhere(i);
+        if (!ce) return null;
+        return React.createElement("button", { onClick: () => moveTo(i.id, ce.vid), className: "text-xs px-2.5 py-1.5 rounded-full mt-2 flex items-center gap-1",
+            style: { fontFamily: "Inter", fontWeight: 600, background: "#E4F1E6", color: "#1F6B34", border: "1px solid #BFDCC5" } },
+            VENDOR_SHORT[ce.vid] + " is $" + ce.diff.toFixed(2) + "/" + ce.base + " cheaper \u2014 put it on the " + VENDOR_SHORT[ce.vid] + " order \u2192");
+    };
+
+    // ---- the working order for this vendor ----
     const orderView = () => {
         if (onList.length === 0) {
-            return (React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#8A9096" } }, "Nothing on the order yet \u2014 go through \u201CSet Up List\u201D and mark what you need."));
+            return React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#8A9096" } },
+                "Nothing on the " + V.short + " order yet \u2014 go through \u201cSet Up List\u201d and mark what you need" + (usualAvail ? ", or fill the usual order in one tap." : "."));
         }
         const cats = groupByStation(onList);
-        return (React.createElement("div", null,
-            React.createElement("div", { className: "flex items-center justify-between gap-2 px-3 py-2.5 rounded-t flex-wrap", style: { background: COLORS.crust } },
-                React.createElement("span", { style: { fontFamily: "Archivo Narrow", fontSize: "18px", color: COLORS.cream } }, "THE ORDER \u00b7 " + onList.length),
-                React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap" },
-                    React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A9096" } }, "item #s"),
-                    [{ k: "none", l: "none" }, { k: "QFC", l: "Quality" }, { k: "Thomsen", l: "Thomsen" }].map((o) => (React.createElement("button", { key: o.k, onClick: () => setNumbersFor(o.k), className: "text-xs px-2.5 py-1.5 rounded-full", style: {
-                            fontFamily: "Inter",
-                            border: "1px solid " + (numbersFor === o.k ? COLORS.cream : "#3A3A44"),
-                            background: numbersFor === o.k ? COLORS.cream : "transparent",
-                            color: numbersFor === o.k ? COLORS.crust : "#8A9096"
-                        } }, o.l))),
-                    React.createElement("button", { onClick: copyOrder, className: "text-sm px-3 py-1.5 rounded-full flex items-center gap-1.5 ml-1", style: { background: COLORS.basil, color: COLORS.cream, border: "none", fontFamily: "Inter", fontWeight: 600 } },
-                        React.createElement(Copy, { size: 14 }),
-                        copied === "order" ? "Copied" : "Copy order"))),
-            React.createElement("div", { className: "space-y-1.5" }, cats.flatMap((g) => g.items).map((i) => (React.createElement("div", { key: i.id, className: "px-3 py-3 rounded", style: { background: COLORS.card, border: "1px solid " + COLORS.line, borderLeft: "5px solid " + COLORS.lamp } },
-                    React.createElement("div", { className: "flex items-center gap-3" },
-                        React.createElement("button", { onClick: () => toggleOpen(i.id), className: "flex-1 min-w-0 text-left" },
-                            React.createElement("div", { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } }, i.item),
-                            i.orderNote ? React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", fontWeight: 500, color: "#8A6116" } }, i.orderNote) : null,
-                            React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#5F676E" } },
-                                (numbersFor !== "none" && skuFor(i, numbersFor) ? "#" + skuFor(i, numbersFor) + "  \u00b7  " : "") + dualPriceLine(i),
-                                React.createElement("span", { style: { color: COLORS.steel } }, openId === i.id ? "  \u25b4" : "  \u25be"))),
-                        React.createElement("span", { className: "text-lg px-2.5 py-0.5 rounded-full flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.cream, background: COLORS.ink } }, "\u00d7" + i.orderNeed),
-                        React.createElement("button", { onClick: () => patch(i.id, { orderNeed: null, orderNote: "" }), className: "px-2 py-2 flex-shrink-0", style: { border: "none", background: "transparent" } },
-                            React.createElement(Trash2, { size: 15, color: "#8A9096" }))),
-                    openId === i.id ? React.createElement(PriceDetail, { i: i, vendorOf: vendorOf, patch: patch }) : null))))));
+        return React.createElement("div", { className: "space-y-1.5" }, cats.flatMap((g) => g.items).map((i) => {
+            const o = orderOf(i, vendor);
+            return React.createElement("div", { key: i.id, className: "px-3 py-3 rounded", style: { background: COLORS.card, border: "1px solid " + COLORS.line, borderLeft: "5px solid " + COLORS.ink } },
+                React.createElement("div", { className: "flex items-center gap-3" },
+                    React.createElement("button", { onClick: () => toggleOpen(i.id), className: "flex-1 min-w-0 text-left" },
+                        React.createElement("div", { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } }, i.item),
+                        o.note ? React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", fontWeight: 500, color: "#8A6116" } }, o.note) : null,
+                        React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#5F676E" } },
+                            (numbersOn && vendorSku(i, vendor) ? "#" + vendorSku(i, vendor) + "  \u00b7  " : "") + priceLine(i),
+                            React.createElement("span", { style: { color: COLORS.steel } }, openId === i.id ? "  \u25b4" : "  \u25be"))),
+                    React.createElement("span", { className: "text-lg px-2.5 py-0.5 rounded-full flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.cream, background: COLORS.ink } }, "\u00d7" + o.need),
+                    React.createElement("button", { onClick: () => clearNeed(i.id), className: "px-2 py-2 flex-shrink-0", style: { border: "none", background: "transparent" } },
+                        React.createElement(Trash2, { size: 15, color: "#8A9096" }))),
+                moveBtn(i),
+                openId === i.id ? React.createElement(PriceDetail, { i: i, vendorOf: () => vendor, patch: patch }) : null);
+        }));
     };
-    // ---- go down every item and say what you need ----
+
+    // ---- go down this vendor's items and say what you need ----
     const setupView = () => {
         const packMode = view === "packs";
-        const shown = inv.filter((i) => match(i) && (!packMode || needsCompare(i)));
+        const shown = (packMode ? inv.filter(needsCompare) : carried).filter(match);
         const cats = groupByStation(shown);
         if (!shown.length) {
-            return (React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#8A9096" } }, packMode ? "Every price on file lines up with how you count it \u2014 nothing left to fill in." : "No items match that search."));
+            return React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#8A9096" } },
+                packMode ? "Every price on file lines up with how you count it \u2014 nothing left to fill in." : (carried.length ? "No items match." : "Nothing is linked to " + V.label + " yet \u2014 add an item number or a price on the Inventory tab."));
         }
-        return cats.map((g) => (React.createElement("div", { key: g.name, className: "mb-4" },
+        return React.createElement("div", null, cats.map((g) => React.createElement("div", { key: g.name, className: "mb-4" },
             React.createElement(StationHeader, { g: g }),
             React.createElement("div", { className: "space-y-1.5" }, g.items.map((i) => {
-                const need = i.orderNeed;
+                const need = orderNeedOf(i, vendor);
                 const isSet = need === 0;
                 const on = Number(need) > 0;
+                const usual = usualOf(i, vendor);
                 const edge = on ? COLORS.ink : isSet ? COLORS.basil : COLORS.line;
-                return (React.createElement("div", { key: i.id, className: "px-3 py-2.5 rounded", style: { background: COLORS.card, border: "1px solid " + edge, borderLeft: "5px solid " + edge } },
+                const o = orderOf(i, vendor);
+                return React.createElement("div", { key: i.id, className: "px-3 py-2.5 rounded", style: { background: COLORS.card, border: "1px solid " + edge, borderLeft: "5px solid " + edge } },
                     React.createElement("div", { className: "flex items-start justify-between gap-2 mb-2" },
                         React.createElement("button", { onClick: () => toggleOpen(i.id), className: "min-w-0 text-left flex-1" },
                             React.createElement("div", { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } }, i.item),
                             React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#5F676E" } },
-                                "on hand " + (i.qty != null ? i.qty : "?") + " " + (i.unit || "") + "  \u00b7  " + dualPriceLine(i),
+                                "on hand " + (i.qty != null ? i.qty : "?") + " " + (i.unit || "") + "  \u00b7  " + priceLine(i) + (vendorPack(i, vendor) ? "  \u00b7  " + vendorPack(i, vendor) : ""),
                                 React.createElement("span", { style: { color: COLORS.steel } }, openId === i.id ? "  \u25b4" : "  \u25be"))),
-                        on ? (React.createElement("span", { className: "text-sm flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.ink } }, "need " + need)) : isSet ? (React.createElement("span", { className: "text-sm flex-shrink-0", style: { fontFamily: "Inter", color: COLORS.basil } }, "all set")) : null),
+                        on ? React.createElement("span", { className: "text-sm flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.ink } }, "need " + need)
+                           : isSet ? React.createElement("span", { className: "text-xs flex-shrink-0", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.basil } }, "all set")
+                           : usual ? React.createElement("span", { className: "text-xs flex-shrink-0", style: { fontFamily: "Inter", color: "#8A9096" } }, "usually " + usual) : null),
                     React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap" },
-                        React.createElement("button", { onClick: () => (isSet ? clearNeed(i.id) : patch(i.id, { orderNeed: 0 })), className: "text-sm px-3 py-2 rounded-full", style: {
-                                fontFamily: "Inter",
-                                border: "1px solid " + (isSet ? COLORS.basil : COLORS.line),
-                                background: isSet ? COLORS.basil : "transparent",
-                                color: isSet ? COLORS.cream : COLORS.crust
-                            } }, "All set"),
-                        [1, 2, 3, 4].map((n) => (React.createElement("button", { key: n, onClick: () => (need === n ? clearNeed(i.id) : patch(i.id, { orderNeed: n })), className: "text-base px-3.5 py-2 rounded-full", style: {
-                                fontFamily: "JetBrains Mono",
-                                fontWeight: 700,
-                                border: "1px solid " + (need === n ? COLORS.ink : COLORS.line),
-                                background: need === n ? COLORS.ink : "transparent",
-                                color: need === n ? COLORS.cream : COLORS.crust
-                            } }, n))),
-                        React.createElement("button", { onClick: () => patch(i.id, { orderNeed: (Number(need) || 0) + 1 }), className: "px-3 py-2 rounded-full flex items-center", style: { border: "1px solid " + COLORS.line, background: "transparent" } },
-                            React.createElement(Plus, { size: 16, color: COLORS.crust })),
-                        on ? React.createElement("div", { className: "ml-auto" },
-                            React.createElement(VendorPick, { i: i, vendorOf: vendorOf, patch: patch })) : null),
-                    on ? React.createElement("input", { placeholder: "Note \u2014 e.g. half a case, one piece only", value: i.orderNote || "", onChange: (e) => patch(i.id, { orderNote: e.target.value }), className: "w-full mt-2 px-3 py-2 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#FAFAF8" } }) : null,
-                    (packMode || openId === i.id) ? React.createElement(PriceDetail, { i: i, vendorOf: vendorOf, patch: patch }) : null));
-            })))));
+                        React.createElement("button", { onClick: () => (isSet ? clearNeed(i.id) : setNeed(i.id, vendor, 0, "")), className: "text-sm px-3 py-2 rounded-full",
+                            style: { fontFamily: "Inter", border: "1px solid " + (isSet ? COLORS.basil : COLORS.line), background: isSet ? COLORS.basil : "transparent", color: isSet ? COLORS.cream : COLORS.crust } }, "All set"),
+                        [1, 2, 3, 4].map((n) => React.createElement("button", { key: n, onClick: () => (need === n ? clearNeed(i.id) : setNeed(i.id, vendor, n)), className: "text-base px-3.5 py-2 rounded-full",
+                            style: { fontFamily: "JetBrains Mono", fontWeight: 700,
+                                // The usual quantity gets a ring so the right tap is obvious.
+                                border: (need === n ? "1px solid " + COLORS.ink : usual === n ? "2px solid " + COLORS.ink : "1px solid " + COLORS.line),
+                                background: need === n ? COLORS.ink : "transparent", color: need === n ? COLORS.cream : COLORS.crust } }, n)),
+                        React.createElement("button", { onClick: () => setNeed(i.id, vendor, (Number(need) || 0) + 1), className: "px-3 py-2 rounded-full flex items-center", style: { border: "1px solid " + COLORS.line, background: "transparent" } },
+                            React.createElement(Plus, { size: 16, color: COLORS.crust }))),
+                    on ? React.createElement("input", { placeholder: "Note \u2014 e.g. half a case, one piece only", value: (o && o.note) || "", onChange: (e) => setNote(i.id, e.target.value),
+                        className: "w-full mt-2 px-3 py-2 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#FAFAF8" } }) : null,
+                    on ? moveBtn(i) : null,
+                    (packMode || openId === i.id) ? React.createElement(PriceDetail, { i: i, vendorOf: () => vendor, patch: patch }) : null);
+            })))),
+            !packMode && unlinked > 0 ? React.createElement("div", { className: "text-xs px-1 py-3 text-center", style: { fontFamily: "Inter", color: "#8A9096" } },
+                unlinked + (unlinked === 1 ? " item isn't" : " items aren't") + " linked to any vendor yet, so they don't show on any order. Add an item number or price on the Inventory tab.") : null);
     };
+
     const views = [
         { id: "order", label: "Order", n: onList.length },
-        { id: "setup", label: "Set Up List", n: inv.length },
+        { id: "setup", label: "Set Up List", n: carried.length },
         { id: "packs", label: "Pack sizes", n: packTodo }
     ];
-    return (React.createElement("div", null,
-        React.createElement("div", { className: "flex items-center justify-between gap-2 px-3 py-3 rounded mb-3", style: { background: COLORS.crust } },
-            React.createElement("div", null,
-                React.createElement("div", { className: "text-2xl", style: { fontFamily: "Archivo Narrow", color: COLORS.cream, lineHeight: 1.1 } }, onList.length === 0 ? "Nothing to order" : onList.length + (onList.length === 1 ? " item to order" : " items to order")),
-                React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8A9096" } }, allSet + " marked all set \u00b7 " + untouched + " not looked at")),
-            React.createElement("button", { onClick: reset, className: "text-sm px-3 py-2 rounded-full flex-shrink-0", style: { fontFamily: "Inter", border: "1px solid #3A3A44", color: COLORS.cream, background: "transparent" } }, "Reset")),
-        React.createElement("div", { className: "flex items-center gap-1.5 mb-2 flex-wrap" },
-            views.map((v) => (React.createElement("button", { key: v.id, onClick: () => setView(v.id), className: "text-sm px-3.5 py-2 rounded-full", style: {
-                    fontFamily: "Inter",
-                    border: "1px solid " + (view === v.id ? COLORS.ink : COLORS.line),
-                    background: view === v.id ? COLORS.ink : "transparent",
-                    color: view === v.id ? COLORS.cream : COLORS.crust
-                } }, v.label + " (" + v.n + ")"))),
-            React.createElement("span", { className: "text-xs ml-auto", style: { fontFamily: "Inter", color: "#5F676E" } }, "tap an item for both prices")),
-        view === "packs" ? (React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded", style: { background: "#FAFAF8", border: "1px solid " + COLORS.line, fontFamily: "Inter", color: COLORS.crust } },
-            "These have a price from both vendors, but on different units \u2014 Quality usually quotes by the pound and Thomsen by the case. Enter how many ",
-            "of our unit",
-            " are in one of theirs and the comparison turns on for good.")) : null,
-        view !== "order" ? (React.createElement("input", { placeholder: "Search all items\u2026", value: q, onChange: (e) => setQ(e.target.value), className: "w-full text-base px-3 py-2.5 rounded mb-3 outline-none", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } })) : null,
-        view === "order" ? orderView() : setupView()));
+    const repLine = [contacts.rep, contacts.phone].filter(Boolean).join(" \u00b7 ");
+
+    return React.createElement("div", null,
+        // ---- vendor header: pick the order you're building, and who it goes to ----
+        React.createElement("div", { className: "px-3 pt-3 pb-3 rounded mb-3", style: { background: COLORS.crust } },
+            React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap mb-3" },
+                VENDORS.map((v) => React.createElement("button", { key: v.id, onClick: () => { setVendor(v.id); setOpenId(""); setRepDraft(null); }, className: "text-sm px-3 py-1.5 rounded-full flex items-center gap-1.5", style: pill(vendor === v.id) },
+                    v.short,
+                    countFor(v.id) > 0 ? React.createElement("span", { className: "text-xs px-1.5 rounded-full", style: { fontFamily: "JetBrains Mono", fontWeight: 700, background: vendor === v.id ? COLORS.crust : COLORS.cream, color: vendor === v.id ? COLORS.cream : COLORS.crust, minWidth: 18, textAlign: "center" } }, countFor(v.id)) : null))),
+            React.createElement("div", { className: "flex items-start justify-between gap-2" },
+                React.createElement("div", { className: "min-w-0" },
+                    React.createElement("div", { className: "text-2xl", style: { fontFamily: "Archivo Narrow", color: COLORS.cream, lineHeight: 1.1 } },
+                        onList.length === 0 ? "Nothing on the " + V.short + " order" : onList.length + (onList.length === 1 ? " item" : " items") + " for " + V.short),
+                    React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8A9096" } }, allSet + " marked all set \u00b7 " + untouched + " not looked at"),
+                    React.createElement("button", { onClick: () => { setRepOpen(!repOpen); setRepDraft(null); }, className: "text-xs mt-2 text-left", style: { background: "transparent", border: "none", padding: 0, fontFamily: "Inter", color: "#B8BDC2" } },
+                        (repLine || "No rep on file") + (contacts.notes ? " \u00b7 " + contacts.notes : "") + (repOpen ? "  \u25b4" : "  \u25be"))),
+                onList.length > 0 ? React.createElement("button", { onClick: reset, className: "text-xs flex-shrink-0", style: { background: "transparent", border: "none", fontFamily: "Inter", color: "#8A9096", textDecoration: "underline", textUnderlineOffset: 3, padding: "4px 0" } }, "Clear " + V.short) : null),
+            // ---- send it ----
+            onList.length > 0 ? React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap mt-3" },
+                React.createElement("button", { onClick: () => send("copy"), className: "flex items-center gap-1.5", style: Object.assign({}, darkBtn, { background: COLORS.basil, border: "none" }) }, React.createElement(Copy, { size: 14 }), copied === "order" ? "Copied" : "Copy order"),
+                contacts.phone ? React.createElement("button", { onClick: () => send("text"), style: darkBtn }, "Text " + (contacts.rep ? contacts.rep.split(" ")[0] : "rep")) : null,
+                contacts.email ? React.createElement("button", { onClick: () => send("email"), style: darkBtn }, "Email") : null,
+                React.createElement("button", { onClick: () => setNumbersOn(!numbersOn), className: "text-xs px-2.5 py-1.5 rounded-full ml-auto", style: pill(numbersOn) }, numbersOn ? "item #s on" : "item #s off")) : null,
+            // ---- rep details, editable ----
+            repOpen ? React.createElement("div", { className: "mt-3 pt-3", style: { borderTop: "1px solid #3A3A44" } },
+                repDraft
+                    ? React.createElement("div", { className: "space-y-1.5" },
+                        React.createElement("input", { placeholder: "Rep name", value: repDraft.rep, onChange: (e) => setRepDraft({ ...repDraft, rep: e.target.value }), className: "w-full px-3 outline-none", style: FIELD }),
+                        React.createElement("input", { placeholder: "Phone", inputMode: "tel", value: repDraft.phone, onChange: (e) => setRepDraft({ ...repDraft, phone: e.target.value }), className: "w-full px-3 outline-none", style: FIELD }),
+                        React.createElement("input", { placeholder: "Email", inputMode: "email", value: repDraft.email, onChange: (e) => setRepDraft({ ...repDraft, email: e.target.value }), className: "w-full px-3 outline-none", style: FIELD }),
+                        React.createElement("input", { placeholder: "Notes \u2014 cutoff, delivery day, account number", value: repDraft.notes, onChange: (e) => setRepDraft({ ...repDraft, notes: e.target.value }), className: "w-full px-3 outline-none", style: FIELD }),
+                        React.createElement("div", { className: "flex gap-1.5" },
+                            React.createElement("button", { onClick: saveRep, style: Object.assign({}, darkBtn, { background: COLORS.basil, border: "none" }) }, "Save"),
+                            React.createElement("button", { onClick: () => setRepDraft(null), style: darkBtn }, "Cancel")))
+                    : React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap" },
+                        contacts.phone ? React.createElement("a", { href: "tel:" + digits(contacts.phone), style: Object.assign({}, darkBtn, { display: "inline-flex", alignItems: "center", textDecoration: "none" }) }, "Call") : null,
+                        contacts.phone ? React.createElement("a", { href: "sms:" + digits(contacts.phone), style: Object.assign({}, darkBtn, { display: "inline-flex", alignItems: "center", textDecoration: "none" }) }, "Text") : null,
+                        contacts.email ? React.createElement("a", { href: "mailto:" + contacts.email, style: Object.assign({}, darkBtn, { display: "inline-flex", alignItems: "center", textDecoration: "none" }) }, "Email") : null,
+                        React.createElement("button", { onClick: () => setRepDraft({ rep: contacts.rep || "", phone: contacts.phone || "", email: contacts.email || "", notes: contacts.notes || "" }), style: darkBtn }, repLine ? "Edit rep" : "Add rep"))) : null),
+        // ---- view switch + search ----
+        React.createElement("div", { className: "flex items-center gap-1.5 mb-3 flex-wrap" },
+            views.map((vw) => React.createElement("button", { key: vw.id, onClick: () => setView(vw.id), className: "text-sm px-3 py-2 rounded-full flex items-center gap-1.5",
+                style: { fontFamily: "Inter", fontWeight: 600, border: "1px solid " + (view === vw.id ? COLORS.crust : COLORS.line), background: view === vw.id ? COLORS.crust : "transparent", color: view === vw.id ? COLORS.cream : COLORS.crust } },
+                vw.label, vw.n > 0 ? React.createElement("span", { className: "text-xs px-1.5 rounded-full", style: { fontFamily: "JetBrains Mono", background: view === vw.id ? COLORS.cream : "#F2F2EF", color: COLORS.crust, minWidth: 18, textAlign: "center" } }, vw.n) : null)),
+            view === "setup" && usualAvail > 0 ? React.createElement("button", { onClick: fillUsual, className: "text-sm px-3 py-2 rounded-full ml-auto", style: { fontFamily: "Inter", fontWeight: 600, background: COLORS.lamp, color: COLORS.ink, border: "none" } }, "Fill the usual (" + usualAvail + ")") : null),
+        view !== "order" ? React.createElement("input", { placeholder: "Search " + V.short + " items\u2026", value: q, onChange: (e) => setQ(e.target.value), className: "w-full px-3 py-2.5 mb-3 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 15, background: "#FAFAF8" } }) : null,
+        view === "order" ? orderView() : setupView());
 }
 // ===================== PREP / ORDER LIST =====================
 const PREP_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
