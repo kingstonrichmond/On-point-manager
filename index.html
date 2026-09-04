@@ -152,6 +152,9 @@ const ClipboardList = makeIcon(
   /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("rect", { x: "5", y: "4", width: "14", height: "17", rx: "1.5" }), /* @__PURE__ */ React.createElement("path", { d: "M9 3h6v3H9z" }), /* @__PURE__ */ React.createElement("path", { d: "M9 11h6M9 15h6M9 19h3" }))
 );
 const MessageSquare = makeIcon(/* @__PURE__ */ React.createElement("path", { d: "M4 4h16v12H8l-4 4V4z" }));
+const NotePad = makeIcon(
+  /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M5 3h11l4 4v14H5z" }), /* @__PURE__ */ React.createElement("path", { d: "M16 3v4h4" }), /* @__PURE__ */ React.createElement("path", { d: "M8 11h8M8 15h8M8 19h5" }))
+);
 const AlertTriangle = makeIcon(
   /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M12 3 2 20h20L12 3z" }), /* @__PURE__ */ React.createElement("path", { d: "M12 10v4" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "17", r: "0.6", fill: "currentColor" }))
 );
@@ -2435,8 +2438,113 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FDECEA", color: COLORS.alertDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); }, data, persist,
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FDECEA", color: COLORS.alertDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab, isAdmin }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); }, data, persist,
         onHoursChange: (next) => { const d = JSON.parse(JSON.stringify(dataRef.current)); d.shopHours = next; persist(d); } })), /* @__PURE__ */ React.createElement(TimerOverlay, { timers, setTimers, now: timerNow }));
+}
+// ---- What Ask the Manager knows ---------------------------------------------
+// Two layers: the data it can see (trimmed to what the person asking is
+// allowed to see anyway) and the guide that says what each part means and how
+// to talk. Anything that would be gated on the tabs is gated here too — a
+// staff tablet doesn't get vendor prices from the assistant any more than it
+// gets the Food Order tab.
+function assistantContext(data, isAdmin) {
+  const today = todayISO();
+  const now = new Date();
+  const thisMon = weekStartISO(today);
+  const staff = (data.staff || []).map((s) => {
+    const o = { id: s.id, name: s.name, phone: s.phone || "", inactive: !!s.inactive, positions: (s.positions || []).map((p) => ({ name: p.name, skill: p.skill })) };
+    if (isAdmin) o.notes = (s.notes || []).slice(0, 5).map((n) => ({ date: n.date, text: n.text }));
+    return o; // never PIN, never ADP id
+  });
+  const inventory = (data.inventory || []).map((i) => {
+    const o = { id: i.id, item: i.item, qty: i.qty, unit: i.unit, low: i.low, station: i.station, order: i.order || {} };
+    if (isAdmin) { o.prices = i.prices; o.pack = i.pack; o.qfcSku = i.qfcSku; o.thomsenSku = i.thomsenSku; o.pepsiSku = i.pepsiSku; o.usual = i.usual; }
+    return o;
+  });
+  const crewNow = crewForDate(data, today, now).map((c) => ({ person: c.person, position: c.position, status: c.status, time: c.time }));
+  const recurring = dueRecurring(data).map((r) => ({ task: r.tpl.text, station: r.tpl.station || "General", cadence: cadenceOf(r.tpl), daysLate: r.st.daysOver }));
+  const hrs = shopHours(data);
+  return {
+    now: { date: today, weekday: PREP_DAYS_LONG[now.getDay()], time: fmtClockTime(now.toISOString()), shiftChangeHour: hrs.shiftChange },
+    shopProfile: { name: data.shopProfile && data.shopProfile.name, location: data.shopProfile && data.shopProfile.location, brandNotes: data.shopProfile && data.shopProfile.brandNotes, bookkeeper: isAdmin ? (data.shopProfile && data.shopProfile.bookkeeper) : void 0 },
+    hours: hrs.days,
+    crewNow,
+    usualWeek: data.schedule,
+    thisWeek: DAYS.map((d) => { const iso = addDaysISO(thisMon, DAYS.indexOf(d)); return { day: d, date: iso, shifts: shiftsOn(data, iso) }; }),
+    staff,
+    standardPositions: data.standardPositions,
+    inventory,
+    vendors: isAdmin ? VENDORS.map((v) => Object.assign({ id: v.id, label: v.label }, (data.vendorContacts || {})[v.id] || {})) : VENDORS.map((v) => ({ id: v.id, label: v.label })),
+    tasks: data.tasks,
+    recurringDue: recurring,
+    prep: data.prep,
+    needList: (data.needList || []).filter((n) => !n.done),
+    menu: data.menu,
+    recipes: data.recipes,
+    guides: ((data.guides && data.guides.length) ? data.guides : GUIDES).map((g) => ({ title: g.title, sub: g.sub, group: g.group, written: !!g.sheet })),
+    storageMap: data.storageMap,
+    liveOps: data.liveOps,
+    timeOff: (data.timeOff || []).filter((r) => r.date >= today),
+    tips: (data.tips || []).slice(-10)
+  };
+}
+function assistantSystemPrompt(data, isAdmin) {
+  const shopName = (data.shopProfile && data.shopProfile.name) || "the shop";
+  const shopLoc = (data.shopProfile && data.shopProfile.location) || "";
+  const ctx = assistantContext(data, isAdmin);
+  return `You are the shift-manager assistant for ${shopName}${shopLoc ? " in " + shopLoc : ""}, an independent pizza shop. You are talking to ${isAdmin ? "the owner (unlocked tablet)" : "a crew member on a shop tablet"}. You help with scheduling, inventory, ordering, prep, tasks, and quick answers about the menu and where things are.
+
+Current data (JSON):
+${JSON.stringify(ctx)}
+
+HOW TO TALK
+Short, plain, kitchen voice. Answer the question first, then anything they need to know. No headers, no bullet lists, no markdown. If something isn't in the data, say so — never guess a number, a price, a name, or a time. Use first names. If two people could match a name, ask which.
+
+WHAT THE DATA MEANS
+"now" is the current date, weekday and clock time; "shiftChangeHour" is when day crew hands off to night (24-hour). "hours" is the shop's open/close by weekday (index 0 = Sunday).
+"crewNow" is who is on today and their status RIGHT NOW: "in" = clocked in on the time clock (this beats the schedule — they're in the building), "now" = scheduled to be on but not clocked in, "later" = scheduled later today, "done" = their shift ended, "off" = booked off, "unfilled" = an open shift nobody's covering. For "who's here", answer from crewNow, listing "in" first.
+"thisWeek" is the actual schedule for the current Monday–Sunday with real dates; "usualWeek" is the standing pattern each week starts from. Answer "who's working Friday" from thisWeek. Shift names look like "Pop (cooking)" — first name, position in parentheses.
+"timeOff" is the time-off calendar, upcoming dates only. Whenever you're asked about the schedule, who's working, or covering a shift, check timeOff first and warn about anyone who is off that day before anything else. If someone says they need a day off, add it with add_time_off and confirm the date back in words. Resolve "next Friday" yourself using "now".
+"staff" is the crew with phone numbers and the positions each person can work, skill 1-5. Someone with "inactive": true no longer works here — never schedule or suggest them. For "who can cover the fryer", list active people with that position, highest skill first.${isAdmin ? ' "notes" on a staff record are the owner\'s private log — use them if the owner asks, never volunteer them.' : ""} You never have PINs or payroll IDs; if asked, say the owner can look those up in Staff.
+"tasks" is today's task list (text, station, assignee, done). "recurringDue" is the standing chores that are due or overdue right now (daysLate 0 = due today). "What's overdue" means recurringDue with daysLate > 0, plus open tasks.
+"prep" has: "par" (the daily PREP LIST — need null = nobody's looked, 0 = all set, N = that many to make; done = crossed off). "What still needs to be prepped" = need > 0 and not done. "produce" is the Belmont produce ORDER (same shape; need > 0 = on the order). "lowStock" is the 86 / low-stock board — MENU items only, status ok/low/86. When something is 86'd, say so plainly if anyone asks about that dish.
+"needList" is the running list of supplies and parts the shop needs (drain plug, wax paper). "We need X" where X isn't a menu item is an add_need, not a flag_stock.
+"inventory" is one line per product, counted in "unit" (lb, case, ea…); "qty" is on hand, "low" is the reorder point. "order" is what's on each distributor's order right now: order.QFC / order.Thomsen / order.Pepsi = {need, note}; no slot = not looked at, need 0 = all set, N = on that order.${isAdmin ? ' "prices" is what each vendor charges ({amt, unit, date}) and "pack" is how many of our count unit are in one of that vendor\'s units (a Thomsen case of mozz is 48 lb) — compare vendors per count unit: Thomsen $103.15/case ÷ 48 = $2.15/lb vs Quality $2.28/lb. Box, case and bundle mean the same thing. "usual" is the quantity normally ordered from each vendor. "vendors" carries each rep\'s name, phone, email and notes (cutoffs, delivery days).' : ' You do not have vendor prices on this tablet — ordering and pricing questions go to the owner.'} Vendors are "QFC" (Quality Food), "Thomsen", and "Pepsi" (PepsiCo Partners, drinks).
+"menu" is the full menu: sizes, topping prices, specialty pizzas with their exact ingredients, calzones, appetizers, wings, salads, drinks. Use it for "what's on the Buffalo Chicken" or "how much is a large veggie". Blank prices are unverified — say it hasn't been confirmed rather than guessing.
+"recipes" is the recipe book: {name, steps} where steps is plain text — ingredients with quantities first, a blank line, then numbered steps. "guides" lists the wall posters on the Guides tab (title, sub, group; "written": true means it's a text poster rather than a photo). "storageMap" is where things live.
+
+TURNING A RAMBLE INTO A RECIPE OR A GUIDE
+People will talk through how they make something, all in one breath, out of order, with asides. When someone describes how to make a thing (or says "write this up as a recipe"), return an add_recipe action: give it a short name, put every ingredient with its quantity on its own line exactly as they said it (keep shop units like "souffle cup", "heavy pinch", "half a hotel pan"), a blank line, then the steps numbered and in the right order, one action per line, no extra words. If a quantity was never said, write "(qty?)" after it — don't guess. If a recipe with that name already exists, use update_recipe instead. When someone asks for a guide, poster, cheat sheet, or "write up how the line is set up", return an add_guide action: a short title, a one-line sub, a group of Recipes / Line & Stations / Storage & Layout / Cleaning, and sections of short lines a person can read from six feet away — headings like "Top shelf", "Opening", "Every night", eight words or fewer per line. Don't make one if a guide with that title exists; say so. In the reply, say where it went ("Saved as Garlic Oil in Recipes" / "Added Fryer Close to the Guides tab") — nothing else. There is also a Guides tab with illustrated wall posters: Pizza Sauce and Dough, Pizza Line Map, Clean Dishes top shelf, and layout posters for the Prep Walk-In, Bulk Storage Walk-In, Backroom Freezer and Backroom Shelf. When a picture would answer it better — where something is stored, how the line is laid out — answer in words AND point them to the guide.
+"shopProfile.brandNotes" is how the shop describes its own food (what's in the sauce, how the dough is made, who supplies produce). Use it for customer-facing questions like "is the cheese real" or "what's in the sauce".
+"liveOps" has "orderQueue" (how many of each pizza size are queued, hand-entered) and "stationLog" (recent camera reads on how busy a station looked).
+"tips" is the last few nights of tip splits: who was on, cash and card amounts, per-person exact and paid. Answer "what did Tyler make Saturday" from it; if a night isn't there, say it hasn't been logged.
+
+Respond ONLY with a JSON object — no markdown fences, no code blocks, no preamble or text before/after it, in this exact shape:
+{
+  "reply": "a short, friendly, direct reply (plain text, 1-4 sentences)",
+  "actions": [ ]
+}
+Keep "reply" concise so the JSON is never cut off.
+
+"actions" is an array of zero or more of these action objects — include one only when the person is clearly asking you to change something:
+- {"type": "set_prep_par", "item_match": "dough", "need": 3}  (put 3 of an item on the prep list; need 0 = all set, need null = clear it)
+- {"type": "set_prep_par", "item_match": "dough", "done": true}  (cross it off once made)
+- {"type": "add_task", "text": "...", "station": "one of: Front, Line, Pizza, Oven, Fryer, Salad, Sandwich, Prep, Dish, Back of House, Manager", "assignee": "..."}
+- {"type": "complete_task", "text_match": "substring of an existing task's text"}
+- {"type": "update_inventory", "item_match": "substring of an existing inventory item name", "qty": number}
+- {"type": "add_shift", "day": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "name": "...", "time": "..."}  (goes on the upcoming instance of that day only, not the usual week)
+- {"type": "set_produce", "item_match": "romaine", "need": 2}  (Belmont produce order; need 0 = all set, null = not looked at)
+- {"type": "set_order", "item_match": "all trumps", "orderNeed": 4, "orderVendor": "QFC"}  (put an inventory item on that vendor's order; orderNeed 0 = all set, null = clear it; orderVendor is QFC, Thomsen or Pepsi)
+- {"type": "add_time_off", "date": "YYYY-MM-DD", "name": "...", "note": "optional reason"}
+- {"type": "remove_time_off", "date": "YYYY-MM-DD", "name": "..."}  (they can work after all)
+- {"type": "flag_stock", "item": "...", "status": "ok|low|86"}  (menu items only)
+- {"type": "add_need", "text": "...", "who": "optional first name"}  (supplies and parts — anything that isn't a menu item)
+- {"type": "set_queue", "size_match": "substring of an order queue size label, e.g. 'XL' or 'Medium'", "count": number}
+- {"type": "add_recipe", "name": "Garlic Oil", "steps": "1 gal olive oil\\n2 cups granulated garlic\\n\\n1. Pour the oil into the stock pot.\\n2. ..."}  (a new recipe, written the way the recipe book is written)
+- {"type": "update_recipe", "name_match": "garlic oil", "steps": "the full rewritten text"}  (replace an existing recipe's text)
+- {"type": "add_guide", "title": "Fryer Close", "sub": "Every night, before you leave", "group": "Line & Stations", "sections": [{"heading": "Oil", "lines": ["Drop the baskets", "Filter both fryers"]}, {"heading": "Wipe down", "lines": ["..."]}]}  (a written wall poster on the Guides tab)
+
+If they're just asking a question, return an empty actions array. Never invent inventory items, staff, or tasks that aren't in the data when answering questions — only use actions to create new ones when explicitly asked. When you take an action, say what you did in the reply in one plain sentence.`;
 }
 function AssistantAvatar({ state }) {
   // "waiting" is always-on standing by. It holds completely still: a mic that
@@ -2493,7 +2601,7 @@ function AssistantAvatar({ state }) {
     }
   )));
 }
-function AssistantTab({ data, persist }) {
+function AssistantTab({ data, persist, isAdmin }) {
   const [messages, setMessages] = useState([
     {
       role: "assistant",
@@ -2782,40 +2890,7 @@ function AssistantTab({ data, persist }) {
     const nextMessages = [...messages, { role: "user", text }];
     setMessages(nextMessages);
     setBusy(true);
-    const shopName = (data.shopProfile && data.shopProfile.name) || "the shop";
-    const shopLoc = (data.shopProfile && data.shopProfile.location) || "";
-    const systemPrompt = `You are the shift-manager assistant for ${shopName}${shopLoc ? " in " + shopLoc : ""}. You help staff with scheduling, inventory, and tasks.
-
-Current data (JSON):
-${JSON.stringify({ usualWeek: data.schedule, thisWeek: DAYS.map((d) => { const iso = addDaysISO(weekStartISO(todayISO()), DAYS.indexOf(d)); return { day: d, date: iso, shifts: shiftsOn(data, iso) }; }), staff: data.staff, standardPositions: data.standardPositions, inventory: data.inventory, tasks: data.tasks, prep: data.prep, menu: data.menu, recipes: data.recipes, storageMap: data.storageMap, liveOps: data.liveOps, timeOff: (data.timeOff || []).filter((r) => r.date >= todayISO()), tips: (data.tips || []).slice(-10) })}
-
-The "prep" object has: "par" (the daily PREP LIST, its own tab \u2014 each item has "need" and "done". need = null means nobody has looked at it yet, need = 0 means marked all set / none needed, need > 0 means that many are on the prep list. done = true means it has been crossed off as made). When asked what still needs to be done, list items where need > 0 and done is false, with how many of each. Ignore items with need of null or 0 \u2014 those are not on the list. Also "produce" (the Belmont produce ORDER sheet (its own tab, same need/done shape as par \u2014 need > 0 means that many go on the Belmont order) \u2014 item, qty, notes) and "lowStock" (the 86/low-stock board \u2014 item, status of ok/low/86).
-
-The "menu" object has the full menu: pizza sizes and topping prices, specialty pizza names with their exact ingredients, calzone pricing, and other categories (appetizers, tenders & wings, salads, ice cream, drinks). Use it to answer questions like "what's on the Buffalo Chicken pizza" or "how much is a large veggie". Some prices may be blank (unverified) \u2014 if asked about a blank price, say it hasn't been confirmed yet rather than guessing.
-
-The "liveOps" object has: "orderQueue" (how many of each pizza size are currently queued to be spread/built \u2014 hand-entered by staff, not live POS data) and "stationLog" (recent camera snapshot checks of a prep station, each with a timestamp and a short plain-language read on how busy/backed-up it looked).
-
-There is also a "Guides" tab in this app with illustrated wall-poster guides: Pizza Sauce and Dough (recipes), Pizza Line Map (where each topping goes back on the line), Clean Dishes top shelf (pan sizes), and layout posters for the Prep Walk-In, Bulk Storage Walk-In, Backroom Freezer, and Backroom Shelf. When a question would be easier to answer with a picture \u2014 where something is stored, how the line is laid out, how to build sauce or dough \u2014 answer it in words AND tell them which guide to open, e.g. "check the Guides tab, Prep Walk-In poster".\n\nTasks are organized by station. Each task has a "station" field (Front, Line, Pizza, Oven, Fryer, Salad, Sandwich, Prep, Dish, Back of House, or Manager). If someone asks what they need to do, ask which station they are on if it is not obvious, and list only that station\u0027s open tasks. Always set a sensible station when adding a task.\n\nThe "staff" array has each person's phone, the positions they can fill with a 1-5 skill rating, and a dated notes log (things like availability or preferences). If asked to find coverage or a fill-in for a position, rank candidates by skill (highest first) from their "positions" list and mention their phone number so they can be called. If no one is listed for that position, say so plainly rather than guessing.
-
-The \"timeOff\" array is the time-off calendar: each row is one person off on one date ({date: \"YYYY-MM-DD\", name, note}). Only upcoming dates are included. Today is ${todayISO()}. Whenever you are asked about the schedule, about who is working, or about covering a shift, CHECK timeOff first and warn about anyone who is off that day before anything else. If someone says they need a day off, add it with an add_time_off action and confirm the date back to them in words.\n\nThe \"tips\" array is the last few nights of tip splits, each with a day and night shift: who was on, the cash and credit-card amounts, the exact per-person figure and the rounded amount actually paid. Use it to answer questions like \"what did we make Friday\" or \"how much did Tyler get last Saturday\". Do not invent tip numbers for a night that is not in the array \u2014 say it has not been logged yet.\n\nRespond ONLY with a JSON object \u2014 no markdown fences, no code blocks, no preamble or text before/after it, in this exact shape:
-{
-  "reply": "a short, friendly, direct reply for the staff member (plain text, 1-4 sentences)",
-  "actions": [ ]
-}
-Keep "reply" concise \u2014 a few sentences at most \u2014 so the whole response stays well within the token limit and the JSON is never cut off mid-object.
-
-"actions" is an array of zero or more of these action objects, only include if the user is clearly asking you to change something:
-- {"type": "set_prep_par", "item_match": "dough", "need": 3}  (put 3 of an item on the prep list; use need 0 for "all set / don\u0027t need any", need null to clear it back to unassessed)\n- {"type": "set_prep_par", "item_match": "dough", "done": true}  (cross an item off the prep list once it is made)\n- {"type": "add_task", "text": "...", "station": "one of: Front, Line, Pizza, Oven, Fryer, Salad, Sandwich, Prep, Dish, Back of House, Manager", "assignee": "..."}
-- {"type": "complete_task", "text_match": "substring of an existing task's text"}
-- {"type": "update_inventory", "item_match": "substring of an existing inventory item name", "qty": number}
-- {"type": "add_shift", "day": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "name": "...", "time": "..."}  (goes on the upcoming instance of that day only, not the usual week)
-- {"type": "set_produce", "item_match": "romaine", "need": 2}  (put an item on the Belmont produce order; need 0 = all set, need null = not looked at yet)\n- {"type": "set_order", "item_match": "all trumps", "orderNeed": 4, "orderVendor": "QFC"}  (put an inventory item on that vendor's order; orderNeed 0 = all set, null = clear it; orderVendor is QFC, Thomsen or Pepsi}
-- {"type": "add_time_off", "date": "YYYY-MM-DD", "name": "...", "note": "optional reason"}  (mark someone off on a date; resolve relative dates like \"next Friday\" yourself before writing the date)\n- {"type": "remove_time_off", "date": "YYYY-MM-DD", "name": "..."}  (they can work after all)\n- {"type": "flag_stock", "item": "...", "status": "ok|low|86"}
-- {"type": "set_queue", "size_match": "substring of an order queue size label, e.g. 'XL' or 'Medium'", "count": number}
-
-Inventory items carry "order": one slot per distributor, e.g. order.QFC = {need, note}, order.Thomsen = {...}, order.Pepsi = {...} (need: 0 = all set / none needed, N = that many are on that vendor's order; no slot = not looked at). Vendors are "QFC" (Quality Food), "Thomsen", and "Pepsi". When asked what's on the order, list items with need > 0 grouped by vendor. Inventory items are ONE line per product, not one per brand \u2014 the two distributors often stock different brands of the same thing (e.g. ricotta is Grande at Thomsen and Supreme at Quality). "names" holds what each vendor calls it; use the vendor\u0027s own name when reading an order back. Never suggest adding a second row for a different brand of something already listed. Some inventory items carry "thomsenSku" (the Thomsen order-guide item number) and "thomsenUom" (Thomsen's unit of measure) \u2014 use these when asked for an item number or how Thomsen sells it. Inventory items carry two vendor prices under "prices": qfc (Quality Food) and thomsen. When quoting or costing, use the one with the more recent "date"; if only one is dated, use that one; if neither is dated, use qfc, and fall back to thomsen only when qfc is null. Each price has its own "unit" \u2014 if the two vendors' units differ, say so rather than comparing them directly. "vendor" is who we actually order the item from, which is separate from price comparison.
-
-If the user is just asking a question, return an empty actions array. Never invent inventory items, staff names, or tasks that aren't in the data when answering questions \u2014 only use actions to create new ones when explicitly asked. "thisWeek" is the actual schedule for the current Monday\u2013Sunday with real dates; "usualWeek" is the standing pattern each week starts from. Answer "who's working" questions from thisWeek.`;
+    const systemPrompt = assistantSystemPrompt(data, isAdmin);
     try {
       const ctrl = new AbortController();
       const timeoutId = setTimeout(() => ctrl.abort(), 3e4);
@@ -2827,7 +2902,7 @@ If the user is just asking a question, return an empty actions array. Never inve
           signal: ctrl.signal,
           body: JSON.stringify({
             model: "claude-sonnet-4-6",
-            max_tokens: 2e3,
+            max_tokens: 3500,
             system: systemPrompt,
             messages: [{ role: "user", content: text }]
           })
@@ -2946,6 +3021,39 @@ If the user is just asking a question, return an empty actions array. Never inve
             else next.prep.lowStock.push({ id: uid(), item: action.item || "Item", status: action.status || "low", notes: "" });
             changed = true;
           }
+        } else if (action.type === "add_recipe") {
+          const name = String(action.name || "").trim(), steps = String(action.steps || "").trim();
+          if (name && steps) {
+            next.recipes = Array.isArray(next.recipes) ? next.recipes : JSON.parse(JSON.stringify(DEFAULT_DATA.recipes || []));
+            const ex = next.recipes.find((r) => r.name.toLowerCase() === name.toLowerCase());
+            if (ex) ex.steps = steps; else next.recipes.push({ id: uid(), name, steps });
+            changed = true;
+          }
+        } else if (action.type === "update_recipe") {
+          const steps = String(action.steps || "").trim();
+          const m = String(action.name_match || "").toLowerCase();
+          next.recipes = Array.isArray(next.recipes) ? next.recipes : JSON.parse(JSON.stringify(DEFAULT_DATA.recipes || []));
+          const r = m && next.recipes.find((r2) => r2.name.toLowerCase().includes(m));
+          if (r && steps) { r.steps = steps; changed = true; }
+        } else if (action.type === "add_guide") {
+          const title = String(action.title || "").trim();
+          const sections = (Array.isArray(action.sections) ? action.sections : []).map((sec) => ({ heading: String((sec && sec.heading) || "").trim(), lines: (Array.isArray(sec && sec.lines) ? sec.lines : []).map((l) => String(l).trim()).filter(Boolean) })).filter((sec) => sec.lines.length);
+          if (title && sections.length) {
+            next.guides = (next.guides && next.guides.length) ? next.guides : JSON.parse(JSON.stringify(GUIDES));
+            if (!next.guides.some((g) => g.title.toLowerCase() === title.toLowerCase())) {
+              next.guides.push({ id: uid(), title, sub: String(action.sub || "").trim(), group: String(action.group || "Recipes").trim() || "Recipes", key: "", v: 0, file: "", sheet: { sections } });
+              changed = true;
+            }
+          }
+        } else if (action.type === "add_need") {
+          const t = String(action.text || "").trim();
+          if (t) {
+            next.needList = Array.isArray(next.needList) ? next.needList : [];
+            if (!next.needList.some((n) => !n.done && n.text.toLowerCase() === t.toLowerCase())) {
+              next.needList.unshift({ id: uid(), text: t, who: action.who || "", addedOn: todayISO(), done: false });
+              changed = true;
+            }
+          }
         } else if (action.type === "set_queue") {
           const r = (_c = next.liveOps) == null ? void 0 : _c.orderQueue.sizes.find((r2) => r2.label.toLowerCase().includes((action.size_match || "").toLowerCase()));
           if (r && typeof action.count === "number") {
@@ -2996,13 +3104,28 @@ If the user is just asking a question, return an empty actions array. Never inve
     const brandNotes = (data.shopProfile && data.shopProfile.brandNotes) || "";
     const platformInstructions = socialPlatform === "tiktok"
         ? `Write it for TikTok: short and punchy, 1-2 sentences max, casual and a little playful, like a hook that would sit under a quick video \u2014 not a polished paragraph. Then a blank line, then 3-5 hashtags (TikTok posts don't need many). Emojis are fine here if they fit naturally.`
-        : `Write it for Instagram: warm, casual, first-person shop-owner voice, 1-3 sentences \u2014 not corporate, not emoji-stuffed. Then a blank line, then 5-8 relevant hashtags.`;
+        : `Write it for Instagram: warm, casual, first-person shop-owner voice, 1-3 sentences \u2014 not corporate, at most one emoji and only if it earns its place. Then a blank line, then 5-8 relevant hashtags.`;
+    // Local tags come from the profile location, so a shop in Warwick doesn't
+    // get tagged Narragansett.
+    const town = String(shopLoc || "").split(",")[0].trim();
+    const region = String(shopLoc || "").split(",")[1] ? String(shopLoc).split(",")[1].trim() : "";
+    const localTags = [town && "#" + town.replace(/[^A-Za-z0-9]/g, ""), town && region && "#" + town.replace(/[^A-Za-z0-9]/g, "") + region.replace(/[^A-Za-z0-9]/g, ""), region && "#" + region.replace(/[^A-Za-z0-9]/g, "") + "Pizza", town && "#" + town.replace(/[^A-Za-z0-9]/g, "") + "Eats"].filter(Boolean);
+    const hrs = shopHours(data);
+    const todayHrs = hrs.days[new Date().getDay()];
     const prompt = `Look at this photo from ${shopName}${shopLoc ? ", an independent pizza shop in " + shopLoc : ""}. Write a caption for it to post on ${socialPlatform === "tiktok" ? "TikTok" : "Instagram"}.
 
 ${platformInstructions}
 
 Brand facts to draw on ONLY when they actually fit this specific photo \u2014 don't force all of them in:
 ${brandNotes || "(No brand notes on file yet \u2014 just write something warm and specific to what's actually in the photo.)"}
+
+Rules:
+- Describe what is actually in the photo. Don't invent a special, a price, a deal, or an ingredient you can't see or that isn't in the brand facts.
+- No prices unless they're visible in the photo. No health claims ("healthy", "guilt-free"). No superlatives about being the best in town.
+- Skip the food-writing clich\u00e9s: no "mouthwatering", "delicious", "indulge", "elevate", "crafted", "culinary". Say what it is and why it's good in plain words.
+- Don't name staff or customers who may be in the photo unless the brand facts name them.
+- It's ${PREP_DAYS_LONG[new Date().getDay()]}${todayHrs && todayHrs.open != null ? ", and the shop is open " + hourLabel(todayHrs.open) + "\u2013" + hourLabel(todayHrs.close) + " today" : ""}. If a call to come in fits naturally, use real hours; don't make up a time.
+- Hashtags: mix a few general pizza tags with local ones${localTags.length ? " like " + localTags.join(" ") : ""}. Never use hashtags for brands or distributors.
 
 Reply with ONLY the caption and hashtags \u2014 no preamble, no "here's a caption", no quotation marks around it.`;
     try {
@@ -4394,7 +4517,7 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
     React.createElement(
       "div",
       { className: "flex gap-2" },
-      [["preptasks", "timers", Clock, "Timers", running.length], ["preptasks", "tasks", ClipboardList, "Tasks", openTaskCount], ["reference", "assistant", MessageSquare, "Ask", 0]].map((j) =>
+      [["preptasks", "timers", Clock, "Timers", running.length], ["preptasks", "tasks", ClipboardList, "Tasks", openTaskCount], ["invorders", "needlist", NotePad, "Need", openNeedCount(data)], ["reference", "assistant", MessageSquare, "Ask", 0]].map((j) =>
         React.createElement("button", { key: j[0] + (j[1] || ""), onClick: () => goTo(j[0], j[1]), className: "flex items-center justify-center gap-2 flex-1",
             style: { background: COLORS.card, border: "none", borderRadius: 14, minHeight: 52, fontFamily: "Inter", fontSize: 15, fontWeight: 600, color: COLORS.crust, boxShadow: "0 1px 2px rgba(23,25,27,0.08)" } },
           React.createElement(j[2], { size: 17, color: COLORS.ink }), j[3],
@@ -7646,6 +7769,57 @@ function PrepListTab({ data, persist, listKey, mode }) {
             return [React.createElement("div", { key: "donehdr", className: "px-4 py-2", style: { background: "#F3F3F0", borderTop: "1px solid " + COLORS.line, borderBottom: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 11.5, fontWeight: 700, letterSpacing: "0.09em", color: INK3, textTransform: "uppercase" } }, "Done")].concat(rows);
         })))));
 }
+// The running "we need" list. Anything anybody thinks of — a drain plug, wax
+// paper, more of a thing — goes here so it isn't lost by the end of the shift.
+// Deliberately separate from the 86 board: 86 is menu items we're out of and
+// have pulled; this is everything else. Nothing is auto-cleared; you check it
+// off when it shows up in the building.
+function needListOf(d) { return (d && Array.isArray(d.needList)) ? d.needList : []; }
+function openNeedCount(d) { return needListOf(d).filter((n) => !n.done).length; }
+function NeedListTab({ data, persist }) {
+  const list = needListOf(data);
+  const [text, setText] = useState("");
+  const [who, setWho] = useState("");
+  const names = staffNameList(data);
+  const write = (fn) => { const next = JSON.parse(JSON.stringify(data)); next.needList = needListOf(next); fn(next.needList, next); persist(next); };
+  const add = () => {
+    const t = text.trim();
+    if (!t) return;
+    write((l) => l.unshift({ id: uid(), text: t, who: who || "", addedOn: todayISO(), done: false }));
+    setText("");
+  };
+  const toggle = (id) => write((l) => { const n = l.find((x) => x.id === id); if (n) { n.done = !n.done; n.doneOn = n.done ? todayISO() : ""; } });
+  const remove = (id) => write((l, next) => { next.needList = l.filter((x) => x.id !== id); });
+  const clearDone = () => write((l, next) => { next.needList = l.filter((x) => !x.done); });
+  const open = list.filter((n) => !n.done), done = list.filter((n) => n.done);
+  const CARD_SHADOW = "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)";
+  const row = (n, i, last) => React.createElement("div", { key: n.id, className: "flex items-stretch", style: { background: COLORS.card } },
+    React.createElement("button", { onClick: () => toggle(n.id), className: "flex-1 min-w-0 flex items-center gap-3 text-left pl-4 pr-2", style: { background: "transparent", border: "none", minHeight: 56 } },
+      React.createElement("span", { className: "flex items-center justify-center flex-shrink-0", style: { width: 26, height: 26, borderRadius: 999, border: n.done ? "none" : "2px solid #CDD0D3", background: n.done ? COLORS.basil : "transparent" } },
+        n.done ? React.createElement(Check, { size: 14, color: "#FFFFFF" }) : null),
+      React.createElement("span", { className: "min-w-0 flex-1 flex flex-col justify-center", style: { borderBottom: last ? "none" : "1px solid " + COLORS.line, minHeight: 56, paddingRight: 8 } },
+        React.createElement("span", { style: { fontFamily: "Inter", fontSize: 16, fontWeight: n.done ? 500 : 600, letterSpacing: "-0.01em", color: n.done ? INK3 : COLORS.crust, textDecoration: n.done ? "line-through" : "none", textDecorationThickness: "2px", lineHeight: 1.3 } }, n.text),
+        React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, color: INK3, marginTop: 2 } }, [n.who, n.addedOn ? shortDate(n.addedOn) : ""].filter(Boolean).join(" \u00b7 ")))),
+    React.createElement("button", { onClick: () => remove(n.id), className: "px-3 flex items-center", style: { background: "transparent", border: "none" } }, React.createElement(X, { size: 15, color: INK3 })));
+  return React.createElement("div", null,
+    React.createElement("div", { className: "px-5 py-5 mb-4", style: { background: COLORS.crust, borderRadius: 20 } },
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#F26B5E", textTransform: "uppercase" } }, "We need"),
+      React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontWeight: 600, fontSize: 34, lineHeight: 1.05, color: "#FFFFFF", marginTop: 4 } }, open.length === 0 ? "Nothing on the list" : open.length + (open.length === 1 ? " thing" : " things")),
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginTop: 6 } }, "Anything the shop needs that isn\u2019t a menu item \u2014 a drain plug, wax paper, more lids. Pops into your head, goes here.")),
+    React.createElement("div", { className: "flex gap-2 mb-3" },
+      React.createElement("input", { placeholder: "What do we need?", value: text, onChange: (e) => setText(e.target.value), onKeyDown: (e) => e.key === "Enter" && add(),
+        className: "flex-1 px-3 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 16, background: "#FAFAF8", minHeight: 46 } }),
+      names.length ? React.createElement("select", { value: who, onChange: (e) => setWho(e.target.value), className: "px-2 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#FAFAF8", minHeight: 46, maxWidth: 110, color: who ? COLORS.crust : INK3 } },
+        React.createElement("option", { value: "" }, "Who?"), names.map((n) => React.createElement("option", { key: n, value: n }, n))) : null,
+      React.createElement("button", { onClick: add, className: "px-4 rounded", style: { background: COLORS.crust, color: "#FFFFFF", border: "none", fontFamily: "Inter", fontSize: 15, fontWeight: 600, minHeight: 46 } }, "Add")),
+    open.length === 0 && done.length === 0 ? React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: INK3 } }, "Nothing yet. Add the first thing.") : null,
+    open.length > 0 ? React.createElement("div", { style: { borderRadius: 16, overflow: "hidden", boxShadow: CARD_SHADOW } }, open.map((n, i) => row(n, i, i === open.length - 1))) : null,
+    done.length > 0 ? React.createElement("div", { className: "mt-5" },
+      React.createElement("div", { className: "flex items-center justify-between mb-2 px-1" },
+        React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, "Got it"),
+        React.createElement("button", { onClick: clearDone, style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.ink, padding: "6px 2px" } }, "Clear these")),
+      React.createElement("div", { style: { borderRadius: 16, overflow: "hidden", boxShadow: CARD_SHADOW } }, done.map((n, i) => row(n, i, i === done.length - 1)))) : null);
+}
 function PrepParTab({ data, persist }) {
   const prep = data.prep || { lowStock: [] };
   const [newFlag, setNewFlag] = useState("");
@@ -7676,7 +7850,7 @@ function PrepParTab({ data, persist }) {
     /* @__PURE__ */ React.createElement(
       "p",
       { className: "text-xs mb-3", style: { fontFamily: "Inter", color: "#7a6a5c" } },
-      "Flag anything we\u2019re out of or running low on so the whole crew can see it."
+      "Menu items we\u2019re out of or running low on, so the whole crew and Ask the Manager know. For everything else \u2014 a drain plug, wax paper \u2014 use the Need list."
     ),
     /* @__PURE__ */ React.createElement(
       "div",
@@ -8451,6 +8625,47 @@ function guideSrc(g) {
   return g.file || "";
 }
 
+// A guide that was written rather than photographed. The assistant produces
+// these from a ramble ("here's how the line is set up…"); the owner can also
+// type one. Rendered as a wall-poster: big title, sections, short lines. The
+// same record can later get a photo, at which point the photo shows instead.
+function sheetToText(sheet) {
+  return ((sheet && sheet.sections) || []).map((sec) => (sec.heading ? "# " + sec.heading + "\n" : "") + (sec.lines || []).join("\n")).join("\n\n");
+}
+function textToSheet(text) {
+  const sections = [];
+  let cur = null;
+  String(text || "").split("\n").forEach((raw) => {
+    const line = raw.trim();
+    if (!line) return;
+    if (/^#\s*/.test(line)) { cur = { heading: line.replace(/^#\s*/, ""), lines: [] }; sections.push(cur); return; }
+    if (!cur) { cur = { heading: "", lines: [] }; sections.push(cur); }
+    cur.lines.push(line.replace(/^[-\u2022*]\s*/, ""));
+  });
+  return { sections };
+}
+function GuideSheet({ g, big }) {
+  const secs = (g.sheet && g.sheet.sections) || [];
+  const t = big ? { title: 44, sub: 18, head: 15, line: 22, pad: 28 } : { title: 17, sub: 11.5, head: 9.5, line: 11.5, pad: 12 };
+  return React.createElement("div", { className: "w-full", style: { background: "#FFFDF7", color: "#17191B", padding: t.pad, fontFamily: "Inter", textAlign: "left", overflow: "hidden", height: big ? "auto" : 150, boxSizing: "border-box" } },
+    React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontWeight: 700, fontSize: t.title, lineHeight: 1.02, letterSpacing: "-0.01em", textTransform: "uppercase" } }, g.title),
+    g.sub ? React.createElement("div", { style: { fontSize: t.sub, color: "#5F676E", marginTop: big ? 6 : 2, fontWeight: 500 } }, g.sub) : null,
+    React.createElement("div", { style: { display: big ? "grid" : "block", gridTemplateColumns: secs.length > 1 ? "repeat(auto-fit, minmax(260px, 1fr))" : "1fr", gap: big ? 22 : 0, marginTop: big ? 22 : 8 } },
+      secs.slice(0, big ? secs.length : 1).map((sec, si) => React.createElement("div", { key: si },
+        sec.heading ? React.createElement("div", { style: { fontSize: t.head, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#C4553F", marginBottom: big ? 8 : 3 } }, sec.heading) : null,
+        (sec.lines || []).slice(0, big ? 999 : 4).map((ln, li) => React.createElement("div", { key: li, style: { fontSize: t.line, lineHeight: 1.3, fontWeight: 600, padding: big ? "5px 0" : "1px 0", borderBottom: big ? "1px solid #EAE6DC" : "none", display: "flex", gap: big ? 12 : 6 } },
+          React.createElement("span", { style: { color: "#B8BDC2", fontFamily: "JetBrains Mono", fontWeight: 500, minWidth: big ? 28 : 14, fontSize: big ? 16 : 10, paddingTop: big ? 3 : 1 } }, (li + 1) + "."),
+          React.createElement("span", null, ln)))))));
+}
+// Print the poster on its own page: title, sections, nothing else.
+function printSheet(g) {
+  const esc = (x) => String(x || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+  const secs = (g.sheet && g.sheet.sections) || [];
+  const html = "<!doctype html><html><head><meta charset='utf-8'><title>" + esc(g.title) + "</title><style>body{font-family:Inter,Helvetica,Arial,sans-serif;margin:36px;color:#17191B}h1{font-family:'Archivo Narrow',Impact,sans-serif;font-size:56px;margin:0;text-transform:uppercase;line-height:1}h2{font-size:15px;letter-spacing:.09em;text-transform:uppercase;color:#C4553F;margin:28px 0 8px}p.sub{color:#5F676E;font-size:18px;margin:6px 0 0}ol{margin:0;padding-left:34px}li{font-size:22px;font-weight:600;padding:6px 0;border-bottom:1px solid #EAE6DC}@media print{body{margin:18px}}</style></head><body><h1>" + esc(g.title) + "</h1>" + (g.sub ? "<p class='sub'>" + esc(g.sub) + "</p>" : "") +
+    secs.map((sec) => (sec.heading ? "<h2>" + esc(sec.heading) + "</h2>" : "") + "<ol>" + (sec.lines || []).map((l) => "<li>" + esc(l) + "</li>").join("") + "</ol>").join("") + "<script>window.onload=function(){window.print()}<\/script></body></html>";
+  const w = window.open("", "_blank");
+  if (w) { w.document.open(); w.document.write(html); w.document.close(); }
+}
 function GuidesTab({ data, persist }) {
   const [open, setOpen] = useState(null);
   const [zoomed, setZoomed] = useState(false);
@@ -8498,6 +8713,14 @@ function GuidesTab({ data, persist }) {
     saveGuides(list.filter((x) => x.id !== g.id));
   };
 
+  // Plain-text editing of a written guide: "# Heading" starts a section, every
+  // other line is one line on the poster.
+  const editSheet = (g) => {
+    const text = window.prompt("One line per step. Start a section with # Heading.", sheetToText(g.sheet));
+    if (text == null) return;
+    const sheet = textToSheet(text);
+    saveGuides(list.map((x) => (x.id === g.id ? { ...x, sheet: sheet.sections.length ? sheet : void 0 } : x)));
+  };
   const editText = (g) => {
     const title = window.prompt("Title", g.title);
     if (title === null) return;
@@ -8527,7 +8750,7 @@ function GuidesTab({ data, persist }) {
       "button",
       {
         onClick: () => {
-          if (guideSrc(g)) {
+          if (guideSrc(g) || g.sheet) {
             setOpen(g);
             setZoomed(false);
           }
@@ -8549,7 +8772,9 @@ function GuidesTab({ data, persist }) {
             style: { height: "150px", objectFit: "cover", objectPosition: "top", display: "block", background: "#e9e2d6" }
           })
         : null,
-      /* @__PURE__ */ React.createElement(
+      (!guideSrc(g) && g.sheet)
+        ? /* @__PURE__ */ React.createElement(GuideSheet, { g, big: false })
+        : /* @__PURE__ */ React.createElement(
         "div",
         {
           className: "w-full items-center justify-center text-center px-3",
@@ -8611,6 +8836,15 @@ function GuidesTab({ data, persist }) {
                 style: { border: `1px solid ${COLORS.line}`, background: "transparent", color: COLORS.crust, fontFamily: "Inter" }
               },
               "Rename"
+            ),
+            /* @__PURE__ */ React.createElement(
+              "button",
+              {
+                onClick: () => editSheet(g),
+                className: "text-xs px-3 py-2 rounded-full",
+                style: { border: `1px solid ${COLORS.line}`, background: "transparent", color: COLORS.crust, fontFamily: "Inter" }
+              },
+              g.sheet ? "Edit text" : "Write it out"
             ),
             /* @__PURE__ */ React.createElement(
               "button",
@@ -8708,7 +8942,12 @@ function GuidesTab({ data, persist }) {
               "Close"
             )
           ),
-          /* @__PURE__ */ React.createElement(
+          (!guideSrc(open) && open.sheet)
+          ? /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { maxWidth: 900, margin: "0 auto" } },
+              /* @__PURE__ */ React.createElement(GuideSheet, { g: open, big: true }),
+              /* @__PURE__ */ React.createElement("div", { className: "flex justify-center py-4" },
+                /* @__PURE__ */ React.createElement("button", { onClick: () => printSheet(open), className: "px-4 py-2 text-sm rounded", style: { background: COLORS.lamp, color: COLORS.ink, border: "none", fontFamily: "Inter", fontWeight: 600 } }, "Print poster")))
+          : /* @__PURE__ */ React.createElement(
             "div",
             { onClick: (e) => e.stopPropagation() },
             /* @__PURE__ */ React.createElement("img", {
@@ -8807,7 +9046,8 @@ function InventoryOrdersTab({ data, persist, isAdmin, lowStockCount, foodOrderNe
         { id: "inventory", label: "Inventory", icon: Package, badge: lowStockCount },
         isAdmin && { id: "foodorder", label: "Food Order", icon: ShoppingCart, badge: foodOrderNeed },
         { id: "belmont", label: "Belmont", icon: ShoppingCart, badge: belmontNeed },
-        { id: "board86", label: "86 Board", icon: AlertTriangle, badge: boardFlags }
+        { id: "board86", label: "86 Board", icon: AlertTriangle, badge: boardFlags },
+        { id: "needlist", label: "Need", icon: NotePad, badge: openNeedCount(data) }
     ].filter(Boolean);
     const [sub, setSub] = useState(initialSub || "inventory");
     const active = items.some((i) => i.id === sub) ? sub : items[0].id;
@@ -8818,7 +9058,8 @@ function InventoryOrdersTab({ data, persist, isAdmin, lowStockCount, foodOrderNe
         active === "inventory" && React.createElement(InventoryTab, { data, persist }),
         active === "foodorder" && isAdmin && React.createElement(FoodOrderTab, { data, persist }),
         active === "belmont" && React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }),
-        active === "board86" && React.createElement(PrepParTab, { data, persist })
+        active === "board86" && React.createElement(PrepParTab, { data, persist }),
+        active === "needlist" && React.createElement(NeedListTab, { data, persist })
     );
 }
 // Prep List (par levels) + Tasks — both "what needs doing today" lists.
@@ -8842,7 +9083,7 @@ function PrepTasksTab({ data, persist, prepTodo, openTasks, timers, setTimers, n
     );
 }
 // Menu + Recipes + Guides — the look-up material, not daily-action tabs.
-function ReferenceTab({ data, persist, initialSub }) {
+function ReferenceTab({ data, persist, initialSub, isAdmin }) {
     const items = [
         { id: "assistant", label: "Ask the Manager", icon: MessageSquare },
         { id: "recipes", label: "Recipes", icon: Pizza },
@@ -8854,7 +9095,7 @@ function ReferenceTab({ data, persist, initialSub }) {
         "div",
         null,
         React.createElement(SubNav, { items, active: sub, setActive: setSub }),
-        sub === "assistant" && React.createElement(AssistantTab, { data, persist }),
+        sub === "assistant" && React.createElement(AssistantTab, { data, persist, isAdmin }),
         sub === "recipes" && React.createElement(RecipesTab, { data, persist }),
         sub === "guides" && React.createElement(GuidesTab, { data, persist }),
         sub === "menu" && React.createElement(MenuTab, { data, persist })
