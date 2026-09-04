@@ -898,6 +898,60 @@ const DENSITY = {
 const INK2 = "#5F676E";
 const INK3 = "#8A9096";
 const TASK_STATIONS = ["Front", "Line", "Pizza", "Oven", "Fryer", "Salad", "Sandwich", "Prep", "Dish", "Back of House", "Manager"];
+// ---- Recurring cadence ----------------------------------------------------
+// A template with a cadence stops being something anybody has to remember and
+// starts showing up on its own. Nothing is generated or written ahead of time:
+// the only fact stored is lastDone, and "is it due" gets worked out from that
+// at render. So two tablets can't double-add it, and a stretch where the shop
+// was closed doesn't pile up seven copies — it's due once, however long it's
+// been sitting.
+const CADENCES = [
+  { id: "none", label: "One-off" },
+  { id: "daily", label: "Daily" },
+  { id: "weekly", label: "Weekly" },
+  { id: "monthly", label: "Monthly" }
+];
+function cadenceOf(tpl) {
+  const c = tpl && tpl.cadence;
+  return c === "daily" || c === "weekly" || c === "monthly" ? c : "none";
+}
+function cadenceLabel(id) {
+  const c = CADENCES.filter((x) => x.id === id)[0];
+  return c ? c.label : "One-off";
+}
+function addMonthsISO(iso, n) {
+  const p = isoParts(iso);
+  const first = new Date(p.y, p.m + n, 1);
+  const lastDay = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  return isoOf(first.getFullYear(), first.getMonth(), Math.min(p.d, lastDay));
+}
+function nextDueISO(tpl) {
+  const c = cadenceOf(tpl);
+  if (c === "none") return null;
+  if (!tpl.lastDone) return todayISO();
+  if (c === "daily") return addDaysISO(tpl.lastDone, 1);
+  if (c === "weekly") return addDaysISO(tpl.lastDone, 7);
+  return addMonthsISO(tpl.lastDone, 1);
+}
+// daysOver is how far past due it is: 0 is due today, 3 means it's been
+// sitting three days. Negative means it isn't due yet and stays hidden.
+function recurStatus(tpl) {
+  const due = nextDueISO(tpl);
+  if (!due) return null;
+  const today = todayISO();
+  const daysOver = Math.round((isoToDate(today).getTime() - isoToDate(due).getTime()) / 864e5);
+  return { due, daysOver, isDue: daysOver >= 0, doneToday: tpl.lastDone === today };
+}
+// Shared so the Today tab and the tab badges count the same work the Tasks tab
+// shows. Without this, a grease trap three weeks late is invisible from the one
+// screen you actually check when you're not in the building.
+function dueRecurring(d) {
+  return ((d && d.taskTemplates) || [])
+    .map((tpl) => ({ tpl, st: recurStatus(tpl) }))
+    .filter((r) => r.st && r.st.isDue);
+}
+function dueRecurringCount(d) { return dueRecurring(d).length; }
+function overdueRecurringCount(d) { return dueRecurring(d).filter((r) => r.st.daysOver > 0).length; }
 // Starter library of reusable task templates — a shop this size does these
 // often enough that they're worth picking from a list rather than retyping.
 // station: "" means General (no zone). Fully editable/removable once seeded;
@@ -959,7 +1013,22 @@ const TASK_TEMPLATES_V2_ADD = [
   { text: "Check hand soap", station: "Front" },
   { text: "Empty the water bucket under the slice case", station: "Front" }
 ];
-const TASK_TEMPLATE_VERSION = 2;
+// v3: the jobs that get forgotten precisely because nobody's standing there
+// when they come due. Seeded with lastDone set to the day they land, so the
+// first one shows up an interval from now instead of dumping eight overdue
+// items on whoever opens the tablet next. "Due now" in the library clears that
+// if something is actually overdue today.
+const TASK_TEMPLATES_V3_ADD = [
+  { text: "Clean the floor mats", station: "Back of House", cadence: "weekly" },
+  { text: "Change the hood filters", station: "Back of House", cadence: "weekly" },
+  { text: "Deep clean the walk-in shelves", station: "Back of House", cadence: "monthly" },
+  { text: "Clean the grease trap", station: "Back of House", cadence: "monthly" },
+  { text: "Delime the dish machine", station: "Dish", cadence: "monthly" },
+  { text: "Descale and clean the ice machine", station: "Back of House", cadence: "monthly" },
+  { text: "Check the fire extinguisher gauges", station: "Manager", cadence: "monthly" },
+  { text: "Restock the first aid kit", station: "Manager", cadence: "monthly" }
+];
+const TASK_TEMPLATE_VERSION = 3;
 function migrateTaskLibrary(d) {
   if (!d || typeof d !== "object") return { data: d, changed: false };
   if ((d.taskLibraryVersion || 0) >= TASK_TEMPLATE_VERSION) return { data: d, changed: false };
@@ -973,6 +1042,15 @@ function migrateTaskLibrary(d) {
   TASK_TEMPLATES_V2_ADD.forEach((t) => {
     if (haveTexts.indexOf(t.text) === -1) {
       d.taskTemplates.push({ id: uid(), text: t.text, station: t.station });
+      haveTexts.push(t.text);
+      changed = true;
+    }
+  });
+  const seedDay = todayISO();
+  TASK_TEMPLATES_V3_ADD.forEach((t) => {
+    if (haveTexts.indexOf(t.text) === -1) {
+      d.taskTemplates.push({ id: uid(), text: t.text, station: t.station, cadence: t.cadence, lastDone: seedDay });
+      haveTexts.push(t.text);
       changed = true;
     }
   });
@@ -983,7 +1061,7 @@ function migrateTaskLibrary(d) {
 // prompt and the social caption writer) instead of hardcoded facts about this
 // one shop. Editable in Settings — this is the field that makes a tailored
 // copy of the app for a different shop sound like THAT shop, not this one.
-const SHOP_PROFILE_VERSION = 1;
+const SHOP_PROFILE_VERSION = 2;
 function migrateShopProfile(d) {
   if (!d || typeof d !== "object") return { data: d, changed: false };
   if ((d.shopProfileVersion || 0) >= SHOP_PROFILE_VERSION) return { data: d, changed: false };
@@ -992,8 +1070,16 @@ function migrateShopProfile(d) {
     d.shopProfile = {
       name: "On Point Pizza",
       location: "Narragansett, RI",
+      bookkeeper: "Val",
       brandNotes: "The sauce is five ingredients: tomatoes, olive oil, fresh garlic, salt, and pepper. The pizza cheese is shredded in-house from a block \u2014 just cheese, nothing else. Dough is made fresh every day and cold-proofs for over 24 hours. Produce comes from Belmont Fruit, a local distributor. Detroit-style pies: the shells start two days ahead from that same slow-fermented dough, then rise again in the pan \u2014 talk about the time invested, never explain the technique step by step. Same crew, every time \u2014 they treat their people right and keep them around. Round thin crust is the shop's main seller; Detroit is the one that goes viral but isn't the volume item. Never name specific big distributors the shop doesn't use, and don't make chain comparisons."
     };
+    changed = true;
+  }
+  // v2: the bookkeeper's name used to be typed straight into the Tips tab.
+  // Every shop-specific fact belongs here and nowhere else, so a copy of the
+  // app for another shop reads that shop's name off its own profile.
+  if (d.shopProfile.bookkeeper === undefined) {
+    d.shopProfile.bookkeeper = d.shopProfile.name === "On Point Pizza" ? "Val" : "";
     changed = true;
   }
   d.shopProfileVersion = SHOP_PROFILE_VERSION;
@@ -1784,6 +1870,11 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
       /* @__PURE__ */ React.createElement("input", { value: (data && data.shopProfile && data.shopProfile.location) || "", onChange: (e) => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { shopProfile: Object.assign({}, data.shopProfile, { location: e.target.value }) })), className: "w-full px-3 outline-none opp-field" })
     ),
     role === "admin" && Row(
+      "Bookkeeper",
+      "Who the tip sheet gets sent to. Their name goes on the note field and the copy button on the Tips tab.",
+      /* @__PURE__ */ React.createElement("input", { value: (data && data.shopProfile && data.shopProfile.bookkeeper) || "", placeholder: "e.g. Val", onChange: (e) => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { shopProfile: Object.assign({}, data.shopProfile, { bookkeeper: e.target.value }) })), className: "w-full px-3 outline-none opp-field" })
+    ),
+    role === "admin" && Row(
       "Brand notes",
       "Facts and voice the assistant can draw on when it writes something \u2014 what makes the food and the place what it is. It only pulls in what fits, so more detail here is never wasted.",
       /* @__PURE__ */ React.createElement("textarea", { value: (data && data.shopProfile && data.shopProfile.brandNotes) || "", onChange: (e) => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { shopProfile: Object.assign({}, data.shopProfile, { brandNotes: e.target.value }) })), rows: 5, className: "w-full px-3 py-2 outline-none opp-field", style: { fontFamily: "Inter", fontSize: 14, lineHeight: 1.5 } })
@@ -2205,8 +2296,8 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   if (!loaded || !data) {
     return /* @__PURE__ */ React.createElement("div", { className: "w-full h-full flex items-center justify-center", style: { background: COLORS.crust, minHeight: 500 } }, /* @__PURE__ */ React.createElement("style", null, FONTS), /* @__PURE__ */ React.createElement(Loader2, { className: "animate-spin", color: COLORS.cream, size: 28 }));
   }
-  const lowStockCount = data.inventory.filter((i) => i.qty <= i.low).length;
-  const openTasks = data.tasks.filter((t) => !t.done).length;
+  const lowStockCount = data.inventory.filter(isLowStock).length;
+  const openTasks = data.tasks.filter((t) => !t.done).length + dueRecurringCount(data);
   const boardFlags = (((_a = data.prep) == null ? void 0 : _a.lowStock) || []).filter((i) => i.status === "low" || i.status === "86").length;
   const prepTodo = (((_a = data.prep) == null ? void 0 : _a.par) || []).filter((i) => Number(i.need) > 0 && !i.done).length;
   const belmontNeed = (((_a = data.prep) == null ? void 0 : _a.produce) || []).filter((i) => Number(i.need) > 0).length;
@@ -2631,7 +2722,7 @@ function AssistantTab({ data, persist }) {
     const systemPrompt = `You are the shift-manager assistant for ${shopName}${shopLoc ? " in " + shopLoc : ""}. You help staff with scheduling, inventory, and tasks.
 
 Current data (JSON):
-${JSON.stringify({ schedule: data.schedule, staff: data.staff, standardPositions: data.standardPositions, inventory: data.inventory, tasks: data.tasks, prep: data.prep, menu: data.menu, recipes: data.recipes, storageMap: data.storageMap, liveOps: data.liveOps, timeOff: (data.timeOff || []).filter((r) => r.date >= todayISO()), tips: (data.tips || []).slice(-10) })}
+${JSON.stringify({ usualWeek: data.schedule, thisWeek: DAYS.map((d) => { const iso = addDaysISO(weekStartISO(todayISO()), DAYS.indexOf(d)); return { day: d, date: iso, shifts: shiftsOn(data, iso) }; }), staff: data.staff, standardPositions: data.standardPositions, inventory: data.inventory, tasks: data.tasks, prep: data.prep, menu: data.menu, recipes: data.recipes, storageMap: data.storageMap, liveOps: data.liveOps, timeOff: (data.timeOff || []).filter((r) => r.date >= todayISO()), tips: (data.tips || []).slice(-10) })}
 
 The "prep" object has: "par" (the daily PREP LIST, its own tab \u2014 each item has "need" and "done". need = null means nobody has looked at it yet, need = 0 means marked all set / none needed, need > 0 means that many are on the prep list. done = true means it has been crossed off as made). When asked what still needs to be done, list items where need > 0 and done is false, with how many of each. Ignore items with need of null or 0 \u2014 those are not on the list. Also "produce" (the Belmont produce ORDER sheet (its own tab, same need/done shape as par \u2014 need > 0 means that many go on the Belmont order) \u2014 item, qty, notes) and "lowStock" (the 86/low-stock board \u2014 item, status of ok/low/86).
 
@@ -2652,14 +2743,14 @@ Keep "reply" concise \u2014 a few sentences at most \u2014 so the whole response
 - {"type": "set_prep_par", "item_match": "dough", "need": 3}  (put 3 of an item on the prep list; use need 0 for "all set / don\u0027t need any", need null to clear it back to unassessed)\n- {"type": "set_prep_par", "item_match": "dough", "done": true}  (cross an item off the prep list once it is made)\n- {"type": "add_task", "text": "...", "station": "one of: Front, Line, Pizza, Oven, Fryer, Salad, Sandwich, Prep, Dish, Back of House, Manager", "assignee": "..."}
 - {"type": "complete_task", "text_match": "substring of an existing task's text"}
 - {"type": "update_inventory", "item_match": "substring of an existing inventory item name", "qty": number}
-- {"type": "add_shift", "day": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "name": "...", "time": "..."}
+- {"type": "add_shift", "day": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "name": "...", "time": "..."}  (goes on the upcoming instance of that day only, not the usual week)
 - {"type": "set_produce", "item_match": "romaine", "need": 2}  (put an item on the Belmont produce order; need 0 = all set, need null = not looked at yet)\n- {"type": "set_order", "item_match": "all trumps", "orderNeed": 4, "orderVendor": "QFC"}  (put an inventory item on the food order; orderNeed 0 = all set, null = clear it}
 - {"type": "add_time_off", "date": "YYYY-MM-DD", "name": "...", "note": "optional reason"}  (mark someone off on a date; resolve relative dates like \"next Friday\" yourself before writing the date)\n- {"type": "remove_time_off", "date": "YYYY-MM-DD", "name": "..."}  (they can work after all)\n- {"type": "flag_stock", "item": "...", "status": "ok|low|86"}
 - {"type": "set_queue", "size_match": "substring of an order queue size label, e.g. 'XL' or 'Medium'", "count": number}
 
 Inventory items also carry "orderNeed" (the FOOD ORDER list: null = not looked at, 0 = all set / none needed, N = that many are on the order) and "orderVendor" (which distributor we're buying that item from this time, "QFC" for Quality Food or "Thomsen"). When asked what's on the food order, list items with orderNeed > 0 grouped by vendor. Inventory items are ONE line per product, not one per brand \u2014 the two distributors often stock different brands of the same thing (e.g. ricotta is Grande at Thomsen and Supreme at Quality). "names" holds what each vendor calls it; use the vendor\u0027s own name when reading an order back. Never suggest adding a second row for a different brand of something already listed. Some inventory items carry "thomsenSku" (the Thomsen order-guide item number) and "thomsenUom" (Thomsen's unit of measure) \u2014 use these when asked for an item number or how Thomsen sells it. Inventory items carry two vendor prices under "prices": qfc (Quality Food) and thomsen. When quoting or costing, use the one with the more recent "date"; if only one is dated, use that one; if neither is dated, use qfc, and fall back to thomsen only when qfc is null. Each price has its own "unit" \u2014 if the two vendors' units differ, say so rather than comparing them directly. "vendor" is who we actually order the item from, which is separate from price comparison.
 
-If the user is just asking a question, return an empty actions array. Never invent inventory items, staff names, or tasks that aren't in the data when answering questions \u2014 only use actions to create new ones when explicitly asked.`;
+If the user is just asking a question, return an empty actions array. Never invent inventory items, staff names, or tasks that aren't in the data when answering questions \u2014 only use actions to create new ones when explicitly asked. "thisWeek" is the actual schedule for the current Monday\u2013Sunday with real dates; "usualWeek" is the standing pattern each week starts from. Answer "who's working" questions from thisWeek.`;
     try {
       const ctrl = new AbortController();
       const timeoutId = setTimeout(() => ctrl.abort(), 3e4);
@@ -2746,11 +2837,13 @@ If the user is just asking a question, return an empty actions array. Never inve
           const i = next.inventory.find((i2) => i2.item.toLowerCase().includes((action.item_match || "").toLowerCase()));
           if (i && typeof action.qty === "number") {
             i.qty = action.qty;
+            i.countedAt = Date.now();
             changed = true;
           }
         } else if (action.type === "add_shift") {
-          if (next.schedule[action.day]) {
-            next.schedule[action.day].push({ id: uid(), name: action.name || "TBD", time: action.time || "" });
+          if (DAYS.indexOf(action.day) !== -1) {
+            const wk = ensureWeek(next, weekStartISO(nextDateForDow(action.day)));
+            wk[action.day].push({ id: uid(), name: action.name || "TBD", time: action.time || "" });
             changed = true;
           }
         } else if (action.type === "set_par" || action.type === "set_prep_par") {
@@ -3000,6 +3093,70 @@ function nextDateForDow(dow3) {
     }
     return start;
 }
+// ---- Real weeks over the usual week ----------------------------------------
+// data.schedule is still the weekly pattern — "the usual week". A calendar
+// week only gets its own copy in data.scheduleWeeks the first time somebody
+// edits it, keyed by that week's Monday. Untouched weeks keep following the
+// usual week, so changing the pattern still changes every week that hasn't
+// been touched, and touching one week never bleeds into the next.
+function weekStartISO(iso) {
+    const back = (isoToDate(iso).getDay() + 6) % 7; // Monday-start
+    return addDaysISO(iso, -back);
+}
+function weekOverride(data, weekISO) {
+    const w = data && data.scheduleWeeks && data.scheduleWeeks[weekISO];
+    return w && typeof w === "object" ? w : null;
+}
+function shiftsOn(data, iso) {
+    const day = DOW3[isoToDate(iso).getDay()];
+    const wk = weekOverride(data, weekStartISO(iso));
+    if (wk && Array.isArray(wk[day])) return wk[day];
+    return (data && data.schedule && data.schedule[day]) || [];
+}
+// Copy the usual week into a real one so it can be edited on its own. Fresh
+// ids, so removing a shift from one week can't touch the pattern. Mutates
+// the clone it's handed. Also drops weeks more than eight back — nothing
+// reads those and they'd pile up forever.
+function ensureWeek(next, weekISO) {
+    next.scheduleWeeks = next.scheduleWeeks || {};
+    const cutoff = addDaysISO(weekStartISO(todayISO()), -56);
+    Object.keys(next.scheduleWeeks).forEach((k) => { if (k < cutoff) delete next.scheduleWeeks[k]; });
+    if (!next.scheduleWeeks[weekISO]) {
+        const wk = {};
+        DAYS.forEach((d) => {
+            wk[d] = ((next.schedule && next.schedule[d]) || []).map((s) => ({ id: uid(), name: s.name, time: s.time || "" }));
+        });
+        next.scheduleWeeks[weekISO] = wk;
+    }
+    return next.scheduleWeeks[weekISO];
+}
+// Display order for a day: by start time, "open"/"day" first, anything the
+// parser can't read at the end in the order it was typed. Stored order is left
+// alone so ids stay stable.
+function sortShifts(list, hrs) {
+    return (list || []).map((s, i) => ({ s, i, w: scheduleWindow(s.time, hrs) }))
+        .sort((a, b) => {
+            const as = a.w ? a.w.start : 99, bs = b.w ? b.w.start : 99;
+            return as - bs || a.i - b.i;
+        })
+        .map((x) => x.s);
+}
+// Split "Pop (cooking)" into the two things it is.
+function splitShiftName(raw) {
+    const t = String(raw || "").trim();
+    const m = t.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+    return m ? { person: m[1].trim(), position: m[2].trim() } : { person: t, position: "" };
+}
+function joinShiftName(person, position) {
+    const p = String(person || "").trim(), q = String(position || "").trim();
+    return q ? p + " (" + q + ")" : p;
+}
+// Open punch for someone today, matched the same loose way time off is.
+function openPunchFor(data, iso, name) {
+    const n = normPerson(name);
+    if (!n) return null;
+    return ((data && data.timeClock) || []).find((e) => e.date === iso && !e.clockOut && normPerson(e.name) === n) || null;
+}
 function normPerson(s) {
     return String(s || "").toLowerCase().split("(")[0].replace(/[^a-z]/g, "").trim();
 }
@@ -3012,10 +3169,13 @@ function isOffThatDay(data, iso, name) {
         return false;
     return offOn(data, iso).some((r) => normPerson(r.name) === n);
 }
+// Active people only. Someone marked "no longer here" keeps their record but
+// stops showing up anywhere you'd pick a name — schedule, tips, Today.
 function staffNameList(data) {
     const seen = {};
     const out = [];
     ((data && data.staff) || []).forEach((s) => {
+        if (s.inactive) return;
         const n = String(s.name || "").split("(")[0].trim();
         if (!n || seen[n.toLowerCase()])
             return;
@@ -3039,7 +3199,7 @@ function findStaffByPin(data, pin) {
     const p = String(pin || "").trim();
     if (!p)
         return null;
-    return ((data && data.staff) || []).find((s) => s.pin && String(s.pin).trim() === p) || null;
+    return ((data && data.staff) || []).find((s) => !s.inactive && s.pin && String(s.pin).trim() === p) || null;
 }
 function openClockEntry(data, staffId, iso) {
     return ((data && data.timeClock) || []).find((e) => e.staffId === staffId && e.date === iso && !e.clockOut) || null;
@@ -3823,28 +3983,40 @@ function scheduleWindow(raw, hrs) {
   if (end < start) end += 12;
   return { start, end, loose: /[~?]|maybe|confirm/i.test(t) };
 }
-// Everyone on today's schedule, with what they're doing at this moment.
+// Everyone on today's schedule, with what they're doing at this moment. An
+// open clock punch beats whatever the schedule says: once you're clocked in
+// you're here, whether the board had you at 4 or not at all. Someone clocked
+// in with no shift on the board shows up too — that's usually the owner.
 function crewForDate(data, iso, nowDate) {
-  const dayKey = DOW3[isoToDate(iso).getDay()];
-  const rows = (data.schedule && data.schedule[dayKey]) || [];
+  const rows = shiftsOn(data, iso);
   const hrs = hoursOn(data, iso);
   const now = hourNow(nowDate);
-  return rows.map((shift) => {
-    const raw = String(shift.name || "").trim();
-    const m = raw.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
-    const person = m ? m[1].trim() : raw;
-    const position = m ? m[2].trim() : "";
+  const seen = {};
+  const out = rows.map((shift) => {
+    const sp = splitShiftName(shift.name);
+    const person = sp.person, position = sp.position;
     const unfilled = /^open\b|needs? filling/i.test(person) || /needs? filling/i.test(String(shift.time || ""));
     const off = !unfilled && isOffThatDay(data, iso, person);
     const win = scheduleWindow(shift.time, hrs);
+    const punch = unfilled ? null : openPunchFor(data, iso, person);
+    if (!unfilled) seen[normPerson(person)] = true;
     let status = "tbd";
     if (unfilled) status = "unfilled";
+    else if (punch) status = "in";
     else if (off) status = "off";
     else if (win && now < win.start) status = "later";
     else if (win && now <= win.end) status = "now";
     else if (win) status = "done";
-    return { id: shift.id, person, position, time: shift.time, unfilled, off, win, status };
+    return { id: shift.id, person, position, time: shift.time, unfilled, off, win, status, since: punch ? punch.clockIn : null };
   });
+  ((data && data.timeClock) || []).forEach((e) => {
+    if (e.date !== iso || e.clockOut) return;
+    const n = normPerson(e.name);
+    if (!n || seen[n]) return;
+    seen[n] = true;
+    out.push({ id: "punch:" + e.id, person: e.name, position: "", time: "", unfilled: false, off: false, win: null, status: "in", since: e.clockIn, unscheduled: true });
+  });
+  return out;
 }
 // Two handoffs, not one. The day crew leaves notes for the night crew — half
 // of whom aren't in yet — and the night crew closes the day out. Entries
@@ -3957,8 +4129,13 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
   const carry = focusAll.filter((f) => f.date !== today && !f.done);
   const openFocus = mine.filter((f) => !f.done);
   const openTasks = (data.tasks || []).filter((t) => !t.done);
+  // Recurring work that's come due counts as open, same as on the Tasks tab.
+  const dueRecurCount = dueRecurringCount(data);
+  const overdueRecur = overdueRecurringCount(data);
+  const openTaskCount = openTasks.length + dueRecurCount;
   const { bad: badTemps } = useWalkInTemps(data);
   const crew = crewForDate(data, today, nowDate);
+  const clockedIn = crew.filter((c) => c.status === "in");
   const onNow = crew.filter((c) => c.status === "now");
   const later = crew.filter((c) => c.status === "later");
   const offToday = crew.filter((c) => c.off);
@@ -3977,7 +4154,7 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
   // One thing at the top, not seven. Worst first: anything actually burning,
   // then coverage, then stock, then the work.
   let alert = null;
-  if (openTasks.length) alert = { tone: "work", text: openTasks.length + " open task" + (openTasks.length === 1 ? "" : "s") };
+  if (openTaskCount) alert = { tone: "work", text: openTaskCount + " open task" + (openTaskCount === 1 ? "" : "s") + (overdueRecur ? " \u00b7 " + overdueRecur + " overdue" : "") };
   if (prepLeft.length) alert = { tone: "work", text: prepLeft.length + " prep item" + (prepLeft.length === 1 ? "" : "s") + " left" };
   if (openFocus.length) alert = { tone: "work", text: openFocus[0].text };
   if (eighty.length) alert = { tone: "bad", text: "86 \u00b7 " + eighty.map((f) => f.item).join(", ") };
@@ -4006,8 +4183,8 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
     if (!nm) return;
     const n = clone();
     const key = DOW3[isoToDate(today).getDay()];
-    n.schedule = n.schedule || {};
-    n.schedule[key] = (n.schedule[key] || []).concat([{ id: uid(), name: nm, time: String(addTime || "").trim() }]);
+    // Today only. The usual week is edited on the Schedule tab on purpose.
+    ensureWeek(n, weekStartISO(today))[key].push({ id: uid(), name: nm, time: String(addTime || "").trim() });
     persist(n);
     setAddMe(false); setAddName(""); setAddTime("");
   };
@@ -4038,7 +4215,7 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
       React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontWeight: 600, fontSize: 27, lineHeight: 1.12, color: "#FFFFFF", marginTop: 5 } },
         alert ? alert.text : "Nothing needs you right now"),
       React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginTop: 5 } },
-        [prepLeft.length + " prep", openFocus.length + " priorities", openTasks.length + " tasks", eighty.length + " 86'd"].join(" \u00b7 "))
+        [prepLeft.length + " prep", openFocus.length + " priorities", openTaskCount + " tasks", eighty.length + " 86'd"].join(" \u00b7 "))
     ),
 
     // who's actually here
@@ -4049,11 +4226,14 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
       crew.length === 0
         ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Nobody on today's schedule.")
         : React.createElement("div", { className: "flex flex-wrap gap-2" },
-            onNow.map((c) => pill(c.person + (c.position ? " \u00b7 " + c.position : ""), COLORS.basil, "#FFFFFF")),
+            // Punched in is the strong green. Scheduled-now-but-not-punched is the
+            // pale one, so if the clock's in use you can see who hasn't shown yet.
+            clockedIn.map((c) => pill(c.person + " \u00b7 in since " + fmtClockTime(c.since), COLORS.basil, "#FFFFFF")),
+            onNow.map((c) => pill(c.person + (c.position ? " \u00b7 " + c.position : ""), clockedIn.length ? "#E4F1E6" : COLORS.basil, clockedIn.length ? "#1F6B34" : "#FFFFFF")),
             later.map((c) => pill(c.person + (c.win ? " from " + hourLabel(c.win.start) : ""), "#F2F2EF", COLORS.crust)),
             unfilled.map((c) => pill("Needs filling" + (c.time ? " \u00b7 " + c.time : ""), "#FFF6E8", "#8A5A00", "rgba(179,107,0,0.35)")),
             offToday.map((c) => pill(c.person + " \u2014 off", "#FDECEA", COLORS.alertDark, "rgba(200,56,47,0.25)")),
-            onNow.length + later.length + unfilled.length + offToday.length === 0
+            clockedIn.length + onNow.length + later.length + unfilled.length + offToday.length === 0
               ? React.createElement("span", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Everyone's shift has finished.") : null),
       addMe
         ? React.createElement("div", { className: "mt-3" },
@@ -4143,7 +4323,7 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
     React.createElement(
       "div",
       { className: "flex gap-2" },
-      [["preptasks", "timers", Clock, "Timers", running.length], ["preptasks", "tasks", ClipboardList, "Tasks", openTasks.length], ["reference", "assistant", MessageSquare, "Ask", 0]].map((j) =>
+      [["preptasks", "timers", Clock, "Timers", running.length], ["preptasks", "tasks", ClipboardList, "Tasks", openTaskCount], ["reference", "assistant", MessageSquare, "Ask", 0]].map((j) =>
         React.createElement("button", { key: j[0] + (j[1] || ""), onClick: () => goTo(j[0], j[1]), className: "flex items-center justify-center gap-2 flex-1",
             style: { background: COLORS.card, border: "none", borderRadius: 14, minHeight: 52, fontFamily: "Inter", fontSize: 15, fontWeight: 600, color: COLORS.crust, boxShadow: "0 1px 2px rgba(23,25,27,0.08)" } },
           React.createElement(j[2], { size: 17, color: COLORS.ink }), j[3],
@@ -4299,6 +4479,75 @@ function computeSplit(crew, byHours, times, shares, defSpan, closeHour, ccPot, c
         allFull: rows.every((r) => r.share === 1)
     };
 }
+// Whole-dollar payouts that add up to the pot. Everyone gets their floor,
+// then the spare dollars go to whoever was rounded down the most — the
+// standard largest-remainder split. What's left after this is only cents.
+function evenOut(rows, pot) {
+    const target = Math.round(Number(pot) || 0);
+    const base = rows.map((r) => ({ name: r.name, floor: Math.floor(r.exact), frac: r.exact - Math.floor(r.exact) }));
+    let spare = target - base.reduce((s, b) => s + b.floor, 0);
+    const order = base.slice().sort((a, b) => b.frac - a.frac);
+    for (let i = 0; i < order.length && spare > 0; i++) { order[i].floor += 1; spare -= 1; }
+    const out = {};
+    base.forEach((b) => { out[b.name] = String(b.floor); });
+    return out;
+}
+// Who worked which shift, from the punches if there are any for the date,
+// otherwise from the schedule. Names come back as the Staff-tab spelling so
+// they match the crew chips. "Day" is anything that starts before the
+// shift-change hour; "night" is anything still going after it — so a
+// 11-to-close shift lands in both, which is right, they cashed out twice.
+function crewFromRecords(data, iso) {
+    const sc = shopHours(data).shiftChange;
+    const canon = (n) => {
+        const k = normPerson(n);
+        return staffNameList(data).find((s) => normPerson(s) === k) || String(n || "").trim();
+    };
+    const day = [], night = [], seenD = {}, seenN = {};
+    const add = (list, seen, n) => { const c = canon(n); const k = normPerson(c); if (k && !seen[k]) { seen[k] = true; list.push(c); } };
+    const punches = ((data && data.timeClock) || []).filter((e) => e.date === iso);
+    if (punches.length) {
+        punches.forEach((e) => {
+            const inH = hourNow(new Date(e.clockIn));
+            const outH = e.clockOut ? hourNow(new Date(e.clockOut)) : 24;
+            if (inH < sc) add(day, seenD, e.name);
+            if (outH > sc) add(night, seenN, e.name);
+        });
+        return { day, night, source: "clock" };
+    }
+    const hrs = hoursOn(data, iso);
+    shiftsOn(data, iso).forEach((sh) => {
+        const sp = splitShiftName(sh.name);
+        if (!sp.person || /^open\b|needs? filling/i.test(sp.person)) return;
+        if (isOffThatDay(data, iso, sp.person)) return;
+        const w = scheduleWindow(sh.time, hrs);
+        if (!w) { add(day, seenD, sp.person); add(night, seenN, sp.person); return; }
+        if (w.start < sc) add(day, seenD, sp.person);
+        if (w.end > sc) add(night, seenN, sp.person);
+    });
+    return { day, night, source: "schedule" };
+}
+// Per-person totals over a Monday-to-Sunday week, from what was actually paid.
+function tipsByPersonForWeek(data, weekISO) {
+    const end = addDaysISO(weekISO, 6);
+    const m = {};
+    ((data && data.tips) || []).forEach((e) => {
+        if (!e.date || e.date < weekISO || e.date > end) return;
+        [e.day, e.night].forEach((side) => {
+            if (!side) return;
+            const rows = side.rows || [];
+            if (rows.length) rows.forEach((r) => { m[r.name] = (m[r.name] || 0) + (Number(r.paid) || 0); });
+            else (side.crew || []).forEach((n) => { m[n] = (m[n] || 0) + (Number(side.paid) || 0); });
+        });
+    });
+    return Object.keys(m).map((name) => ({ name, total: m[name] })).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+}
+function sidePaid(side) {
+    if (!side) return 0;
+    const rows = side.rows || [];
+    if (rows.length) return rows.reduce((s, r) => s + (Number(r.paid) || 0), 0);
+    return (Number(side.paid) || 0) * ((side.crew || []).length);
+}
 // Entries saved before the cc line existed have no ccExact on their rows. The
 // shift's cc and total are both stored, so the slice can be recovered rather
 // than shown as $0.00 forever.
@@ -4407,7 +4656,11 @@ function PayoutTable({ split, pot, byHours, times, setTimes, shares, setShares, 
                 React.createElement("strong", { style: { fontFamily: "JetBrains Mono", color: COLORS.crust } }, money(totalPaid))),
             React.createElement("span", { style: { color: Math.abs(left) < 0.005 ? "#5F676E" : left < 0 ? COLORS.alert : COLORS.basil } },
                 left < 0 ? "over by " : "left over ",
-                React.createElement("strong", { style: { fontFamily: "JetBrains Mono" } }, money(Math.abs(left)))))));
+                React.createElement("strong", { style: { fontFamily: "JetBrains Mono" } }, money(Math.abs(left)))),
+            // Off by a dollar or more means somebody's about to fiddle with the
+            // Paying column by hand. Do the fiddling for them.
+            Math.abs(left) >= 0.995 && split.rows.length > 1 ? React.createElement("button", { onClick: () => setPaidMap(evenOut(split.rows, pot)), className: "ml-auto px-2.5 py-1 rounded",
+                style: { background: COLORS.crust, color: "#FFFFFF", border: "none", fontFamily: "Inter", fontSize: 12.5, fontWeight: 600 } }, "Even it out") : null)));
 }
 function SplitModeToggle({ byHours, setByHours, defSpan, split, onUseClocked }) {
     const simple = !byHours && split.allFull && split.rows.length > 0;
@@ -4426,9 +4679,9 @@ function SplitModeToggle({ byHours, setByHours, defSpan, split, onUseClocked }) 
             React.createElement("strong", { style: { fontFamily: "JetBrains Mono", fontSize: 18, color: COLORS.crust } }, money(split.rows[0].exact)),
             " each"))));
 }
-function tipEntryText(e) {
+function tipEntryText(e, shopName) {
     const L = [];
-    L.push(shortDate(e.date) + " — On Point tips");
+    L.push(shortDate(e.date) + " \u2014 " + (shopName || "Tips"));
     const side = (tag, s) => {
         if (!s || !(s.crew || []).length)
             return;
@@ -4526,6 +4779,21 @@ function TipsTab({ data, persist }) {
     const [okReplaceDay, setOkReplaceDay] = useState(false);
     const [okReplaceNight, setOkReplaceNight] = useState(false);
     const names = staffNameList(data);
+    const bookkeeper = (data.shopProfile && String(data.shopProfile.bookkeeper || "").trim()) || "the bookkeeper";
+    // The app already knows who worked. Offer it, don't force it — the crew
+    // chips stay editable either way, and this only ever adds names.
+    const fromRecords = crewFromRecords(data, date);
+    const missingFrom = (have, want) => want.filter((n) => !have.some((c) => normPerson(c) === normPerson(n)));
+    const fillLabel = fromRecords.source === "clock" ? "Add who clocked in" : "Add who's on the schedule";
+    const fillBtn = (have, want, setCrew) => {
+        const add = missingFrom(have, want);
+        if (!add.length) return null;
+        return React.createElement("button", { onClick: () => setCrew(have.concat(add)), className: "flex items-center gap-1.5 px-3 py-2 rounded text-sm mb-2",
+            style: { background: "#FFFFFF", color: COLORS.ink, border: "1px solid " + COLORS.line, fontFamily: "Inter", fontWeight: 600 } },
+            React.createElement(fromRecords.source === "clock" ? Clock : Users, { size: 13 }), " " + fillLabel + " (" + add.length + ")");
+    };
+    const [weekISO, setWeekISO] = useState(weekStartISO(todayISO()));
+    const shopTipTitle = ((data.shopProfile && data.shopProfile.name) || "Shop") + " tips";
     // A leftover sheet from a previous day was the thing confusing people: they
     // opened Tips and found numbers already in it. If that old day was saved,
     // clear it out automatically. If it wasn't, don't silently bin someone's
@@ -4707,6 +4975,7 @@ function TipsTab({ data, persist }) {
                 dayCrew.length,
                 " ",
                 dayCrew.length === 1 ? "person" : "people"),
+            fillBtn(dayCrew, fromRecords.day, setDayCrew),
             React.createElement(CrewPicker, { names: names, crew: dayCrew, setCrew: setDayCrew, extra: dayExtra, setExtra: setDayExtra }),
             React.createElement("div", { className: "flex flex-wrap gap-3 mt-3" },
                 React.createElement(MoneyField, { label: "Cash tips", value: dayCash, onChange: setDayCash }),
@@ -4742,6 +5011,7 @@ function TipsTab({ data, persist }) {
                 nightCrew.length,
                 " ",
                 nightCrew.length === 1 ? "person" : "people"),
+            fillBtn(nightCrew, fromRecords.night, setNightCrew),
             React.createElement(CrewPicker, { names: names, crew: nightCrew, setCrew: setNightCrew, extra: nightExtra, setExtra: setNightExtra }),
             React.createElement("div", { className: "flex flex-wrap gap-3 mt-3" },
                 React.createElement(MoneyField, { label: "Credit card tips \u2014 WHOLE day", value: ccAll, onChange: setCcAll }),
@@ -4773,7 +5043,7 @@ function TipsTab({ data, persist }) {
             } : null }),
             React.createElement(PayoutTable, { split: nightSplit, pot: nightTotal, byHours: nightByHours, times: nightTimes, setTimes: setNightTimes, shares: nightShares, setShares: setNightShares, defSpan: NIGHT_SPAN, paidMap: nightPaidMap, setPaidMap: setNightPaidMap })),
         React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
-            React.createElement("input", { placeholder: "Note for Val (who was off, anything unusual)", value: note, onChange: (e) => setNote(e.target.value), className: "px-3 py-2.5 rounded outline-none opp-field w-full mb-3", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
+            React.createElement("input", { placeholder: "Note for " + bookkeeper + " (who was off, anything unusual)", value: note, onChange: (e) => setNote(e.target.value), className: "px-3 py-2.5 rounded outline-none opp-field w-full mb-3", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter" } }),
             nightSaved ? (React.createElement("button", { onClick: () => setOkReplaceNight(!okReplaceNight), className: "flex items-start gap-2.5 w-full text-left px-2.5 py-2.5 rounded mb-2", style: { background: okReplaceNight ? "#FDECEA" : "#F1F7F3", border: "1px solid " + (okReplaceNight ? COLORS.alert : COLORS.basil) } },
                 React.createElement("span", { className: "flex items-center justify-center rounded flex-shrink-0", style: { width: 22, height: 22, marginTop: 1, border: "2px solid " + (okReplaceNight ? COLORS.alert : COLORS.basil), background: okReplaceNight ? COLORS.alert : COLORS.basil } },
                     React.createElement(Check, { size: 13, color: "#FFFFFF" })),
@@ -4784,15 +5054,43 @@ function TipsTab({ data, persist }) {
                 React.createElement(TicketButton, { onClick: () => saveShift("night"), color: nightBlocked ? COLORS.line : undefined, style: { padding: "10px 20px", fontSize: 15, opacity: nightBlocked ? 0.5 : 1, color: nightBlocked ? "#5F676E" : undefined } },
                     React.createElement(Check, { size: 15 }),
                     " ",
-                    nightSaved ? "Replace the night" : "Save the night"),
-                React.createElement(TicketButton, { onClick: clearForm, color: COLORS.line, style: { color: COLORS.crust } }, "Clear the whole sheet"))),
+                    nightSaved ? "Replace the night" : "Save the night")),
+            // Deliberately not a button next to Save. A quiet link at the bottom
+            // of the card is one tap harder to hit by accident.
+            !emptyForm ? React.createElement("div", { className: "mt-4 text-right" },
+                React.createElement("button", { onClick: clearForm, style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 13, color: "#8A9096", textDecoration: "underline", textUnderlineOffset: 3, padding: "4px 0" } }, "Clear the whole sheet")) : null),
+        // What each person actually took home this week, from the saved
+        // sheets. Answers the question the crew asks every Friday without
+        // anyone scrolling the log and adding it up.
+        (() => {
+            const thisWk = weekStartISO(todayISO());
+            const rows = tipsByPersonForWeek(data, weekISO);
+            const total = rows.reduce((a, r) => a + r.total, 0);
+            const wkLabel = weekISO === thisWk ? "This week" : weekISO === addDaysISO(thisWk, -7) ? "Last week" : shortDate(weekISO) + " \u2013 " + shortDate(addDaysISO(weekISO, 6));
+            const nav = (txt, on) => React.createElement("button", { onClick: on, style: { background: "transparent", border: "1px solid " + COLORS.line, borderRadius: 8, fontFamily: "Inter", fontSize: 15, color: COLORS.crust, minWidth: 32, minHeight: 30, padding: "0 8px" } }, txt);
+            return React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
+                React.createElement("div", { className: "flex items-center justify-between mb-2" },
+                    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#5F676E" } }, "TIPS BY PERSON \u00b7 " + wkLabel),
+                    React.createElement("div", { className: "flex items-center gap-1.5" },
+                        nav("\u2039", () => setWeekISO(addDaysISO(weekISO, -7))),
+                        weekISO !== thisWk ? nav("Now", () => setWeekISO(thisWk)) : null,
+                        nav("\u203a", () => setWeekISO(addDaysISO(weekISO, 7))))),
+                rows.length === 0
+                    ? React.createElement("div", { className: "text-sm italic", style: { fontFamily: "Inter", color: "#8A9096" } }, "Nothing saved for this week yet.")
+                    : React.createElement("div", null,
+                        React.createElement("div", { className: "grid gap-x-3 gap-y-1", style: { gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" } },
+                            rows.map((r) => React.createElement("div", { key: r.name, className: "flex items-baseline justify-between px-2.5 py-1.5 rounded", style: { background: "#FAFAF8", border: "1px solid " + COLORS.line } },
+                                React.createElement("span", { className: "truncate text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, r.name),
+                                React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 15, fontWeight: 600, color: COLORS.crust, marginLeft: 8 } }, "$" + r.total)))),
+                        React.createElement("div", { className: "text-xs mt-2", style: { fontFamily: "Inter", color: "#8A9096" } }, "$" + total + " paid out across " + rows.length + (rows.length === 1 ? " person" : " people") + ", from the saved sheets only.")));
+        })(),
         React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("div", { className: "flex items-center justify-between mb-2" },
                 React.createElement("div", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#5F676E" } }, "TIP LOG"),
-                log.length > 0 && (React.createElement(TicketButton, { color: COLORS.basil, onClick: () => copyOut(log.slice(0, 31).map(tipEntryText).join("\n\n"), "all") },
+                log.length > 0 && (React.createElement(TicketButton, { color: COLORS.basil, onClick: () => copyOut(log.slice(0, 31).map((e) => tipEntryText(e, shopTipTitle)).join("\n\n"), "all") },
                     React.createElement(Copy, { size: 13 }),
                     " ",
-                    copied === "all" ? "Copied" : "Copy for Val"))),
+                    copied === "all" ? "Copied" : "Copy for " + bookkeeper))),
             log.length === 0 && React.createElement("div", { className: "text-sm italic", style: { fontFamily: "Inter", color: "#8A9096" } }, "Nothing logged yet."),
             React.createElement("div", { className: "space-y-1.5" }, log.map((e) => (React.createElement("div", { key: e.id, className: "rounded", style: { background: "#FAFAF8", border: "1px solid " + COLORS.line } },
                 React.createElement("button", { onClick: () => setOpen(open === e.id ? "" : e.id), className: "w-full text-left px-3 py-2.5 flex items-center justify-between gap-2" },
@@ -4800,20 +5098,14 @@ function TipsTab({ data, persist }) {
                         React.createElement("strong", null, prettyDate(e.date)),
                         React.createElement("span", { style: { color: "#5F676E" } },
                             "  ",
-                            "day $",
-                            e.day ? e.day.paid : 0,
-                            " \u00D7 ",
-                            e.day ? (e.day.crew || []).length : 0,
-                            "  ·  ",
-                            "night $",
-                            e.night ? e.night.paid : 0,
-                            " \u00D7 ",
-                            e.night ? (e.night.crew || []).length : 0)),
+                            "day $" + sidePaid(e.day) + " \u00b7 " + (e.day ? (e.day.crew || []).length : 0),
+                            "  \u00b7  ",
+                            "night $" + sidePaid(e.night) + " \u00b7 " + (e.night ? (e.night.crew || []).length : 0))),
                     React.createElement("span", { style: { color: COLORS.steel, fontFamily: "Inter" } }, open === e.id ? "▴" : "▾")),
                 open === e.id && (React.createElement("div", { className: "px-3 pb-3" },
-                    React.createElement("pre", { className: "text-xs whitespace-pre-wrap p-2.5 rounded", style: { background: COLORS.card, fontFamily: "JetBrains Mono", color: COLORS.crust } }, tipEntryText(e)),
+                    React.createElement("pre", { className: "text-xs whitespace-pre-wrap p-2.5 rounded", style: { background: COLORS.card, fontFamily: "JetBrains Mono", color: COLORS.crust } }, tipEntryText(e, shopTipTitle)),
                     React.createElement("div", { className: "flex gap-2 mt-2" },
-                        React.createElement(TicketButton, { color: COLORS.basil, onClick: () => copyOut(tipEntryText(e), e.id) },
+                        React.createElement(TicketButton, { color: COLORS.basil, onClick: () => copyOut(tipEntryText(e, shopTipTitle), e.id) },
                             React.createElement(Copy, { size: 13 }),
                             " ",
                             copied === e.id ? "Copied" : "Copy"),
@@ -4823,74 +5115,176 @@ function TipsTab({ data, persist }) {
 }
 // ===================== SCHEDULE TAB (with time-off warnings) =====================
 function ScheduleTab({ data, persist, canEdit }) {
+    // One real week at a time, or the usual week the real ones start from.
+    const thisWeek = weekStartISO(todayISO());
+    const [weekISO, setWeekISO] = useState(thisWeek);
+    const [usual, setUsual] = useState(false);
     const [draft, setDraft] = useState({});
-    const addShift = (day) => {
-        const d = draft[day];
-        if (!d || !d.name)
-            return;
-        const next = JSON.parse(JSON.stringify(data));
-        next.schedule[day].push({ id: uid(), name: d.name, time: d.time || "" });
-        persist(next);
-        setDraft({ ...draft, [day]: { name: "", time: "" } });
-    };
-    const removeShift = (day, id) => {
-        const next = JSON.parse(JSON.stringify(data));
-        next.schedule[day] = next.schedule[day].filter((s) => s.id !== id);
-        persist(next);
-    };
-    // Each weekday column stands for its next real calendar date.
-    const dayDate = {};
-    DAYS.forEach((d) => { dayDate[d] = nextDateForDow(d); });
-    const anyOff = DAYS.some((d) => offOn(data, dayDate[d]).length > 0);
+    const [editing, setEditing] = useState(null); // { id, time }
+    const today = todayISO();
     const CARD_SHADOW = "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)";
-    const FIELD = { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 16, minHeight: 44, background: "#FAFAF8" };
-    const totalShifts = DAYS.reduce((n, d) => n + data.schedule[d].length, 0);
+    const FIELD = { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 16, minHeight: 44, background: "#FAFAF8", borderRadius: 10 };
+
+    const dayDate = {};
+    DAYS.forEach((d, i) => { dayDate[d] = addDaysISO(weekISO, i); });
+    const override = weekOverride(data, weekISO);
+    const rowsFor = (day) => usual ? ((data.schedule && data.schedule[day]) || []) : shiftsOn(data, dayDate[day]);
+    const hrsFor = (day) => hoursOn(data, usual ? nextDateForDow(day) : dayDate[day]);
+
+    // Every write goes to exactly one place: the usual week, or this week's
+    // own copy (made from the usual week the first time it's touched).
+    const write = (day, fn) => {
+        const next = JSON.parse(JSON.stringify(data));
+        next.schedule = next.schedule || {};
+        const list = usual ? (next.schedule[day] = next.schedule[day] || []) : ensureWeek(next, weekISO)[day];
+        fn(list, next);
+        persist(next);
+    };
+    const addShift = (day) => {
+        const d = draft[day] || {};
+        const person = String(d.name || "").trim();
+        if (!person) return;
+        const name = person === "__open__" ? "Open shift" : joinShiftName(person, d.position);
+        write(day, (list) => list.push({ id: uid(), name, time: String(d.time || "").trim() }));
+        setDraft({ ...draft, [day]: { open: true, name: "", position: "", time: "" } });
+    };
+    const removeShift = (day, id) => write(day, (list, next) => {
+        const i = list.findIndex((s) => s.id === id);
+        if (i !== -1) list.splice(i, 1);
+    });
+    const saveTime = (day) => {
+        if (!editing) return;
+        const e = editing;
+        setEditing(null);
+        write(day, (list) => { const s = list.find((x) => x.id === e.id); if (s) s.time = String(e.time || "").trim(); });
+    };
+    const copyDay = (toDay, fromDay) => {
+        if (!fromDay || fromDay === toDay) return;
+        const src = rowsFor(fromDay);
+        write(toDay, (list) => {
+            const have = list.map((s) => normPerson(s.name));
+            src.forEach((s) => { if (have.indexOf(normPerson(s.name)) === -1) list.push({ id: uid(), name: s.name, time: s.time || "" }); });
+        });
+    };
+    const resetWeek = () => {
+        const next = JSON.parse(JSON.stringify(data));
+        if (next.scheduleWeeks) delete next.scheduleWeeks[weekISO];
+        persist(next);
+    };
+    const setD = (day, patch) => setDraft({ ...draft, [day]: { ...(draft[day] || {}), ...patch } });
+
+    // Positions the picker offers: the shop's standard list, anything on a
+    // staff record, and anything already written on a shift.
+    const positions = (() => {
+        const seen = {}, out = [];
+        const add = (p) => { const t = String(p || "").trim(); if (t && !seen[t.toLowerCase()]) { seen[t.toLowerCase()] = true; out.push(t); } };
+        (data.standardPositions || []).forEach(add);
+        (data.staff || []).forEach((st) => (st.positions || []).forEach((p) => add(p.name)));
+        DAYS.forEach((d) => ((data.schedule && data.schedule[d]) || []).forEach((sh) => add(splitShiftName(sh.name).position)));
+        return out.sort((a, b) => a.localeCompare(b));
+    })();
+    const names = staffNameList(data);
+
+    const totalShifts = DAYS.reduce((n, d) => n + rowsFor(d).length, 0);
+    const perPerson = (() => {
+        const m = {};
+        DAYS.forEach((d) => rowsFor(d).forEach((sh) => {
+            const p = splitShiftName(sh.name).person;
+            if (!p || /^open\b|needs? filling/i.test(p)) return;
+            m[p] = (m[p] || 0) + 1;
+        }));
+        return Object.keys(m).map((p) => ({ p, n: m[p] })).sort((a, b) => b.n - a.n || a.p.localeCompare(b.p));
+    })();
+    const anyOff = !usual && DAYS.some((d) => offOn(data, dayDate[d]).length > 0);
+    const weekLabel = shortDate(weekISO) + " \u2013 " + shortDate(addDaysISO(weekISO, 6));
+    const navBtn = (txt, onClick, extra) => React.createElement("button", { onClick, style: Object.assign({ background: "rgba(255,255,255,0.08)", color: "#FFFFFF", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, fontFamily: "Inter", fontSize: 14, fontWeight: 600, minHeight: 36, padding: "0 12px" }, extra || {}) }, txt);
 
     return (React.createElement("div", null,
         React.createElement("div", { className: "px-5 py-5 mb-4", style: { background: COLORS.crust, borderRadius: 20 } },
-            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#F26B5E", textTransform: "uppercase" } }, "Week ahead"),
+            React.createElement("div", { className: "flex items-center justify-between gap-2 flex-wrap" },
+                React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#F26B5E", textTransform: "uppercase" } },
+                    usual ? "The usual week" : (weekISO === thisWeek ? "This week" : weekISO < thisWeek ? "Past week" : "Coming up")),
+                !usual && React.createElement("div", { className: "flex items-center gap-1.5" },
+                    navBtn("\u2039", () => setWeekISO(addDaysISO(weekISO, -7)), { padding: "0 13px", fontSize: 18 }),
+                    weekISO !== thisWeek && navBtn("Today", () => setWeekISO(thisWeek)),
+                    navBtn("\u203a", () => setWeekISO(addDaysISO(weekISO, 7)), { padding: "0 13px", fontSize: 18 }))),
             React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontWeight: 600, fontSize: 34, lineHeight: 1.05, color: "#FFFFFF", marginTop: 4 } },
-                totalShifts + (totalShifts === 1 ? " shift on the board" : " shifts on the board")),
+                usual ? "Every week starts from this" : weekLabel),
             React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginTop: 6 } },
-                anyOff ? "Someone's off this week \u2014 check the flags below" : "No time off booked this week")),
-        anyOff && (React.createElement("div", { className: "px-4 py-4 mb-4", style: { background: "#FDECEA", borderRadius: 16, border: "1px solid rgba(200,56,47,0.22)" } },
-            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: COLORS.alertDark, textTransform: "uppercase", marginBottom: 8 } }, "Don't forget \u2014 time off this coming week"),
-            React.createElement("div", { className: "flex flex-wrap gap-x-6 gap-y-2" }, DAYS.map((d) => {
-                const rows = offOn(data, dayDate[d]);
-                if (!rows.length)
-                    return null;
-                return (React.createElement("div", { key: d, style: { fontFamily: "Inter", fontSize: 15, color: COLORS.crust } },
-                    React.createElement("span", { style: { fontWeight: 700 } }, d + " " + shortDate(dayDate[d])),
-                    React.createElement("span", { style: { color: COLORS.alertDark, fontWeight: 500 } }, " \u2014 no " + rows.map((r) => r.name).join(", "))));
-            })))),
+                totalShifts + (totalShifts === 1 ? " shift" : " shifts")
+                + (usual ? "" : override ? " \u00b7 edited for this week" : " \u00b7 same as the usual week")
+                + (anyOff ? " \u00b7 someone's off, check the flags" : "")),
+            perPerson.length > 0 && React.createElement("div", { className: "flex flex-wrap gap-1.5 mt-3" },
+                perPerson.map((x) => React.createElement("span", { key: x.p, style: { fontFamily: "Inter", fontSize: 12.5, fontWeight: 600, color: "#FFFFFF", background: "rgba(255,255,255,0.10)", borderRadius: 999, padding: "3px 10px" } }, x.p + " " + x.n))),
+            canEdit && React.createElement("div", { className: "flex items-center gap-2 mt-4 flex-wrap" },
+                React.createElement("button", { onClick: () => { setUsual(!usual); setEditing(null); }, style: { background: usual ? COLORS.lamp : "transparent", color: usual ? COLORS.ink : "#FFFFFF", border: "1px solid " + (usual ? COLORS.lamp : "rgba(255,255,255,0.22)"), borderRadius: 10, fontFamily: "Inter", fontSize: 14, fontWeight: 600, minHeight: 38, padding: "0 14px" } },
+                    usual ? "Back to the calendar" : "Edit the usual week"),
+                !usual && override && React.createElement("button", { onClick: resetWeek, style: { background: "transparent", color: "#8A9096", border: "none", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, minHeight: 38, padding: "0 6px" } }, "Reset to usual week"),
+                usual && React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#8A9096" } }, "Changes here reach every week that hasn't been edited on its own."))),
         React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" }, DAYS.map((day) => {
-            const offRows = offOn(data, dayDate[day]);
-            return (React.createElement("div", { key: day, className: "px-4 py-4", style: { background: COLORS.card, borderRadius: 18, boxShadow: CARD_SHADOW } },
+            const iso = dayDate[day];
+            const isToday = !usual && iso === today;
+            const offRows = usual ? [] : offOn(data, iso);
+            const rows = sortShifts(rowsFor(day), hrsFor(day));
+            const d = draft[day] || {};
+            return (React.createElement("div", { key: day, className: "px-4 py-4", style: { background: COLORS.card, borderRadius: 18, boxShadow: CARD_SHADOW, border: isToday ? "1.5px solid " + COLORS.basil : "1.5px solid transparent" } },
                 React.createElement("div", { className: "flex items-baseline justify-between mb-3" },
-                    React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontWeight: 600, fontSize: 20, letterSpacing: "0.01em", color: COLORS.crust } }, day),
-                    React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: 12.5, fontWeight: 500, color: INK3 } }, shortDate(dayDate[day]))),
+                    React.createElement("div", { className: "flex items-baseline gap-2" },
+                        React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontWeight: 600, fontSize: 20, letterSpacing: "0.01em", color: COLORS.crust } }, day),
+                        isToday && React.createElement("span", { style: { fontFamily: "Inter", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", background: "#E4F1E6", color: "#1F6B34", borderRadius: 999, padding: "2px 8px" } }, "Today")),
+                    !usual && React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: 12.5, fontWeight: 500, color: INK3 } }, shortDate(iso))),
                 offRows.length > 0 && (React.createElement("div", { className: "px-3 py-2 mb-3", style: { background: "#FDECEA", borderRadius: 10, color: COLORS.alertDark, fontFamily: "Inter", fontSize: 13, fontWeight: 600 } },
                     "Off: " + offRows.map((r) => r.name).join(", "))),
-                React.createElement("div", { className: "mb-3" },
-                    data.schedule[day].length === 0 && (React.createElement("div", { className: "py-3 text-center", style: { fontFamily: "Inter", fontSize: 14, color: INK3 } }, "No one scheduled")),
-                    data.schedule[day].map((s, i, arr) => {
-                        const off = isOffThatDay(data, dayDate[day], s.name);
-                        return (React.createElement("div", { key: s.id, className: "flex items-center justify-between gap-2",
-                            style: { padding: "9px 0", borderBottom: i === arr.length - 1 ? "none" : "1px solid " + COLORS.line } },
-                            React.createElement("div", { className: "min-w-0" },
-                                React.createElement("div", { className: "truncate", style: { fontFamily: "Inter", fontSize: 15.5, fontWeight: 600, letterSpacing: "-0.01em",
-                                        color: off ? COLORS.alertDark : COLORS.crust,
-                                        textDecoration: off ? "line-through" : "none", textDecorationThickness: "2px" } }, s.name),
-                                React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: 12.5, fontWeight: 500, color: off ? COLORS.alertDark : INK2, marginTop: 1 } }, off ? (s.time ? s.time + "  \u00b7  OFF" : "OFF") : s.time)),
-                            canEdit && React.createElement("button", { onClick: () => removeShift(day, s.id), style: { background: "transparent", border: "none", padding: 8, flexShrink: 0 } },
+                React.createElement("div", { className: "mb-2" },
+                    rows.length === 0 && (React.createElement("div", { className: "py-3 text-center", style: { fontFamily: "Inter", fontSize: 14, color: INK3 } }, "No one scheduled")),
+                    rows.map((sh, i) => {
+                        const sp = splitShiftName(sh.name);
+                        const off = !usual && isOffThatDay(data, iso, sp.person);
+                        const punch = isToday ? openPunchFor(data, iso, sp.person) : null;
+                        const isEditing = editing && editing.id === sh.id;
+                        return (React.createElement("div", { key: sh.id, className: "flex items-center justify-between gap-2",
+                            style: { padding: "9px 0", borderBottom: i === rows.length - 1 ? "none" : "1px solid " + COLORS.line } },
+                            React.createElement("div", { className: "min-w-0 flex-1" },
+                                React.createElement("div", { className: "flex items-center gap-2 min-w-0" },
+                                    React.createElement("span", { className: "truncate", style: { fontFamily: "Inter", fontSize: 15.5, fontWeight: 600, letterSpacing: "-0.01em",
+                                            color: off ? COLORS.alertDark : COLORS.crust,
+                                            textDecoration: off ? "line-through" : "none", textDecorationThickness: "2px" } }, sp.person),
+                                    sp.position && React.createElement("span", { className: "truncate", style: { fontFamily: "Inter", fontSize: 13, color: INK2 } }, sp.position),
+                                    punch && React.createElement("span", { className: "flex-shrink-0", style: { fontFamily: "Inter", fontSize: 11.5, fontWeight: 700, color: "#1F6B34", background: "#E4F1E6", borderRadius: 999, padding: "2px 8px" } }, "in " + fmtClockTime(punch.clockIn))),
+                                isEditing
+                                    ? React.createElement("input", { autoFocus: true, value: editing.time, placeholder: "e.g. 4-close",
+                                        onChange: (e) => setEditing({ id: sh.id, time: e.target.value }),
+                                        onBlur: () => saveTime(day),
+                                        onKeyDown: (e) => { if (e.key === "Enter") saveTime(day); if (e.key === "Escape") setEditing(null); },
+                                        className: "px-2 outline-none mt-1", style: Object.assign({}, FIELD, { minHeight: 36, fontSize: 14, width: "100%", maxWidth: 180 }) })
+                                    : React.createElement("button", { onClick: () => { if (canEdit) setEditing({ id: sh.id, time: sh.time || "" }); }, className: "text-left",
+                                        style: { background: "transparent", border: "none", padding: 0, fontFamily: "JetBrains Mono", fontSize: 12.5, fontWeight: 500, color: off ? COLORS.alertDark : (sh.time ? INK2 : INK3), marginTop: 1, textDecoration: canEdit ? "underline dotted" : "none", textUnderlineOffset: 3 } },
+                                        off ? (sh.time ? sh.time + "  \u00b7  OFF" : "OFF") : (sh.time || (canEdit ? "add a time" : "\u2014")))),
+                            canEdit && React.createElement("button", { onClick: () => removeShift(day, sh.id), style: { background: "transparent", border: "none", padding: 8, flexShrink: 0 } },
                                 React.createElement(Trash2, { size: 15, color: INK3 }))));
                     })),
-                canEdit && React.createElement("div", { className: "flex flex-col gap-2" },
-                    React.createElement("input", { placeholder: "Name", value: (draft[day] && draft[day].name) || "", onChange: (e) => setDraft({ ...draft, [day]: { ...draft[day], name: e.target.value } }), className: "px-3 outline-none", style: FIELD }),
-                    React.createElement("input", { placeholder: "Time \u2014 e.g. 4pm\u2013close", value: (draft[day] && draft[day].time) || "", onChange: (e) => setDraft({ ...draft, [day]: { ...draft[day], time: e.target.value } }), className: "px-3 outline-none", style: FIELD }),
-                    React.createElement("button", { onClick: () => addShift(day), className: "flex items-center justify-center gap-1.5",
-                        style: { background: COLORS.lamp, color: COLORS.ink, border: "none", borderRadius: 12, fontFamily: "Inter", fontSize: 15, fontWeight: 600, minHeight: 44 } },
-                        React.createElement(Plus, { size: 16 }), "Add"))));
+                canEdit && (!d.open
+                    ? React.createElement("button", { onClick: () => setD(day, { open: true }), className: "w-full flex items-center justify-center gap-1.5",
+                        style: { background: "transparent", color: COLORS.crust, border: "1px dashed " + COLORS.line, borderRadius: 12, fontFamily: "Inter", fontSize: 14, fontWeight: 600, minHeight: 40 } },
+                        React.createElement(Plus, { size: 15 }), "Add shift")
+                    : React.createElement("div", { className: "flex flex-col gap-2 pt-1" },
+                        React.createElement("select", { value: d.name || "", onChange: (e) => setD(day, { name: e.target.value }), className: "px-3 outline-none", style: FIELD },
+                            React.createElement("option", { value: "" }, "Who?"),
+                            names.map((n2) => React.createElement("option", { key: n2, value: n2 }, n2)),
+                            React.createElement("option", { value: "__open__" }, "Open shift \u2014 needs filling")),
+                        d.name !== "__open__" && React.createElement("select", { value: d.position || "", onChange: (e) => setD(day, { position: e.target.value }), className: "px-3 outline-none", style: FIELD },
+                            React.createElement("option", { value: "" }, "Position (optional)"),
+                            positions.map((p2) => React.createElement("option", { key: p2, value: p2 }, p2))),
+                        React.createElement("input", { placeholder: "Time \u2014 e.g. 4-close", value: d.time || "", onChange: (e) => setD(day, { time: e.target.value }),
+                            onKeyDown: (e) => { if (e.key === "Enter") addShift(day); }, className: "px-3 outline-none", style: FIELD }),
+                        React.createElement("div", { className: "flex gap-2" },
+                            React.createElement("button", { onClick: () => addShift(day), className: "flex-1 flex items-center justify-center gap-1.5",
+                                style: { background: COLORS.lamp, color: COLORS.ink, border: "none", borderRadius: 12, fontFamily: "Inter", fontSize: 15, fontWeight: 600, minHeight: 44 } },
+                                React.createElement(Plus, { size: 16 }), "Add"),
+                            React.createElement("button", { onClick: () => setD(day, { open: false }), style: { background: "transparent", color: INK2, border: "1px solid " + COLORS.line, borderRadius: 12, fontFamily: "Inter", fontSize: 14, fontWeight: 600, minHeight: 44, padding: "0 14px" } }, "Done")),
+                        React.createElement("select", { value: "", onChange: (e) => { copyDay(day, e.target.value); }, className: "px-3 outline-none", style: Object.assign({}, FIELD, { minHeight: 38, fontSize: 14, color: INK2 }) },
+                            React.createElement("option", { value: "" }, "Copy another day's shifts\u2026"),
+                            DAYS.filter((d2) => d2 !== day && rowsFor(d2).length > 0).map((d2) => React.createElement("option", { key: d2, value: d2 }, d2 + " (" + rowsFor(d2).length + ")")))))));
         }))));
 }
 // ===================== TIMERS =====================
@@ -5297,6 +5691,9 @@ function StaffTab({ data, persist }) {
   const [noteDraft, setNoteDraft] = useState({});
   const [expanded, setExpanded] = useState(null);
   const [fillPosition, setFillPosition] = useState("");
+  const [confirmRemove, setConfirmRemove] = useState(null);
+  const [showFormer, setShowFormer] = useState(false);
+  const blank = { name: "", phone: "", pin: "", adpId: "" };
   const save = (next) => {
     const nextData = JSON.parse(JSON.stringify(data));
     nextData.staff = next;
@@ -5304,104 +5701,174 @@ function StaffTab({ data, persist }) {
   };
   const startEdit = (s) => {
     setEditingId(s.id);
+    setAdding(false);
     setDraft({ name: s.name, phone: s.phone || "", pin: s.pin || "", adpId: s.adpId || "" });
   };
-  const pinTaken = (pin, exceptId) => !!pin && staff.some((s) => s.id !== exceptId && s.pin && String(s.pin) === String(pin));
+  const pinTaken = (pin, exceptId) => !!pin && staff.some((s) => s.id !== exceptId && !s.inactive && s.pin && String(s.pin) === String(pin));
   const saveEdit = () => {
     save(staff.map((s) => s.id === editingId ? { ...s, name: draft.name, phone: draft.phone, pin: draft.pin, adpId: draft.adpId } : s));
     setEditingId(null);
-    setDraft({ name: "", phone: "", pin: "", adpId: "" });
+    setDraft(blank);
   };
   const addStaff = () => {
     if (!draft.name.trim()) return;
     save([...staff, { id: uid(), name: draft.name.trim(), phone: draft.phone, pin: draft.pin || "", adpId: draft.adpId || "", positions: [], notes: [] }]);
     setAdding(false);
-    setDraft({ name: "", phone: "", pin: "", adpId: "" });
+    setDraft(blank);
   };
-  const remove = (id) => save(staff.filter((s) => s.id !== id));
+  // Two taps to delete. One tap arms it, a second on the same person does it,
+  // tapping anything else disarms. Marking someone as gone is the normal path.
+  const remove = (id) => {
+    if (confirmRemove !== id) { setConfirmRemove(id); return; }
+    save(staff.filter((s) => s.id !== id));
+    setConfirmRemove(null);
+  };
+  const setInactive = (id, flag) => {
+    save(staff.map((s) => s.id === id ? { ...s, inactive: !!flag, leftOn: flag ? todayISO() : "" } : s));
+    setExpanded(null);
+    setConfirmRemove(null);
+  };
   const addPosition = (staffId) => {
     const d = posDraft[staffId];
     if (!d || !d.name || !d.name.trim()) return;
-    save(
-      staff.map(
-        (s) => s.id === staffId ? { ...s, positions: [...s.positions || [], { id: uid(), name: d.name.trim(), skill: d.skill || 3 }] } : s
-      )
-    );
+    save(staff.map((s) => s.id === staffId ? { ...s, positions: [...s.positions || [], { id: uid(), name: d.name.trim(), skill: d.skill || 3 }] } : s));
     setPosDraft({ ...posDraft, [staffId]: { name: "", skill: 3 } });
   };
-  const removePosition = (staffId, posId) => {
-    save(staff.map((s) => s.id === staffId ? { ...s, positions: s.positions.filter((p) => p.id !== posId) } : s));
-  };
-  const setPositionSkill = (staffId, posId, skill) => {
-    save(
-      staff.map(
-        (s) => s.id === staffId ? { ...s, positions: s.positions.map((p) => p.id === posId ? { ...p, skill } : p) } : s
-      )
-    );
-  };
+  const removePosition = (staffId, posId) => save(staff.map((s) => s.id === staffId ? { ...s, positions: (s.positions || []).filter((p) => p.id !== posId) } : s));
+  const setPositionSkill = (staffId, posId, skill) => save(staff.map((s) => s.id === staffId ? { ...s, positions: (s.positions || []).map((p) => p.id === posId ? { ...p, skill } : p) } : s));
+  // Notes carry a real date now. Older ones were saved as whatever the tablet's
+  // locale printed, so display accepts both.
   const addNote = (staffId) => {
     const text = (noteDraft[staffId] || "").trim();
     if (!text) return;
-    const entry = { id: uid(), date: (/* @__PURE__ */ new Date()).toLocaleDateString(), text };
+    const entry = { id: uid(), date: todayISO(), text };
     save(staff.map((s) => s.id === staffId ? { ...s, notes: [entry, ...s.notes || []] } : s));
     setNoteDraft({ ...noteDraft, [staffId]: "" });
   };
-  const removeNote = (staffId, noteId) => {
-    save(staff.map((s) => s.id === staffId ? { ...s, notes: s.notes.filter((n) => n.id !== noteId) } : s));
+  const removeNote = (staffId, noteId) => save(staff.map((s) => s.id === staffId ? { ...s, notes: (s.notes || []).filter((n) => n.id !== noteId) } : s));
+  const noteDate = (d) => (/^\d{4}-\d{2}-\d{2}$/.test(String(d)) ? shortDate(d) : String(d || ""));
+
+  // Same position vocabulary the schedule picker uses: the standard list, what's
+  // on any staff record, and anything already written on a shift.
+  const allPositions = (() => {
+    const seen = {}, out = [];
+    const add = (p) => { const t = String(p || "").trim(); if (t && !seen[t.toLowerCase()]) { seen[t.toLowerCase()] = true; out.push(t); } };
+    (data.standardPositions || []).forEach(add);
+    staff.forEach((st) => (st.positions || []).forEach((p) => add(p.name)));
+    DAYS.forEach((d) => ((data.schedule && data.schedule[d]) || []).forEach((sh) => add(splitShiftName(sh.name).position)));
+    return out.sort((a, b) => a.localeCompare(b));
+  })();
+  const firstName = (s) => String(s.name || "").split("(")[0].trim();
+  const byName = (a, b) => firstName(a).localeCompare(firstName(b));
+  const active = staff.filter((s) => !s.inactive).sort(byName);
+  const former = staff.filter((s) => s.inactive).sort(byName);
+  const fillCandidates = fillPosition ? active.map((s) => ({ s, p: (s.positions || []).find((p) => p.name.toLowerCase() === fillPosition.toLowerCase()) })).filter((x) => x.p).sort((a, b) => b.p.skill - a.p.skill) : [];
+
+  // This pay week, per person — same week boundary the ADP export uses, so the
+  // number here is the number that shows up on the payroll file.
+  const payWeek = weekKeyFor(todayISO(), (data.adpWeekStart != null) ? data.adpWeekStart : 0);
+  const tipsThisWeek = tipsByPersonForWeek(data, payWeek);
+  const weekLine = (s) => {
+    const wk = hoursHistoryFor(data, s.id, 2).find((w) => w.week === payWeek);
+    const tip = tipsThisWeek.find((t) => normPerson(t.name) === normPerson(firstName(s)));
+    if (!wk && !tip) return null;
+    const bits = [];
+    if (wk) bits.push(fmtHours(wk.hours) + (wk.open ? " \u00b7 on now" : ""));
+    if (tip) bits.push("$" + tip.total + " tips");
+    return "This week: " + bits.join(" \u00b7 ");
   };
-  const allPositions = Array.from(
-    /* @__PURE__ */ new Set([...data.standardPositions || [], ...staff.flatMap((s) => (s.positions || []).map((p) => p.name))])
-  );
-  const fillCandidates = fillPosition ? staff.map((s) => ({ s, p: (s.positions || []).find((p) => p.name.toLowerCase() === fillPosition.toLowerCase()) })).filter((x) => x.p).sort((a, b) => b.p.skill - a.p.skill) : [];
-  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A9096" } }, "Phone numbers, positions + skill, and notes that stick around \u2014 separate from the weekly Schedule."), !adding && /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => {
-    setAdding(true);
-    setEditingId(null);
-    setDraft({ name: "", phone: "" });
-  }, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 13 }), " Add staff")), allPositions.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "mb-3 px-3 py-2.5 rounded", style: { background: "#FBF0DA", border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-1.5", style: { fontFamily: "Inter", color: "#8A6116" } }, "Find a fill-in"), /* @__PURE__ */ React.createElement(
-    "select",
-    {
-      value: fillPosition,
-      onChange: (e) => setFillPosition(e.target.value),
-      className: "w-full text-sm px-2 py-1.5 rounded outline-none mb-2",
-      style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
-    },
-    /* @__PURE__ */ React.createElement("option", { value: "" }, "Select a position..."),
-    allPositions.map((p) => /* @__PURE__ */ React.createElement("option", { key: p, value: p }, p))
-  ), fillPosition && (fillCandidates.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#8A9096" } }, "No one's listed for ", fillPosition, " yet.") : /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, fillCandidates.map(({ s, p }) => /* @__PURE__ */ React.createElement("div", { key: s.id, className: "flex items-center justify-between text-sm", style: { fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(Stars, { value: p.skill }), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { color: "#8A9096" } }, s.phone || "no number"))))))), adding && /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 mb-3 rounded space-y-1.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("input", { placeholder: "Name", value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "4-digit PIN (time clock)", inputMode: "numeric", maxLength: 4, value: draft.pin, onChange: (e) => setDraft({ ...draft, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${pinTaken(draft.pin, null) ? COLORS.alert : COLORS.line}`, fontFamily: "JetBrains Mono" } }), pinTaken(draft.pin, null) && /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.alertDark } }, "Someone else already has that PIN."), /* @__PURE__ */ React.createElement("input", { placeholder: "ADP employee ID (for payroll export)", value: draft.adpId, onChange: (e) => setDraft({ ...draft, adpId: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" } }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: addStaff, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => {
-    setAdding(false);
-    setDraft({ name: "", phone: "" });
-  }, color: "#8A9096" }, "Cancel"))), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, staff.map((s) => {
+  const digits = (ph) => String(ph || "").replace(/[^\d+]/g, "");
+  const linkBtn = (href, txt, key) => React.createElement("a", { key, href, onClick: (e) => e.stopPropagation(), className: "text-xs px-2 py-1 rounded",
+    style: { fontFamily: "Inter", fontWeight: 600, background: "#F2F2EF", color: COLORS.crust, textDecoration: "none", border: "1px solid " + COLORS.line } }, txt);
+  const FIELD = { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" };
+
+  const personForm = (onSave, onCancel, exceptId) => React.createElement("div", { className: "space-y-1.5" },
+    React.createElement("input", { placeholder: "Name", value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: FIELD }),
+    React.createElement("input", { placeholder: "Phone number", inputMode: "tel", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: FIELD }),
+    React.createElement("input", { placeholder: "4-digit PIN (time clock)", inputMode: "numeric", maxLength: 4, value: draft.pin, onChange: (e) => setDraft({ ...draft, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${pinTaken(draft.pin, exceptId) ? COLORS.alert : COLORS.line}`, fontFamily: "JetBrains Mono" } }),
+    pinTaken(draft.pin, exceptId) && React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.alertDark } }, "Someone else already has that PIN."),
+    React.createElement("input", { placeholder: "ADP employee ID (for payroll export)", value: draft.adpId, onChange: (e) => setDraft({ ...draft, adpId: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" } }),
+    React.createElement("div", { className: "flex gap-1.5" },
+      React.createElement(TicketButton, { onClick: onSave, color: COLORS.basil }, React.createElement(Check, { size: 13 }), " Save"),
+      React.createElement(TicketButton, { onClick: onCancel, color: "#8A9096" }, "Cancel")));
+
+  const card = (s) => {
     const editing = editingId === s.id;
     const open = expanded === s.id;
     const pd = posDraft[s.id] || { name: "", skill: 3 };
-    return /* @__PURE__ */ React.createElement("div", { key: s.id, className: "rounded px-3 py-2.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, editing ? /* @__PURE__ */ React.createElement("div", { className: "space-y-1.5" }, /* @__PURE__ */ React.createElement("input", { value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "Phone number", value: draft.phone, onChange: (e) => setDraft({ ...draft, phone: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }), /* @__PURE__ */ React.createElement("input", { placeholder: "4-digit PIN (time clock)", inputMode: "numeric", maxLength: 4, value: draft.pin, onChange: (e) => setDraft({ ...draft, pin: e.target.value.replace(/\D/g, "").slice(0, 4) }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${pinTaken(draft.pin, editingId) ? COLORS.alert : COLORS.line}`, fontFamily: "JetBrains Mono" } }), pinTaken(draft.pin, editingId) && /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.alertDark } }, "Someone else already has that PIN."), /* @__PURE__ */ React.createElement("input", { placeholder: "ADP employee ID (for payroll export)", value: draft.adpId, onChange: (e) => setDraft({ ...draft, adpId: e.target.value }), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono" } }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(TicketButton, { onClick: saveEdit, color: COLORS.basil }, /* @__PURE__ */ React.createElement(Check, { size: 13 }), " Save"), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => setEditingId(null), color: "#8A9096" }, "Cancel"))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "flex items-start justify-between gap-2 cursor-pointer", onClick: () => setExpanded(open ? null : s.id) }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, s.name), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8A9096" } }, s.phone || "no number on file", " \xB7 ", s.pin ? "PIN set" : "no PIN", " \xB7 ", s.adpId ? "ADP linked" : "no ADP ID", (s.positions || []).length > 0 && " \xB7 " + s.positions.map((p) => p.name).join(", "))), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 shrink-0" }, /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
-      e.stopPropagation();
-      startEdit(s);
-    }, className: "text-xs px-2 py-0.5 rounded", style: { fontFamily: "Inter", border: `1px solid ${COLORS.line}`, color: COLORS.crust } }, "Edit"), /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
-      e.stopPropagation();
-      remove(s.id);
-    } }, /* @__PURE__ */ React.createElement(Trash2, { size: 13, color: "#8A9096" })), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "JetBrains Mono", color: "#8A9096" } }, open ? "\u2212" : "+"))), open && /* @__PURE__ */ React.createElement("div", { className: "mt-2.5 pt-2.5", style: { borderTop: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-1", style: { fontFamily: "Inter", color: COLORS.crust } }, "Positions & skill"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1 mb-2" }, (s.positions || []).map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, className: "flex items-center justify-between" }, /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.crust } }, p.name), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(Stars, { value: p.skill, onChange: (n) => setPositionSkill(s.id, p.id, n) }), /* @__PURE__ */ React.createElement("button", { onClick: () => removePosition(s.id, p.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 12, color: "#8A9096" }))))), (s.positions || []).length === 0 && /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#8A9096" } }, "No positions listed yet.")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 mb-3" }, /* @__PURE__ */ React.createElement(
-      "select",
-      {
-        value: pd.name,
-        onChange: (e) => setPosDraft({ ...posDraft, [s.id]: { ...pd, name: e.target.value } }),
-        className: "flex-1 text-xs px-2 py-1.5 rounded outline-none",
-        style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", color: pd.name ? COLORS.crust : "#8A9096" }
-      },
-      /* @__PURE__ */ React.createElement("option", { value: "" }, "Select a position..."),
-      (data.standardPositions || []).map((p) => /* @__PURE__ */ React.createElement("option", { key: p, value: p }, p))
-    ), /* @__PURE__ */ React.createElement(Stars, { value: pd.skill, onChange: (n) => setPosDraft({ ...posDraft, [s.id]: { ...pd, skill: n } }) }), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => addPosition(s.id), color: COLORS.basil }, /* @__PURE__ */ React.createElement(Plus, { size: 12 }))), /* @__PURE__ */ React.createElement("div", { className: "text-xs font-semibold mb-1", style: { fontFamily: "Inter", color: COLORS.crust } }, "Notes log"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1 mb-2" }, (s.notes || []).map((n) => /* @__PURE__ */ React.createElement("div", { key: n.id, className: "flex items-start justify-between gap-2 text-xs", style: { fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#5F676E" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa" } }, n.date, " \u2014 "), n.text), /* @__PURE__ */ React.createElement("button", { onClick: () => removeNote(s.id, n.id) }, /* @__PURE__ */ React.createElement(Trash2, { size: 11, color: "#bbb" })))), (s.notes || []).length === 0 && /* @__PURE__ */ React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#8A9096" } }, "No notes yet.")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5" }, /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        placeholder: "Add a note (e.g. out next Tuesday)",
-        value: noteDraft[s.id] || "",
-        onChange: (e) => setNoteDraft({ ...noteDraft, [s.id]: e.target.value }),
-        onKeyDown: (e) => e.key === "Enter" && addNote(s.id),
-        className: "flex-1 text-xs px-2 py-1.5 rounded outline-none",
-        style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" }
-      }
-    ), /* @__PURE__ */ React.createElement(TicketButton, { onClick: () => addNote(s.id), color: COLORS.crust }, /* @__PURE__ */ React.createElement(Plus, { size: 12 }))))));
-  })));
+    const armed = confirmRemove === s.id;
+    const wl = s.inactive ? null : weekLine(s);
+    const ph = digits(s.phone);
+    return React.createElement("div", { key: s.id, className: "rounded px-3 py-2.5", style: { background: COLORS.card, border: `1px solid ${armed ? COLORS.alert : COLORS.line}`, opacity: s.inactive ? 0.75 : 1 } },
+      editing ? personForm(saveEdit, () => { setEditingId(null); setDraft(blank); }, editingId)
+      : React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "flex items-start justify-between gap-2 cursor-pointer", onClick: () => { setExpanded(open ? null : s.id); setConfirmRemove(null); } },
+          React.createElement("div", { className: "min-w-0" },
+            React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, s.name,
+              s.inactive && React.createElement("span", { className: "ml-2 text-xs px-1.5 py-0.5 rounded", style: { fontFamily: "Inter", fontWeight: 600, background: "#F2F2EF", color: "#5F676E" } }, "No longer here" + (s.leftOn ? " \u00b7 " + shortDate(s.leftOn) : ""))),
+            wl && React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: COLORS.crust } }, wl),
+            React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8A9096" } },
+              s.phone || "no number on file", " \u00b7 ", s.pin ? "PIN set" : "no PIN", " \u00b7 ", s.adpId ? "ADP linked" : "no ADP ID",
+              (s.positions || []).length > 0 && " \u00b7 " + s.positions.map((p) => p.name).join(", ")),
+            ph && !s.inactive && React.createElement("div", { className: "flex gap-1.5 mt-1.5" },
+              linkBtn("sms:" + ph, "Text", "t"),
+              linkBtn("tel:" + ph, "Call", "c"))),
+          React.createElement("div", { className: "flex items-center gap-2 shrink-0" },
+            React.createElement("button", { onClick: (e) => { e.stopPropagation(); startEdit(s); }, className: "text-xs px-2 py-0.5 rounded", style: { fontFamily: "Inter", border: `1px solid ${COLORS.line}`, color: COLORS.crust } }, "Edit"),
+            React.createElement("button", { onClick: (e) => { e.stopPropagation(); remove(s.id); }, className: armed ? "text-xs px-2 py-0.5 rounded" : "", style: armed ? { fontFamily: "Inter", fontWeight: 600, background: COLORS.alert, color: "#FFFFFF", border: "none" } : {} },
+              armed ? "Delete for good?" : React.createElement(Trash2, { size: 13, color: "#8A9096" })),
+            React.createElement("span", { className: "text-xs", style: { fontFamily: "JetBrains Mono", color: "#8A9096" } }, open ? "\u2212" : "+"))),
+        open && React.createElement("div", { className: "mt-2.5 pt-2.5", style: { borderTop: `1px solid ${COLORS.line}` } },
+          React.createElement("div", { className: "text-xs font-semibold mb-1", style: { fontFamily: "Inter", color: COLORS.crust } }, "Positions & skill"),
+          React.createElement("div", { className: "space-y-1 mb-2" },
+            (s.positions || []).map((p) => React.createElement("div", { key: p.id, className: "flex items-center justify-between" },
+              React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.crust } }, p.name),
+              React.createElement("div", { className: "flex items-center gap-2" },
+                React.createElement(Stars, { value: p.skill, onChange: (n) => setPositionSkill(s.id, p.id, n) }),
+                React.createElement("button", { onClick: () => removePosition(s.id, p.id) }, React.createElement(Trash2, { size: 12, color: "#8A9096" }))))),
+            (s.positions || []).length === 0 && React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#8A9096" } }, "No positions listed yet.")),
+          React.createElement("div", { className: "flex gap-1.5 mb-3" },
+            React.createElement("select", { value: pd.name, onChange: (e) => setPosDraft({ ...posDraft, [s.id]: { ...pd, name: e.target.value } }), className: "flex-1 text-xs px-2 py-1.5 rounded outline-none", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter", color: pd.name ? COLORS.crust : "#8A9096" } },
+              React.createElement("option", { value: "" }, "Select a position..."),
+              allPositions.map((p) => React.createElement("option", { key: p, value: p }, p))),
+            React.createElement(Stars, { value: pd.skill, onChange: (n) => setPosDraft({ ...posDraft, [s.id]: { ...pd, skill: n } }) }),
+            React.createElement(TicketButton, { onClick: () => addPosition(s.id), color: COLORS.basil }, React.createElement(Plus, { size: 12 }))),
+          React.createElement("div", { className: "text-xs font-semibold mb-1", style: { fontFamily: "Inter", color: COLORS.crust } }, "Notes log"),
+          React.createElement("div", { className: "space-y-1 mb-2" },
+            (s.notes || []).map((n) => React.createElement("div", { key: n.id, className: "flex items-start justify-between gap-2 text-xs", style: { fontFamily: "Inter" } },
+              React.createElement("span", { style: { color: "#5F676E" } }, React.createElement("span", { style: { color: "#aaa" } }, noteDate(n.date), " \u2014 "), n.text),
+              React.createElement("button", { onClick: () => removeNote(s.id, n.id) }, React.createElement(Trash2, { size: 11, color: "#bbb" })))),
+            (s.notes || []).length === 0 && React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#8A9096" } }, "No notes yet.")),
+          React.createElement("div", { className: "flex gap-1.5 mb-3" },
+            React.createElement("input", { placeholder: "Add a note (e.g. out next Tuesday)", value: noteDraft[s.id] || "", onChange: (e) => setNoteDraft({ ...noteDraft, [s.id]: e.target.value }), onKeyDown: (e) => e.key === "Enter" && addNote(s.id), className: "flex-1 text-xs px-2 py-1.5 rounded outline-none", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } }),
+            React.createElement(TicketButton, { onClick: () => addNote(s.id), color: COLORS.crust }, React.createElement(Plus, { size: 12 }))),
+          React.createElement("button", { onClick: () => setInactive(s.id, !s.inactive), className: "text-xs px-2.5 py-1.5 rounded", style: { fontFamily: "Inter", fontWeight: 600, background: "transparent", border: `1px solid ${COLORS.line}`, color: COLORS.crust } },
+            s.inactive ? "Back on the crew" : "No longer here"))));
+  };
+
+  return React.createElement("div", null,
+    React.createElement("div", { className: "flex items-center justify-between mb-3" },
+      React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A9096" } }, "Phone numbers, positions + skill, and notes that stick around \u2014 separate from the weekly Schedule."),
+      !adding && React.createElement(TicketButton, { onClick: () => { setAdding(true); setEditingId(null); setDraft(blank); }, color: COLORS.basil }, React.createElement(Plus, { size: 13 }), " Add staff")),
+    allPositions.length > 0 && React.createElement("div", { className: "mb-3 px-3 py-2.5 rounded", style: { background: "#FBF0DA", border: `1px solid ${COLORS.line}` } },
+      React.createElement("div", { className: "text-xs font-semibold mb-1.5", style: { fontFamily: "Inter", color: "#8A6116" } }, "Find a fill-in"),
+      React.createElement("select", { value: fillPosition, onChange: (e) => setFillPosition(e.target.value), className: "w-full text-sm px-2 py-1.5 rounded outline-none mb-2", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } },
+        React.createElement("option", { value: "" }, "Select a position..."),
+        allPositions.map((p) => React.createElement("option", { key: p, value: p }, p))),
+      fillPosition && (fillCandidates.length === 0
+        ? React.createElement("div", { className: "text-xs italic", style: { fontFamily: "Inter", color: "#8A9096" } }, "No one's listed for ", fillPosition, " yet.")
+        : React.createElement("div", { className: "space-y-1" }, fillCandidates.map(({ s, p }) => React.createElement("div", { key: s.id, className: "flex items-center justify-between text-sm", style: { fontFamily: "Inter" } },
+            React.createElement("span", { style: { color: COLORS.crust } }, s.name),
+            React.createElement("div", { className: "flex items-center gap-2" },
+              React.createElement(Stars, { value: p.skill }),
+              digits(s.phone) ? linkBtn("sms:" + digits(s.phone), "Text", "t") : React.createElement("span", { className: "text-xs", style: { color: "#8A9096" } }, "no number"))))))),
+    adding && React.createElement("div", { className: "px-3 py-2.5 mb-3 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, personForm(addStaff, () => { setAdding(false); setDraft(blank); }, null)),
+    React.createElement("div", { className: "space-y-2" }, active.map(card)),
+    active.length === 0 && React.createElement("div", { className: "text-sm italic py-3", style: { fontFamily: "Inter", color: "#8A9096" } }, "Nobody on the crew yet."),
+    former.length > 0 && React.createElement("div", { className: "mt-4" },
+      React.createElement("button", { onClick: () => setShowFormer(!showFormer), className: "text-xs", style: { fontFamily: "Inter", fontWeight: 600, background: "transparent", border: "none", color: "#8A9096", padding: "4px 0" } },
+        (showFormer ? "\u25be " : "\u25b8 ") + "Former staff (" + former.length + ")"),
+      showFormer && React.createElement("div", { className: "space-y-2 mt-2" }, former.map(card))));
 }
 // Downscale before upload — full-res phone photos are slow and can blow the
 // request size, and invoices stay readable at this width.
@@ -5751,6 +6218,12 @@ function InvoiceScanner({ data, persist, onClose }) {
   );
 }
 
+// An item that has never been counted isn't low, it's unknown. Seed data and
+// freshly added rows start at zero with no countedAt; the first real count
+// stamps it. Anything already holding a positive quantity was obviously
+// counted at some point, so an existing shop needs no migration.
+function isCounted(i) { return i.countedAt != null || Number(i.qty) > 0; }
+function isLowStock(i) { return isCounted(i) && Number(i.qty) <= Number(i.low); }
 function InventoryTab({ data, persist }) {
   const [scanning, setScanning] = useState(false);
   const [draft, setDraft] = useState({ item: "", qty: "", unit: "", low: "", cost: "", vendor: "" });
@@ -5787,6 +6260,14 @@ function InventoryTab({ data, persist }) {
     i[field] = value;
     persist(next);
   };
+  // Typing anything in the count box, including 0, is a count.
+  const updateQty = (id, raw) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const i = next.inventory.find((i2) => i2.id === id);
+    i.qty = Number(raw) || 0;
+    i.countedAt = Date.now();
+    persist(next);
+  };
   const updatePrice = (id, vendorKey, field, value) => {
     const next = JSON.parse(JSON.stringify(data));
     const i = next.inventory.find((i2) => i2.id === id);
@@ -5808,6 +6289,7 @@ function InventoryTab({ data, persist }) {
       id: uid(),
       item: draft.item,
       qty: Number(draft.qty) || 0,
+      countedAt: draft.qty === "" || draft.qty == null ? null : Date.now(),
       unit: draft.unit || "ea",
       low: Number(draft.low) || 0,
       vendor: draft.vendor || "QFC",
@@ -5830,7 +6312,8 @@ function InventoryTab({ data, persist }) {
     showCost ? "Hide cost/vendor" : "Show cost/vendor"
   )), /* @__PURE__ */ React.createElement("div", { className: "space-y-2 mb-3" }, data.inventory.map((i) => {
     var _a, _b;
-    const isLow = i.qty <= i.low;
+    const isLow = isLowStock(i);
+    const counted = isCounted(i);
     return /* @__PURE__ */ React.createElement(
       "div",
       {
@@ -5838,12 +6321,13 @@ function InventoryTab({ data, persist }) {
         className: "px-3 py-3 rounded",
         style: { background: isLow ? "#FDECEA" : COLORS.card, border: `1px solid ${isLow ? COLORS.alert : COLORS.line}`, borderLeft: `5px solid ${isLow ? COLORS.alert : COLORS.line}` }
       },
-      /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, isLow && /* @__PURE__ */ React.createElement(AlertTriangle, { size: 14, color: COLORS.alert }), /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 500, color: COLORS.crust } }, i.item), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A9096" } }, "low at ", i.low, " ", i.unit)), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(
+      /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, isLow && /* @__PURE__ */ React.createElement(AlertTriangle, { size: 14, color: COLORS.alert }), /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 500, color: COLORS.crust } }, i.item), !counted && /* @__PURE__ */ React.createElement("span", { className: "text-xs px-1.5 py-0.5 rounded", style: { fontFamily: "Inter", background: "#F2F2EF", color: "#5F676E", border: "1px solid #DCDFE2" } }, "not counted yet"), /* @__PURE__ */ React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A9096" } }, "low at ", i.low, " ", i.unit)), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement(
         "input",
         {
           type: "number",
-          value: i.qty,
-          onChange: (e) => updateField(i.id, "qty", Number(e.target.value)),
+          value: counted ? i.qty : "",
+          placeholder: "count",
+          onChange: (e) => updateQty(i.id, e.target.value),
           className: "w-20 text-lg px-2 py-2 rounded text-right",
           style: { border: `1px solid ${COLORS.line}`, fontFamily: "JetBrains Mono", color: isLow ? COLORS.alertDark : COLORS.crust }
         }
@@ -6071,7 +6555,7 @@ function OrderTab({ data }) {
     const nextChecked = { ...checked };
     const nextQty = { ...qty };
     inv.forEach((i) => {
-      if (i.qty <= i.low) {
+      if (isLowStock(i)) {
         nextChecked[i.id] = true;
         if (nextQty[i.id] === void 0) nextQty[i.id] = Math.max(Math.ceil(i.low * 2 - i.qty), 1);
       }
@@ -6142,7 +6626,7 @@ function OrderTab({ data }) {
 
   const row = (i) => {
     const on = !!checked[i.id];
-    const low = i.qty <= i.low;
+    const low = isLowStock(i);
     return React.createElement(
       "div",
       {
@@ -8152,6 +8636,7 @@ function TasksTab({ data, persist }) {
   const [zoneText, setZoneText] = useState("");
   const [tplText, setTplText] = useState("");
   const [tplStation, setTplStation] = useState("General");
+  const [tplCadence, setTplCadence] = useState("none");
   const stationOf = (t) => t.station || "General";
   const toggle = (id) => {
     const next = JSON.parse(JSON.stringify(data));
@@ -8209,7 +8694,12 @@ function TasksTab({ data, persist }) {
   const addTemplate = () => {
     if (!tplText.trim()) return;
     const next = JSON.parse(JSON.stringify(data));
-    next.taskTemplates = (next.taskTemplates || []).concat([{ id: uid(), text: tplText.trim(), station: tplStation }]);
+    next.taskTemplates = (next.taskTemplates || []).concat([{
+      id: uid(), text: tplText.trim(), station: tplStation,
+      cadence: tplCadence,
+      // Start the clock today rather than firing the moment it's saved.
+      lastDone: tplCadence === "none" ? "" : todayISO()
+    }]);
     persist(next);
     setTplText("");
   };
@@ -8230,17 +8720,79 @@ function TasksTab({ data, persist }) {
     persist(next);
   };
 
+  // ---- Recurring templates -------------------------------------------------
+  // Checking one off doesn't create or delete a task, it just stamps the day.
+  // prevDone is kept only so an accidental tap can be undone from the Done
+  // list without guessing what the previous date was.
+  const patchTemplate = (id, changes) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const t = (next.taskTemplates || []).find((t2) => t2.id === id);
+    if (!t) return;
+    Object.assign(t, changes);
+    persist(next);
+  };
+  // lastDone is only the cadence clock — seeding a template or switching a
+  // cadence on sets it so the first one lands an interval out. completedOn is
+  // the separate record of somebody actually doing the job, and it's the only
+  // thing the Done list trusts. Without the split, eight seeded templates would
+  // read as eight tasks finished today that nobody touched.
+  const completeRecurring = (id) => {
+    const tpl = templates.find((t) => t.id === id);
+    patchTemplate(id, { prevDone: (tpl && tpl.lastDone) || "", lastDone: todayISO(), completedOn: todayISO() });
+  };
+  const undoRecurring = (id) => {
+    const tpl = templates.find((t) => t.id === id);
+    patchTemplate(id, { lastDone: (tpl && tpl.prevDone) || "", prevDone: "", completedOn: "" });
+  };
+  const setCadence = (id, cadence) => {
+    // Turning a cadence on shouldn't make the task instantly overdue — start
+    // the clock today. Turning it off leaves lastDone alone so switching back
+    // on doesn't lose the history.
+    const tpl = templates.find((t) => t.id === id);
+    const wasOff = cadenceOf(tpl) === "none";
+    const changes = { cadence };
+    if (cadence !== "none" && wasOff && !(tpl && tpl.lastDone)) changes.lastDone = todayISO();
+    patchTemplate(id, changes);
+  };
+  const markDueNow = (id) => patchTemplate(id, { lastDone: "", prevDone: "" });
+
+  // The library doubles as the reference for what each station is responsible
+  // for, so it reads grouped by zone rather than as one long list. Only zones
+  // holding something show up.
+  const templatesIn = (z) => templates.filter((t) => (t.station || "General") === z);
+  const libraryZones = ["General"].concat(zones).filter((z, i, a) => a.indexOf(z) === i && templatesIn(z).length > 0);
+
+  const recurring = templates.filter((t) => cadenceOf(t) !== "none");
+  // Virtual rows: shaped like a task so the station grouping can treat them the
+  // same, but they never enter data.tasks.
+  const dueRecurring = recurring
+    .map((tpl) => ({ tpl, st: recurStatus(tpl) }))
+    .filter((r) => r.st && r.st.isDue)
+    .map((r) => ({
+      id: "recur:" + r.tpl.id, tplId: r.tpl.id, text: r.tpl.text,
+      station: r.tpl.station || "General", daysOver: r.st.daysOver, cadence: cadenceOf(r.tpl)
+    }));
+  const recurDoneToday = recurring
+    .filter((tpl) => tpl.completedOn === todayISO())
+    .map((tpl) => ({ id: "recur:" + tpl.id, tplId: tpl.id, text: tpl.text, station: tpl.station || "General" }));
+  const dueAt = (s) => dueRecurring.filter((r) => r.station === s);
+
   const allStations = zones.slice();
   data.tasks.forEach((t) => {
     if (allStations.indexOf(stationOf(t)) === -1) allStations.push(stationOf(t));
   });
+  dueRecurring.forEach((r) => {
+    if (allStations.indexOf(r.station) === -1) allStations.push(r.station);
+  });
   // Always offer General in the pickers, even before anything's using it —
   // unlike allStations (for filter chips), which only shows it once it is.
   const pickableStations = ["General"].concat(zones);
-  const openCount = (s) => data.tasks.filter((t) => !t.done && stationOf(t) === s).length;
+  const openCount = (s) => data.tasks.filter((t) => !t.done && stationOf(t) === s).length + dueAt(s).length;
   const shown = filter === "All" ? allStations : [filter];
   const doneTasks = data.tasks.filter((t) => t.done && (filter === "All" || stationOf(t) === filter));
-  const totalOpen = data.tasks.filter((t) => !t.done).length;
+  const doneRecur = recurDoneToday.filter((r) => filter === "All" || r.station === filter);
+  const totalOpen = data.tasks.filter((t) => !t.done).length + dueRecurring.length;
+  const overdueCount = dueRecurring.filter((r) => r.daysOver > 0).length;
   const D = DENSITY[useDensity()];
   const CARD_SHADOW = "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)";
   const FIELD = { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 16, minHeight: 48, background: COLORS.card };
@@ -8296,6 +8848,27 @@ function TasksTab({ data, persist }) {
     )
   );
 
+  // Recurring rows read the same as a normal task, with two differences: a
+  // cadence badge so nobody wonders why it appeared on its own, and an overdue
+  // count that only shows once it's actually late. No assignee and no zone
+  // picker — these belong to the library, not to today.
+  const recurRow = (r, last) => React.createElement(
+    "div",
+    { key: r.id, className: "flex items-stretch", style: { background: COLORS.card } },
+    React.createElement(
+      "button",
+      { onClick: () => completeRecurring(r.tplId), className: "flex-1 min-w-0 flex items-center gap-3 text-left " + D.pad,
+        style: { background: "transparent", border: "none", minHeight: D.row } },
+      React.createElement("span", { className: "flex items-center justify-center flex-shrink-0",
+        style: { width: D.check, height: D.check, borderRadius: 999, border: "2px solid " + (r.daysOver > 0 ? "#F26B5E" : "#CDD0D3") } }),
+      React.createElement("span", { className: "min-w-0 flex-1 flex items-center gap-2",
+        style: { borderBottom: last ? "none" : "1px solid " + COLORS.line, minHeight: D.row, paddingRight: 8 } },
+        React.createElement("span", { className: "truncate", style: { fontFamily: "Inter", fontSize: D.name, fontWeight: 600, letterSpacing: "-0.012em", color: COLORS.crust } }, r.text),
+        React.createElement("span", { className: "flex-shrink-0", style: { fontFamily: "Inter", fontSize: 12.5, fontWeight: 700, color: r.daysOver > 0 ? "#FFFFFF" : INK2, background: r.daysOver > 0 ? "#F26B5E" : "#F2F2EF", borderRadius: 7, padding: "3px 9px" } },
+          r.daysOver > 0 ? (r.daysOver === 1 ? "1 day late" : r.daysOver + " days late") : cadenceLabel(r.cadence)))
+    )
+  );
+
   return React.createElement(
     "div",
     null,
@@ -8305,8 +8878,9 @@ function TasksTab({ data, persist }) {
       React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#F26B5E", textTransform: "uppercase" } }, "Tasks \u00b7 " + todayLong()),
       React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontWeight: 600, fontSize: 34, lineHeight: 1.05, color: "#FFFFFF", marginTop: 4 } },
         totalOpen === 0 ? "All caught up" : totalOpen + (totalOpen === 1 ? " task open" : " tasks open")),
-      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginTop: 6 } },
-        allStations.filter((s) => openCount(s) > 0).length + " stations with work \u00b7 " + doneTasks.length + " done")
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: overdueCount > 0 ? "#F26B5E" : "#8A9096", marginTop: 6 } },
+        allStations.filter((s) => openCount(s) > 0).length + " stations with work \u00b7 " + (doneTasks.length + doneRecur.length) + " done"
+          + (overdueCount > 0 ? " \u00b7 " + overdueCount + " overdue" : ""))
     ),
     React.createElement(
       "div",
@@ -8339,7 +8913,11 @@ function TasksTab({ data, persist }) {
     ),
     shown.map((s) => {
       const items = data.tasks.filter((t) => !t.done && stationOf(t) === s);
-      if (items.length === 0 && filter === "All") return null;
+      // Anything late floats to the top of its station — the whole point is
+      // that it stopped being invisible.
+      const recurs = dueAt(s).slice().sort((a, b) => b.daysOver - a.daysOver);
+      const total = items.length + recurs.length;
+      if (total === 0 && filter === "All") return null;
       return React.createElement(
         "div",
         { key: s, className: "mb-4" },
@@ -8349,9 +8927,11 @@ function TasksTab({ data, persist }) {
           React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, s),
           React.createElement("span", { style: { flex: 1, height: 1, background: COLORS.line } })
         ),
-        items.length === 0
+        total === 0
           ? React.createElement("div", { className: "px-4 py-6 text-center", style: { fontFamily: "Inter", fontSize: 14.5, color: INK2, background: COLORS.card, borderRadius: 16, boxShadow: CARD_SHADOW } }, "Nothing open at this station.")
-          : React.createElement("div", { style: { borderRadius: 16, overflow: "hidden", boxShadow: CARD_SHADOW } }, items.map((t, i) => taskRow(t, i === items.length - 1)))
+          : React.createElement("div", { style: { borderRadius: 16, overflow: "hidden", boxShadow: CARD_SHADOW } },
+              recurs.map((r, i) => recurRow(r, i === total - 1)),
+              items.map((t, i) => taskRow(t, recurs.length + i === total - 1)))
       );
     }),
     totalOpen === 0 && React.createElement(
@@ -8359,16 +8939,30 @@ function TasksTab({ data, persist }) {
       { className: "px-6 py-12 text-center", style: { fontFamily: "Inter", fontSize: 15, color: INK2, background: COLORS.card, borderRadius: 16, boxShadow: CARD_SHADOW } },
       "Every station clear. Nothing waiting on anybody."
     ),
-    doneTasks.length > 0 && React.createElement(
+    (doneTasks.length + doneRecur.length) > 0 && React.createElement(
       "div",
       { className: "mt-6" },
       React.createElement(
         "div",
         { className: "flex items-center justify-between mb-2 px-1" },
         React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, "Done"),
-        React.createElement("button", { onClick: clearDone, style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.ink, padding: "6px 2px" } }, "Clear finished")
+        doneTasks.length > 0 && React.createElement("button", { onClick: clearDone, style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.ink, padding: "6px 2px" } }, "Clear finished")
       ),
-      React.createElement(
+      doneRecur.length > 0 && React.createElement(
+        "div",
+        { className: "mb-2", style: { borderRadius: 16, overflow: "hidden", boxShadow: CARD_SHADOW } },
+        doneRecur.map((r, i) => React.createElement(
+          "div",
+          { key: r.id, className: "flex items-stretch", style: { background: COLORS.card } },
+          React.createElement("button", { onClick: () => undoRecurring(r.tplId), className: "flex-1 min-w-0 flex items-center gap-3 text-left pl-4 pr-2", style: { background: "transparent", border: "none", minHeight: 54 } },
+            React.createElement("span", { className: "flex items-center justify-center flex-shrink-0", style: { width: 27, height: 27, borderRadius: 999, background: COLORS.basil } },
+              React.createElement(Check, { size: 15, color: "#FFFFFF" })),
+            React.createElement("span", { className: "min-w-0 flex-1 flex items-center gap-2", style: { borderBottom: i === doneRecur.length - 1 ? "none" : "1px solid " + COLORS.line, minHeight: 54, paddingRight: 8 } },
+              React.createElement("span", { className: "truncate", style: { fontFamily: "Inter", fontSize: 16, fontWeight: 500, color: INK3, textDecoration: "line-through", textDecorationThickness: "2px" } }, r.text),
+              React.createElement("span", { className: "flex-shrink-0", style: { fontFamily: "Inter", fontSize: 12.5, color: INK3 } }, r.station)))
+        ))
+      ),
+      doneTasks.length > 0 && React.createElement(
         "div",
         { style: { borderRadius: 16, overflow: "hidden", boxShadow: CARD_SHADOW } },
         doneTasks.map((t, i) => React.createElement(
@@ -8418,18 +9012,43 @@ function TasksTab({ data, persist }) {
           "div",
           { className: "px-4 py-4", style: { background: COLORS.card, borderRadius: 16, boxShadow: CARD_SHADOW } },
           React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#8A9096", textTransform: "uppercase", marginBottom: 10 } }, "Task library"),
-          React.createElement("div", { className: "text-xs mb-3", style: { fontFamily: "Inter", color: "#8A9096" } }, "Reusable tasks. Add one to today's list without retyping it, or leave it here for whenever it comes up."),
+          React.createElement("div", { className: "text-xs mb-3", style: { fontFamily: "Inter", color: "#8A9096" } }, "Everything each zone is responsible for, in one place \u2014 use it as the reference for what a station does. Give a task a cadence and it shows up on the list by itself when it comes due."),
           templates.length === 0 && React.createElement("div", { className: "text-sm italic py-3", style: { fontFamily: "Inter", color: "#8A9096" } }, "No saved tasks yet."),
-          React.createElement("div", { className: "space-y-1.5 mb-3" }, templates.map((tpl) => React.createElement(
+          React.createElement("div", { className: "mb-3" }, libraryZones.map((z) => React.createElement(
             "div",
-            { key: tpl.id, className: "flex items-center gap-2 py-1.5", style: { borderBottom: "1px solid " + COLORS.line } },
-            React.createElement("span", { className: "flex-1 min-w-0 truncate", style: { fontFamily: "Inter", fontSize: 14.5, color: COLORS.crust } }, tpl.text),
-            React.createElement("select", { value: tpl.station || "General", onChange: (e) => moveTemplate(tpl.id, e.target.value), className: "outline-none",
-                style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 12.5, color: INK2, background: "#FAFAF8", maxWidth: 96, minHeight: 32, padding: "0 4px" } },
-              pickableStations.map((s) => React.createElement("option", { key: s, value: s }, s))),
-            React.createElement("button", { onClick: () => addToToday(tpl), className: "px-2.5 py-1.5 rounded flex-shrink-0", style: { background: COLORS.basil, color: "#FFFFFF", border: "none", fontFamily: "Inter", fontSize: 12.5, fontWeight: 600 } }, "+ Today"),
-            React.createElement("button", { onClick: () => removeTemplate(tpl.id), style: { background: "transparent", border: "none", padding: 6, flexShrink: 0 } },
-              React.createElement(Trash2, { size: 14, color: INK3 }))
+            { key: z, className: "mb-3" },
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 11.5, fontWeight: 700, letterSpacing: "0.09em", color: INK3, textTransform: "uppercase", marginBottom: 4 } }, z),
+            templatesIn(z).map((tpl) => {
+              const cad = cadenceOf(tpl);
+              const st = recurStatus(tpl);
+              return React.createElement(
+                "div",
+                { key: tpl.id, className: "py-1.5", style: { borderBottom: "1px solid " + COLORS.line } },
+                React.createElement(
+                  "div",
+                  { className: "flex items-center gap-2" },
+                  React.createElement("span", { className: "flex-1 min-w-0 truncate", style: { fontFamily: "Inter", fontSize: 14.5, color: COLORS.crust } }, tpl.text),
+                  React.createElement("select", { value: cad, onChange: (e) => setCadence(tpl.id, e.target.value), className: "outline-none",
+                      style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 12.5, fontWeight: cad === "none" ? 400 : 600, color: cad === "none" ? INK2 : COLORS.crust, background: cad === "none" ? "#FAFAF8" : "#F2F2EF", maxWidth: 92, minHeight: 32, padding: "0 4px" } },
+                    CADENCES.map((c) => React.createElement("option", { key: c.id, value: c.id }, c.label))),
+                  React.createElement("select", { value: tpl.station || "General", onChange: (e) => moveTemplate(tpl.id, e.target.value), className: "outline-none",
+                      style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 12.5, color: INK2, background: "#FAFAF8", maxWidth: 92, minHeight: 32, padding: "0 4px" } },
+                    pickableStations.map((s) => React.createElement("option", { key: s, value: s }, s))),
+                  cad === "none" && React.createElement("button", { onClick: () => addToToday(tpl), className: "px-2.5 py-1.5 rounded flex-shrink-0", style: { background: COLORS.basil, color: "#FFFFFF", border: "none", fontFamily: "Inter", fontSize: 12.5, fontWeight: 600 } }, "+ Today"),
+                  React.createElement("button", { onClick: () => removeTemplate(tpl.id), style: { background: "transparent", border: "none", padding: 6, flexShrink: 0 } },
+                    React.createElement(Trash2, { size: 14, color: INK3 }))
+                ),
+                st && React.createElement(
+                  "div",
+                  { className: "flex items-center gap-2 mt-0.5" },
+                  React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, color: st.daysOver > 0 ? "#F26B5E" : INK3 } },
+                    st.daysOver > 0 ? "Overdue since " + prettyDate(st.due)
+                      : st.daysOver === 0 ? "On the list now"
+                      : "Next " + prettyDate(st.due)),
+                  st.daysOver < 0 && React.createElement("button", { onClick: () => markDueNow(tpl.id), style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 12, fontWeight: 600, color: COLORS.ink, padding: "2px 0" } }, "Due now")
+                )
+              );
+            })
           ))),
           React.createElement("div", { className: "flex gap-2 flex-wrap" },
             React.createElement("input", { placeholder: "New reusable task\u2026", value: tplText, onChange: (e) => setTplText(e.target.value), onKeyDown: (e) => e.key === "Enter" && addTemplate(),
@@ -8437,6 +9056,9 @@ function TasksTab({ data, persist }) {
             React.createElement("select", { value: tplStation, onChange: (e) => setTplStation(e.target.value), className: "px-2 outline-none rounded",
                 style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#FAFAF8", minHeight: 40 } },
               pickableStations.map((s) => React.createElement("option", { key: s, value: s }, s))),
+            React.createElement("select", { value: tplCadence, onChange: (e) => setTplCadence(e.target.value), className: "px-2 outline-none rounded",
+                style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#FAFAF8", minHeight: 40 } },
+              CADENCES.map((c) => React.createElement("option", { key: c.id, value: c.id }, c.label))),
             React.createElement("button", { onClick: addTemplate, className: "px-4 rounded", style: { background: COLORS.crust, color: "#FFFFFF", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600 } }, "Add"))
         )
       )
