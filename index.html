@@ -108,6 +108,7 @@
   window.SYNC_URL = "/.netlify/functions/data";
   window.MEDIA_URL = "/.netlify/functions/media";
   window.YOLINK_URL = "/.netlify/functions/yolink";
+  window.WHEREAMI_URL = "/.netlify/functions/whereami";
 </script>
 
 <script>
@@ -1176,13 +1177,23 @@ function merge3(base, mine, theirs) {
     });
     return out;
   }
-  // Scalars and ragged arrays: if I didn't touch it, take theirs.
+  // Scalars and ragged arrays: if I didn't touch it, take theirs. With no base
+  // to compare against there's no way to tell an edit from a stale copy, and
+  // the shared copy is the safer bet.
+  if (typeof base === "undefined") return theirs;
   return sameJSON(base, mine) ? theirs : mine;
 }
 
 const SYNC_URL = (typeof window !== "undefined" && window.SYNC_URL) || "/.netlify/functions/data";
+// The document as the shell currently holds it — kept up to date by every
+// load, pull, merge and persist. Async code (anything after an await, any
+// setInterval) reads THIS rather than the `data` prop it captured, because
+// that prop is a snapshot from whichever render started the work.
+const LIVE_DATA = { current: null };
+function liveData(fallback) { return LIVE_DATA.current || fallback; }
 const MEDIA_URL = (typeof window !== "undefined" && window.MEDIA_URL) || "/.netlify/functions/media";
 const YOLINK_URL = (typeof window !== "undefined" && window.YOLINK_URL) || "/.netlify/functions/yolink";
+const WHEREAMI_URL = (typeof window !== "undefined" && window.WHEREAMI_URL) || "/.netlify/functions/whereami";
 // ===================== ACCESS =====================
 // Two shared codes, not per-person accounts: shared tablets, floury hands, and
 // staff turnover all argue against usernames. The code is only a key — the
@@ -1216,21 +1227,34 @@ function setWho(v) { try { v ? localStorage.setItem(AUTH_WHO, v) : localStorage.
     const opts = Object.assign({}, init || {});
     const h = new Headers((opts && opts.headers) || (typeof input !== "string" && input.headers) || {});
     const k = getAuthKey();
-    // Only fill in the stored device code if the caller hasn't supplied one.
-    // checkKey() deliberately passes a different code to ask the server "what
-    // role is THIS?" — overwriting it here made the admin unlock always test
-    // the device code instead, so 5678 came back as staff.
-    if (k && !h.has("x-opp-key")) h.set("x-opp-key", k);
+    // A caller that supplies its own code is a PROBE — checkKey() asking the
+    // server "what role is THIS code?" for the lock screen or the admin unlock.
+    // Probes must not touch the device's stored key or role: a mistyped admin
+    // code used to come back 401, trip the generic "denied" handler below, and
+    // log the whole tablet out.
+    const probe = h.has("x-opp-key");
+    if (k && !probe) h.set("x-opp-key", k);
     const who = getWho();
     if (who) h.set("x-opp-who", who);
     opts.headers = h;
     return raw(typeof input === "string" ? input : input.url, opts).then((res) => {
+      if (probe) return res;
       // The server tells us which code we handed it. No header means the
       // function hasn't been updated yet — see the banner in Settings.
+      //
+      // The stored role may deliberately be LOWER than what the key allows:
+      // "Drop to staff" and auto-drop keep the admin key on the tablet and
+      // just set the role to staff. So this only ever fills an empty role or
+      // lowers one (the server stopped accepting the key as admin) — it never
+      // promotes a tablet back to admin on its own.
       const role = res.headers && res.headers.get && res.headers.get("x-opp-role");
-      if (role && role !== getStoredRole()) {
-        setStoredRole(role);
-        try { window.dispatchEvent(new Event("opp:role")); } catch (e) {}
+      if (role) {
+        const stored = getStoredRole();
+        const rank = { staff: 1, admin: 2 };
+        if (!stored || (rank[role] || 0) < (rank[stored] || 0)) {
+          setStoredRole(role);
+          try { window.dispatchEvent(new Event("opp:role")); } catch (e) {}
+        }
       }
       if (res.status === 401) {
         setStoredRole("");
@@ -1669,6 +1693,29 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
   const [adminBusy, setAdminBusy] = useState(false);
   const staffNames = staffNameList(data || {});
   const chooseWho = (v) => { setWhoState(v); setWho(v); };
+  // Shop-wifi rule for the time clock: where does THIS device appear to be,
+  // and is that address one of the registered ones?
+  const [myNet, setMyNet] = useState({ state: "idle", ip: "", error: "" });
+  const lookMyNet = async () => {
+    setMyNet({ state: "checking", ip: "", error: "" });
+    const r = await fetchMyIP();
+    setMyNet(r.ip ? { state: "known", ip: r.ip, error: "" } : { state: "unknown", ip: "", error: r.error || "" });
+  };
+  useEffect(() => { if (role === "admin") lookMyNet(); }, [role]);
+  const shopNet = shopNetworkOf(data);
+  const setShopNet = (patch) => persist && persist((cur) => {
+    const d = JSON.parse(JSON.stringify(cur));
+    d.shopNetwork = Object.assign({ required: false, ips: [] }, d.shopNetwork || {}, patch);
+    return d;
+  });
+  const registerMyNet = () => {
+    if (myNet.state !== "known" || !myNet.ip) return;
+    if (shopNet.ips.some((r) => netKey(r.ip) === netKey(myNet.ip))) return;
+    const label = (who || device || "").trim();
+    setShopNet({ ips: shopNet.ips.concat([{ id: uid(), ip: myNet.ip, label, addedAt: todayISO() }]) });
+  };
+  const forgetNet = (id) => setShopNet({ ips: shopNet.ips.filter((r) => r.id !== id) });
+  const myNetRegistered = myNet.state === "known" && onShopNetwork(data, myNet.ip);
   const tryAdmin = async () => {
     if (!adminCode.trim() || adminBusy) return;
     setAdminBusy(true); setAdminErr("");
@@ -1860,7 +1907,7 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
       "You're signed in as",
       role === "admin"
         ? "Admin \u2014 everything is visible. It stays that way until you drop it yourself, unless auto-drop is switched on below."
-        : "Staff. Tips, Staff, Food Order, Live Ops and Settings changes need the admin code.",
+        : "Staff. The Staff directory, Food Order, Live Ops and the shop-wide settings need the admin code.",
       role === "admin"
         ? /* @__PURE__ */ React.createElement(
             "div",
@@ -1957,6 +2004,59 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
           onChange: (e) => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { autoClockOutHour: Number(e.target.value) })),
           className: "w-full px-3 outline-none opp-field" },
         [22, 23, 0, 1, 2, 3, 4].map((h) => /* @__PURE__ */ React.createElement("option", { key: h, value: h }, hourLabel(h)))
+      )
+    ),
+    role === "admin" && Row(
+      "Clock in only from the shop wifi",
+      "The app can't see the wifi's name, but it can see the address the shop's internet connection uses \u2014 every tablet and phone on the wifi shows up with it. With this on, a phone on cell data is told to clock in on a shop tablet instead. If the check itself can't run, punches still go through.",
+      /* @__PURE__ */ React.createElement(
+        "div",
+        { className: "flex gap-1", style: { background: "#E4E5E3", borderRadius: 14, padding: 3, maxWidth: 320 } },
+        [{ id: false, label: "Anywhere" }, { id: true, label: "Shop wifi only" }].map((o) => /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            key: String(o.id),
+            onClick: () => setShopNet({ required: o.id }),
+            className: "flex-1",
+            style: {
+              fontFamily: "Inter", fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em",
+              borderRadius: 12, border: "none", minHeight: 40, padding: "0 12px",
+              background: shopNet.required === o.id ? "#FFFFFF" : "transparent",
+              color: shopNet.required === o.id ? COLORS.crust : "#5F676E",
+              boxShadow: shopNet.required === o.id ? "0 1px 3px rgba(23,25,27,0.12)" : "none"
+            }
+          },
+          o.label
+        ))
+      )
+    ),
+    role === "admin" && Row(
+      "Shop network",
+      "Register it from a tablet in the shop. Do it once from your phone on the wifi too \u2014 phones sometimes use a second kind of address. If the internet provider ever hands the shop a new one, the time clock will start saying \u201Cnot on the shop wifi\u201D: just register again from any tablet.",
+      /* @__PURE__ */ React.createElement(
+        "div",
+        null,
+        /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 flex-wrap mb-2" },
+          /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "Inter", fontSize: 13.5, color: "#5F676E" } }, "This device:"),
+          /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13.5, color: COLORS.crust } },
+            myNet.state === "known" ? myNet.ip : myNet.state === "checking" ? "checking\u2026" : myNet.state === "unknown" ? "couldn't tell" : ""),
+          myNet.state === "known" && /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 600, color: myNetRegistered ? COLORS.basil : "#8A9096" } },
+            myNetRegistered ? "registered" : "not registered"),
+          myNet.state === "unknown" && myNet.error && /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, color: "#8A9096" } }, "(" + myNet.error + ")")),
+        /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap mb-2" },
+          /* @__PURE__ */ React.createElement("button", { onClick: registerMyNet, disabled: myNet.state !== "known" || myNetRegistered,
+            style: { background: COLORS.lamp, color: COLORS.ink, border: "none", borderRadius: 12, minHeight: 44, padding: "0 16px", fontFamily: "Inter", fontSize: 15, fontWeight: 600, opacity: (myNet.state !== "known" || myNetRegistered) ? 0.45 : 1 } },
+            myNetRegistered ? "This network is registered" : "Register this device's network"),
+          /* @__PURE__ */ React.createElement("button", { onClick: lookMyNet,
+            style: { background: "#F2F2EF", color: COLORS.crust, border: "none", borderRadius: 12, minHeight: 44, padding: "0 14px", fontFamily: "Inter", fontSize: 15, fontWeight: 600 } }, "Check again")),
+        shopNet.ips.length === 0
+          ? /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13.5, color: "#8A9096" } }, shopNet.required ? "Nothing registered yet \u2014 nobody can clock in until you register the shop's address from a tablet here." : "Nothing registered yet.")
+          : shopNet.ips.map((r) => /* @__PURE__ */ React.createElement("div", { key: r.id || r.ip, className: "flex items-center justify-between gap-2", style: { padding: "7px 0", borderTop: "1px solid " + COLORS.line } },
+              /* @__PURE__ */ React.createElement("div", { className: "min-w-0" },
+                /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: 13.5, color: COLORS.crust, wordBreak: "break-all" } }, r.ip),
+                /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, color: "#8A9096" } }, (r.label ? r.label + " \u00b7 " : "") + "added " + (r.addedAt || ""))),
+              /* @__PURE__ */ React.createElement("button", { onClick: () => forgetNet(r.id), className: "text-xs px-2.5 py-1.5 rounded",
+                style: { fontFamily: "Inter", fontWeight: 600, border: "1px solid " + COLORS.line, background: "transparent", color: COLORS.alertDark, flexShrink: 0 } }, "Remove")))
       )
     ),
 
@@ -2166,18 +2266,28 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   const [saveError, setSaveError] = useState(false);
   const [sync, setSync] = useState({ state: "starting", at: null, from: "" });
   const [syncSecs, setSyncSecs] = useState(() => {
-    const v = Number(localStorage.getItem("opp:syncSecs"));
+    // A tablet that has never touched Settings has no key at all. Number(null)
+    // is 0, which used to read as "Off" — so fresh tablets never polled.
+    let raw = null;
+    try { raw = localStorage.getItem("opp:syncSecs"); } catch (e) {}
+    if (raw === null || raw === "") return 10;
+    const v = Number(raw);
     return Number.isFinite(v) && v >= 0 ? v : 10;
   });
   const dataRef = useRef(null);
   const baseRef = useRef(null);   // last doc we agreed on with the server
   const revRef = useRef(0);
+  // True once this device has heard back from the server at least once (a
+  // real document, or "nothing here yet"). Until then nothing is pushed: a
+  // push carrying baseRev 0 against a populated server used to 409, merge
+  // against no base, and let a stale cache win over everyone's live edits.
+  const syncedRef = useRef(false);
   const pushTimerRef = useRef(null);
   const pushingRef = useRef(false);
   const dirtyRef = useRef(false);
   const syncSecsRef = useRef(10);
   syncSecsRef.current = syncSecs;
-  const deviceName = useRef(localStorage.getItem("opp:device") || "").current;
+  const deviceName = useRef((() => { try { return localStorage.getItem("opp:device") || ""; } catch (e) { return ""; } })()).current;
 
   // "Offline" is useless on its own — say which failure it was.
   const explain = (e) => {
@@ -2196,9 +2306,30 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   };
 
   const cacheLocal = (d) => {
+    LIVE_DATA.current = d;
     try {
       localStorage.setItem("shared:shop-data", JSON.stringify(d));
     } catch (e) {}
+  };
+  // The base is remembered alongside the cache so a reload keeps the three-way
+  // merge honest: edits made while offline are still "mine since base" next
+  // time, instead of being thrown away by a first pull that takes theirs whole.
+  const setBase = (rev, doc) => {
+    revRef.current = rev;
+    baseRef.current = doc ? JSON.parse(JSON.stringify(doc)) : null;
+    try {
+      if (doc) localStorage.setItem("shared:shop-base", JSON.stringify({ rev, data: doc }));
+      else localStorage.removeItem("shared:shop-base");
+    } catch (e) {}
+  };
+  const runMigrations = (doc) => {
+    const ms = migrateSchedule(doc);
+    const mi = migrateInventory(ms.data);
+    const mr = migrateRecipes(mi.data);
+    const mt = migrateTimeOff(mr.data);
+    const ml = migrateTaskLibrary(mt.data);
+    const msp = migrateShopProfile(ml.data);
+    return { data: msp.data, changed: ms.changed || mi.changed || mr.changed || mt.changed || ml.changed || msp.changed };
   };
 
   // Pull the server copy and fold it into whatever is on screen. Anything this
@@ -2212,36 +2343,34 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
       if (!doc.data) {
         // Nothing on the server yet — this device seeds it.
         setSync({ state: "ok", at: Date.now(), from: "" });
+        syncedRef.current = true;
         if (opts && opts.initial) {
-          revRef.current = 0;
-          baseRef.current = null;
+          setBase(0, null);
           queuePush(true);
         }
         return;
       }
       if (doc.rev === revRef.current && !(opts && opts.initial)) {
         setSync({ state: "ok", at: Date.now(), from: "" });
+        syncedRef.current = true;
+        // A push that failed earlier left edits waiting; the server hasn't
+        // moved, so just send them now.
+        if (dirtyRef.current && !pushingRef.current) queuePush(true);
         return;
       }
       const mine = dataRef.current;
       const merged = mine && baseRef.current
         ? merge3(baseRef.current, mine, doc.data)
         : doc.data;
-      const ms2 = migrateSchedule(merged);
-      const mi2 = migrateInventory(ms2.data);
-      const mr2 = migrateRecipes(mi2.data);
-      const mt2 = migrateTimeOff(mr2.data);
-      const ml2 = migrateTaskLibrary(mt2.data);
-      const msp2 = migrateShopProfile(ml2.data);
-      const mig = { data: msp2.data, changed: ms2.changed || mi2.changed || mr2.changed || mt2.changed || ml2.changed || msp2.changed };
-      revRef.current = doc.rev;
-      baseRef.current = JSON.parse(JSON.stringify(doc.data));
+      const mig = runMigrations(merged);
+      setBase(doc.rev, doc.data);
+      syncedRef.current = true;
       dataRef.current = mig.data;
       setData(mig.data);
       cacheLocal(mig.data);
       setSync({ state: "ok", at: Date.now(), from: doc.by || "" });
       // If merging surfaced local edits the server hasn't seen, send them up.
-      if (mig.changed || !sameJSON(mig.data, doc.data)) queuePush();
+      if (mig.changed || dirtyRef.current || !sameJSON(mig.data, doc.data)) queuePush();
     } catch (e) {
       setSync({ state: "offline", at: Date.now(), from: "", why: explain(e) });
     }
@@ -2250,11 +2379,18 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   const push = async () => {
     if (pushingRef.current) return;
     if (!dataRef.current) return;
+    // Never push before the first successful pull: we'd be writing over a
+    // document we haven't seen. The pull that follows sends whatever is dirty.
+    if (!syncedRef.current) { dirtyRef.current = true; return; }
     pushingRef.current = true;
     dirtyRef.current = false;
     const attempt = async (tries) => {
+      // Snapshot what's being sent. Edits that land while the request is in
+      // flight belong to the NEXT push, and the base must be exactly what the
+      // server accepted, not whatever dataRef holds by the time it answers.
+      const sent = dataRef.current;
       const body = JSON.stringify({
-        data: dataRef.current,
+        data: sent,
         baseRev: revRef.current,
         by: deviceName
       });
@@ -2267,8 +2403,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
         const doc = await res.json();
         // Someone else wrote first. Merge onto their copy and try again.
         const merged = merge3(baseRef.current, dataRef.current, doc.data);
-        revRef.current = doc.rev;
-        baseRef.current = JSON.parse(JSON.stringify(doc.data));
+        setBase(doc.rev, doc.data);
         dataRef.current = merged;
         setData(merged);
         cacheLocal(merged);
@@ -2278,18 +2413,24 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
       if (!res.ok) throw new Error("HTTP " + res.status);
       const out = await res.json();
       if (out.error) throw new Error(out.error);
-      revRef.current = out.rev;
-      baseRef.current = JSON.parse(JSON.stringify(dataRef.current));
+      setBase(out.rev, sent);
+      if (dataRef.current !== sent) dirtyRef.current = true;
       setSaveError(false);
       setSync({ state: "ok", at: Date.now(), from: "" });
     };
+    let failed = false;
     try {
       await attempt(3);
     } catch (e) {
+      // Keep the edits marked as unsent so the next successful pull (polling,
+      // coming back online, switching back to the app) pushes them. Don't
+      // re-queue here — that would hammer a server that's down.
+      failed = true;
+      dirtyRef.current = true;
       setSync({ state: "offline", at: Date.now(), from: "", why: explain(e) });
     }
     pushingRef.current = false;
-    if (dirtyRef.current) queuePush();
+    if (dirtyRef.current && !failed) queuePush();
   };
 
   // Coalesce rapid edits (typing, tapping down a list) into one write.
@@ -2308,18 +2449,28 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
       try {
         const raw = localStorage.getItem("shared:shop-data");
         const saved = raw ? JSON.parse(raw) : DEFAULT_DATA;
-        const ms = migrateSchedule(saved);
-        const mi = migrateInventory(ms.data);
-        const mr = migrateRecipes(mi.data);
-        const mt = migrateTimeOff(mr.data);
-        const ml = migrateTaskLibrary(mt.data);
-        const msp = migrateShopProfile(ml.data);
-        const mig = { data: msp.data, changed: ms.changed || mi.changed || mr.changed || mt.changed || ml.changed || msp.changed };
+        const mig = runMigrations(saved);
         dataRef.current = mig.data;
+        LIVE_DATA.current = mig.data;
         setData(mig.data);
+        // Restore the last agreed-on server copy. Without one (first run on
+        // this tablet), the loaded copy itself is the base: then the merge on
+        // first pull sees only what changed on this screen since it opened.
+        let base = null;
+        try { const rawBase = localStorage.getItem("shared:shop-base"); base = rawBase ? JSON.parse(rawBase) : null; } catch (e) { base = null; }
+        if (base && base.data && Number.isFinite(base.rev)) {
+          revRef.current = base.rev;
+          baseRef.current = base.data;
+        } else {
+          revRef.current = 0;
+          baseRef.current = JSON.parse(JSON.stringify(mig.data));
+        }
       } catch (e) {
         dataRef.current = DEFAULT_DATA;
+        LIVE_DATA.current = DEFAULT_DATA;
         setData(DEFAULT_DATA);
+        revRef.current = 0;
+        baseRef.current = JSON.parse(JSON.stringify(DEFAULT_DATA));
       }
       setLoaded(true);
       await pull({ initial: true });
@@ -2340,7 +2491,13 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
     return () => clearInterval(id);
   }, [syncSecs]);
 
-  const persist = (next) => {
+  // persist(nextDoc) or persist((current) => nextDoc). Anything that runs
+  // after an await or inside a timer must use the function form (or clone
+  // liveData()) — the `data` prop it closed over may be minutes old, and
+  // writing it back would erase every edit made since.
+  const persist = (nextOrFn) => {
+    const next = typeof nextOrFn === "function" ? nextOrFn(dataRef.current) : nextOrFn;
+    if (!next) return;
     dataRef.current = next;
     setData(next);
     cacheLocal(next);
@@ -2438,7 +2595,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FDECEA", color: COLORS.alertDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab, isAdmin }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { baseRef.current = null; revRef.current = 0; await pull({ initial: true }); }, data, persist,
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FDECEA", color: COLORS.alertDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab, isAdmin }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { setBase(0, null); dirtyRef.current = false; await pull({ initial: true }); }, data, persist,
         onHoursChange: (next) => { const d = JSON.parse(JSON.stringify(dataRef.current)); d.shopHours = next; persist(d); } })), /* @__PURE__ */ React.createElement(TimerOverlay, { timers, setTimers, now: timerNow }));
 }
 // ---- What Ask the Manager knows ---------------------------------------------
@@ -2447,6 +2604,14 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
 // to talk. Anything that would be gated on the tabs is gated here too — a
 // staff tablet doesn't get vendor prices from the assistant any more than it
 // gets the Food Order tab.
+// Find the one row an action means. An empty needle matches nothing — the
+// model occasionally sends "" and `"anything".includes("")` is true, which
+// used to quietly edit whatever row happened to be first.
+function matchRow(list, field, needle) {
+  const q = String(needle || "").trim().toLowerCase();
+  if (!q || !Array.isArray(list)) return null;
+  return list.find((r) => String((r && r[field]) || "").toLowerCase().includes(q)) || null;
+}
 function assistantContext(data, isAdmin) {
   const today = todayISO();
   const now = new Date();
@@ -2944,9 +3109,11 @@ function AssistantTab({ data, persist, isAdmin }) {
           parsed = { reply: raw.trim() || "Sorry, I lost my train of thought \u2014 try that again?", actions: [] };
         }
       }
-      let next = JSON.parse(JSON.stringify(data));
+      // The reply took seconds to arrive; apply its actions to the document
+      // as it is NOW, not the copy this tablet had when the question went out.
+      let next = JSON.parse(JSON.stringify(liveData(data)));
       let changed = false;
-      for (const action of parsed.actions || []) {
+      for (const action of Array.isArray(parsed.actions) ? parsed.actions : []) {
         if (action.type === "add_time_off") {
           const nm = String(action.name || "").trim();
           const dt = String(action.date || "").trim();
@@ -2968,13 +3135,13 @@ function AssistantTab({ data, persist, isAdmin }) {
           next.tasks.push({ id: uid(), text: action.text || "New task", station: action.station || "Back of House", assignee: action.assignee || "Anyone", done: false });
           changed = true;
         } else if (action.type === "complete_task") {
-          const t = next.tasks.find((t2) => t2.text.toLowerCase().includes((action.text_match || "").toLowerCase()));
+          const t = matchRow(next.tasks, "text", action.text_match);
           if (t) {
             t.done = true;
             changed = true;
           }
         } else if (action.type === "update_inventory") {
-          const i = next.inventory.find((i2) => i2.item.toLowerCase().includes((action.item_match || "").toLowerCase()));
+          const i = matchRow(next.inventory, "item", action.item_match);
           if (i && typeof action.qty === "number") {
             i.qty = action.qty;
             i.countedAt = Date.now();
@@ -2987,7 +3154,7 @@ function AssistantTab({ data, persist, isAdmin }) {
             changed = true;
           }
         } else if (action.type === "set_par" || action.type === "set_prep_par") {
-          const r = (_a = next.prep) == null ? void 0 : _a.par.find((r2) => r2.item.toLowerCase().includes((action.item_match || "").toLowerCase()));
+          const r = matchRow(next.prep && next.prep.par, "item", action.item_match);
           if (r) {
             if (action.need !== void 0) {
               r.need = action.need === null ? null : Number(action.need);
@@ -2997,18 +3164,18 @@ function AssistantTab({ data, persist, isAdmin }) {
             changed = true;
           }
         } else if (action.type === "set_order") {
-          const r = (next.inventory || []).find((r2) => r2.item.toLowerCase().includes((action.item_match || "").toLowerCase()));
+          const r = matchRow(next.inventory, "item", action.item_match);
           if (r) {
             // Orders are per vendor now. No vendor named: the one that carries it,
             // preferring the item's default.
-            const vid = action.orderVendor || (carriedBy(r, r.vendor) ? r.vendor : (VENDORS.find((v) => carriedBy(r, v.id)) || VENDORS[0]).id);
+            const vid = (action.orderVendor && VENDOR_BY_ID[action.orderVendor] ? action.orderVendor : null) || (carriedBy(r, r.vendor) ? r.vendor : (VENDORS.find((v) => carriedBy(r, v.id)) || VENDORS[0]).id);
             r.order = r.order || {};
             if (action.orderNeed === null) delete r.order[vid];
             else if (action.orderNeed !== void 0) r.order[vid] = { need: Number(action.orderNeed), note: (r.order[vid] && r.order[vid].note) || "" };
             changed = true;
           }
         } else if (action.type === "set_produce") {
-          const r = (_b = next.prep) == null ? void 0 : _b.produce.find((r2) => r2.item.toLowerCase().includes((action.item_match || "").toLowerCase()));
+          const r = matchRow(next.prep && next.prep.produce, "item", action.item_match);
           if (r) {
             if (action.need !== void 0) r.need = action.need === null ? null : Number(action.need);
             if (action.qty !== void 0) r.need = Number(action.qty) || 0;
@@ -3395,8 +3562,13 @@ function findStaffByPin(data, pin) {
         return null;
     return ((data && data.staff) || []).find((s) => !s.inactive && s.pin && String(s.pin).trim() === p) || null;
 }
+// The open entry for a person, whatever day it started on. Matching on
+// today's date meant a closer tapping out at 12:20am got clocked IN again,
+// because Friday's open shift wasn't "today" any more.
 function openClockEntry(data, staffId, iso) {
-    return ((data && data.timeClock) || []).find((e) => e.staffId === staffId && e.date === iso && !e.clockOut) || null;
+    const list = ((data && data.timeClock) || []).filter((e) => e.staffId === staffId && !e.clockOut);
+    if (!list.length) return null;
+    return list.find((e) => e.date === iso) || list.sort((a, b) => (a.clockIn < b.clockIn ? 1 : -1))[0];
 }
 function fmtClockTime(iso) {
     try {
@@ -3747,8 +3919,8 @@ function ShiftEditor({ data, persist, entryId, dateISO, onDone }) {
     );
 }
 // Adding a punch someone forgot entirely.
-function AddShift({ data, persist, staff, onDone }) {
-    const [date, setDate] = useState(todayISO());
+function AddShift({ data, persist, staff, onDone, dateISO }) {
+    const [date, setDate] = useState(dateISO || todayISO());
     const [inT, setInT] = useState("");
     const [outT, setOutT] = useState("");
     const [err, setErr] = useState("");
@@ -3789,6 +3961,175 @@ function AddShift({ data, persist, staff, onDone }) {
                 style: { background: "transparent", color: COLORS.crust, border: `1px solid ${COLORS.line}`, fontFamily: "Inter", fontWeight: 600 } }, "Cancel"))
     );
 }
+
+// Every shift in one week, day by day, each one editable — the owner's view of
+// the time clock. One week at a time: that's what payroll asks about and what
+// a phone can hold. The week boundary follows the ADP week-start setting so
+// the totals here match the export.
+function WeekShifts({ data, persist }) {
+    const weekStart = (data && data.adpWeekStart != null) ? data.adpWeekStart : 0;
+    const [weekISO, setWeekISO] = useState(() => weekKeyFor(todayISO(), weekStart));
+    const [editingId, setEditingId] = useState(null);
+    const [addingDay, setAddingDay] = useState("");
+    const [addStaffId, setAddStaffId] = useState("");
+    const today = todayISO();
+    const thisWeek = weekKeyFor(today, weekStart);
+    const days = [0, 1, 2, 3, 4, 5, 6].map((i) => addDaysISO(weekISO, i));
+    const endISO = days[6];
+    const staffById = {};
+    ((data && data.staff) || []).forEach((s) => { staffById[s.id] = s; });
+    const firstNameOf = (e) => String(e.name || (staffById[e.staffId] && staffById[e.staffId].name) || "?").split("(")[0].trim();
+    const entries = ((data && data.timeClock) || []).filter((e) => e.date >= weekISO && e.date <= endISO);
+    const hoursOf = (e) => {
+        const a = new Date(e.clockIn).getTime();
+        const b = e.clockOut ? new Date(e.clockOut).getTime() : Date.now();
+        const h = (b - a) / 3600000;
+        return isFinite(h) && h > 0 ? h : 0;
+    };
+    const byDay = {};
+    days.forEach((d) => { byDay[d] = []; });
+    entries.forEach((e) => { if (byDay[e.date]) byDay[e.date].push(e); });
+    days.forEach((d) => byDay[d].sort((a, b) => (a.clockIn < b.clockIn ? -1 : 1)));
+    const totals = {};
+    let weekHours = 0;
+    entries.forEach((e) => {
+        const h = hoursOf(e);
+        weekHours += h;
+        const key = e.staffId || normPerson(e.name);
+        if (!totals[key]) totals[key] = { name: firstNameOf(e), hours: 0, open: false, review: 0 };
+        totals[key].hours += h;
+        if (!e.clockOut) totals[key].open = true;
+        if (e.needsReview) totals[key].review++;
+    });
+    const people = Object.values(totals).sort((a, b) => b.hours - a.hours);
+    const reviewCount = entries.filter((e) => e.needsReview).length;
+    const activeStaff = ((data && data.staff) || []).filter((s) => !s.inactive);
+    const title = weekISO === thisWeek ? "This week" : weekISO === addDaysISO(thisWeek, -7) ? "Last week" : "Week of " + shortDate(weekISO);
+    const navBtn = (dir, disabled) => React.createElement("button", {
+        onClick: () => { setWeekISO(addDaysISO(weekISO, 7 * dir)); setEditingId(null); setAddingDay(""); },
+        disabled,
+        style: { width: 40, height: 40, borderRadius: 12, border: `1px solid ${COLORS.line}`, background: "#FFFFFF", color: COLORS.crust, fontFamily: "Inter", fontSize: 18, fontWeight: 600, opacity: disabled ? 0.35 : 1 }
+    }, dir < 0 ? "‹" : "›");
+    const timeSpan = (e) => fmtClockTime(e.clockIn) + "–" + (e.clockOut ? fmtClockTime(e.clockOut) : "now");
+    return React.createElement(
+        "div",
+        { className: "mt-1" },
+        React.createElement("div", { className: "flex items-center justify-between gap-2 mb-1" },
+            navBtn(-1, false),
+            React.createElement("div", { className: "text-center min-w-0" },
+                React.createElement("div", { style: { fontFamily: "Inter", fontSize: 17, fontWeight: 700, color: COLORS.crust } }, title),
+                React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: 12.5, color: "#8A9096" } }, weekLabel(weekISO))),
+            navBtn(1, weekISO >= thisWeek)),
+        React.createElement("div", { className: "text-center mb-3", style: { fontFamily: "Inter", fontSize: 13, color: "#5F676E" } },
+            entries.length ? fmtHours(weekHours) + " · " + entries.length + (entries.length === 1 ? " shift" : " shifts") + " · " + people.length + (people.length === 1 ? " person" : " people") : "No shifts this week"),
+        reviewCount > 0 && React.createElement("div", { className: "text-xs mb-3 px-3 py-2.5 rounded", style: { fontFamily: "Inter", background: "#FFF6E8", color: "#8A5A00", borderRadius: 12 } },
+            reviewCount + " auto clocked-out " + (reviewCount === 1 ? "shift needs" : "shifts need") + " checking — they're marked below. Edit and save to clear the flag."),
+        days.map((d) => {
+            const rows = byDay[d];
+            const dayHours = rows.reduce((a, e) => a + hoursOf(e), 0);
+            const isToday = d === today;
+            const future = d > today;
+            return React.createElement("div", { key: d, className: "mb-3" },
+                React.createElement("div", { className: "flex items-center justify-between", style: { padding: "6px 0 4px", borderBottom: `1px solid ${COLORS.line}` } },
+                    React.createElement("div", { className: "flex items-center gap-2" },
+                        React.createElement("span", { style: { fontFamily: "Inter", fontSize: 14.5, fontWeight: 700, color: COLORS.crust } }, dayLabel(d)),
+                        isToday && React.createElement("span", { style: { fontFamily: "Inter", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", background: COLORS.lamp, color: COLORS.ink, borderRadius: 999, padding: "2px 7px" } }, "Today")),
+                    rows.length > 0 && React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13, color: "#5F676E" } }, fmtHours(dayHours))),
+                rows.length === 0 && React.createElement("div", { className: "text-xs py-2 italic", style: { fontFamily: "Inter", color: "#8A9096" } }, future ? "—" : "No shifts"),
+                rows.map((e) => React.createElement("div", { key: e.id },
+                    React.createElement("div", { className: "flex items-center gap-2", style: { padding: "8px 0", borderBottom: `1px solid ${COLORS.line}` } },
+                        React.createElement("div", { className: "flex-1 min-w-0" },
+                            React.createElement("div", { className: "flex items-center gap-2 min-w-0" },
+                                React.createElement("span", { className: "truncate", style: { fontFamily: "Inter", fontSize: 15, fontWeight: 600, color: COLORS.crust } }, firstNameOf(e)),
+                                !e.clockOut && React.createElement("span", { style: { width: 8, height: 8, borderRadius: 999, background: COLORS.basil, flexShrink: 0 } })),
+                            React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: 12.5, color: e.clockOut ? "#5F676E" : COLORS.basil } }, timeSpan(e)),
+                            e.needsReview && React.createElement("div", { style: { fontFamily: "Inter", fontSize: 11.5, fontWeight: 600, color: "#8A5A00", marginTop: 1 } }, "Auto clocked out — check the out time"),
+                            e.editedBy && !e.needsReview && React.createElement("div", { style: { fontFamily: "Inter", fontSize: 11, color: "#8A9096", marginTop: 1 } }, e.addedBy ? "Added by hand" : "Edited")),
+                        React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13.5, color: COLORS.crust, flexShrink: 0 } }, fmtHours(hoursOf(e))),
+                        React.createElement("button", {
+                            onClick: () => { setEditingId(editingId === e.id ? null : e.id); setAddingDay(""); },
+                            className: "text-xs px-2.5 py-1.5 rounded",
+                            style: { fontFamily: "Inter", fontWeight: 600, border: `1px solid ${editingId === e.id ? COLORS.crust : COLORS.line}`, background: editingId === e.id ? COLORS.crust : "transparent", color: editingId === e.id ? "#FFFFFF" : COLORS.ink, flexShrink: 0 }
+                        }, "Edit")),
+                    editingId === e.id && React.createElement(ShiftEditor, { data, persist, entryId: e.id, dateISO: d, onDone: () => setEditingId(null) }))),
+                !future && addingDay !== d && React.createElement("button", {
+                    onClick: () => { setAddingDay(d); setAddStaffId(""); setEditingId(null); },
+                    className: "mt-1.5 text-xs",
+                    style: { background: "transparent", border: "none", fontFamily: "Inter", fontWeight: 600, color: COLORS.ink, padding: "4px 0" }
+                }, "+ Add a shift"),
+                addingDay === d && React.createElement("div", { className: "mt-1" },
+                    React.createElement("div", { className: "flex items-center gap-2" },
+                        React.createElement("select", { value: addStaffId, onChange: (ev) => setAddStaffId(ev.target.value), className: "flex-1 px-3 outline-none opp-field", style: { minHeight: 42 } },
+                            React.createElement("option", { value: "" }, "Who worked?"),
+                            activeStaff.map((st) => React.createElement("option", { key: st.id, value: st.id }, String(st.name).split("(")[0].trim()))),
+                        React.createElement("button", { onClick: () => setAddingDay(""), className: "text-xs px-2.5 py-1.5 rounded", style: { fontFamily: "Inter", fontWeight: 600, border: `1px solid ${COLORS.line}`, background: "transparent", color: COLORS.crust } }, "Cancel")),
+                    addStaffId && staffById[addStaffId] && React.createElement(AddShift, { key: addStaffId + d, data, persist, staff: staffById[addStaffId], dateISO: d, onDone: () => setAddingDay("") })));
+        }),
+        people.length > 0 && React.createElement("div", { className: "mt-4 pt-3", style: { borderTop: `1px solid ${COLORS.line}` } },
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 11.5, fontWeight: 700, letterSpacing: "0.06em", color: "#8A9096", textTransform: "uppercase", marginBottom: 6 } }, "Hours by person"),
+            people.map((pp) => React.createElement("div", { key: pp.name, className: "flex items-center justify-between", style: { padding: "6px 0" } },
+                React.createElement("span", { style: { fontFamily: "Inter", fontSize: 14.5, fontWeight: 600, color: COLORS.crust } }, pp.name, pp.open ? React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 600, color: COLORS.basil, marginLeft: 8 } }, "on now") : null),
+                React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13.5, color: COLORS.crust } },
+                    fmtHours(Math.min(pp.hours, 40)),
+                    pp.hours > 40 ? React.createElement("span", { style: { color: "#8A5A00", marginLeft: 6 } }, "+ " + fmtHours(pp.hours - 40) + " OT") : null)))),
+        React.createElement("div", { className: "text-xs mt-3", style: { fontFamily: "Inter", color: "#8A9096" } },
+            "The week runs " + ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][weekStart] + " to " + ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"][weekStart] + ", same as the payroll export. Change it under Settings → Payroll.")
+    );
+}
+
+// ---- Shop network check for the time clock ----------------------------------
+// Everything on the shop wifi leaves through the same internet connection, so
+// the server sees one address for all of it. The owner registers that address
+// (Settings → Time clock); a punch from anywhere else is refused with a note
+// to use a shop tablet. Phones sometimes get a second kind of address (IPv6)
+// that differs from the tablets', so more than one can be registered and
+// IPv6 is matched on its network half rather than the whole thing.
+function shopNetworkOf(data) {
+    const n = (data && data.shopNetwork) || {};
+    return { required: !!n.required, ips: Array.isArray(n.ips) ? n.ips : [] };
+}
+function expandIPv6(ip) {
+    const raw = String(ip || "").split("%")[0].toLowerCase();
+    if (raw.indexOf(":") === -1) return raw;
+    const halves = raw.split("::");
+    const head = halves[0] ? halves[0].split(":") : [];
+    const tail = halves.length > 1 && halves[1] ? halves[1].split(":") : [];
+    const fill = Math.max(0, 8 - head.length - tail.length);
+    const groups = head.concat(Array(fill).fill("0"), tail);
+    return groups.map((g) => g.padStart(4, "0")).join(":");
+}
+// What two devices on the same network share: the whole IPv4 address, or the
+// first 64 bits of an IPv6 one.
+function netKey(ip) {
+    const v = String(ip || "").trim();
+    if (!v) return "";
+    if (v.indexOf(":") === -1) return v;
+    return expandIPv6(v).split(":").slice(0, 4).join(":");
+}
+function onShopNetwork(data, ip) {
+    const key = netKey(ip);
+    if (!key) return false;
+    return shopNetworkOf(data).ips.some((r) => netKey(r && r.ip) === key);
+}
+// Ask the server where this device appears to be. Resolves to
+// { ip, at } or { error } — never throws, so a missing function or a dead
+// connection just means "couldn't tell".
+async function fetchMyIP() {
+    try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6000);
+        let res;
+        try {
+            res = await fetch(WHEREAMI_URL, { headers: { "cache-control": "no-cache" }, signal: ctrl.signal });
+        } finally { clearTimeout(t); }
+        if (!res.ok) return { error: "HTTP " + res.status };
+        const out = await res.json();
+        if (!out || !out.ip) return { error: (out && out.error) || "No address in the reply." };
+        return { ip: String(out.ip), at: Date.now() };
+    } catch (e) {
+        return { error: (e && e.message) || "Couldn't reach the site." };
+    }
+}
 function TimeClockPanel({ data, persist, isAdmin }) {
     const [digits, setDigits] = useState("");
     const [msg, setMsg] = useState(null); // { text, tone }
@@ -3797,33 +4138,70 @@ function TimeClockPanel({ data, persist, isAdmin }) {
     const [rangeEnd, setRangeEnd] = useState(todayISO());
     const [mode, setMode] = useState("punch"); // "punch" | "hours"
     const [viewing, setViewing] = useState(null); // staff record whose hours are shown
-    const [allHours, setAllHours] = useState(false); // admin: everyone at once
     const [overrideReview, setOverrideReview] = useState(false);
+    // Where this device appears to be, for the shop-wifi rule. Checked when the
+    // panel opens and again before a punch if the last look is stale.
+    const [net, setNet] = useState({ state: "idle", ip: "", at: 0, error: "" });
+    const netRef = useRef(net);
+    netRef.current = net;
+    const shopNet = shopNetworkOf(data);
+    const checkNet = async () => {
+        if (!shopNet.required) return netRef.current;
+        setNet((n) => ({ ...n, state: "checking" }));
+        const r = await fetchMyIP();
+        const next = r.ip ? { state: "known", ip: r.ip, at: r.at, error: "" } : { state: "unknown", ip: "", at: Date.now(), error: r.error || "" };
+        setNet(next);
+        return next;
+    };
+    useEffect(() => { if (shopNet.required) checkNet(); }, [shopNet.required]);
     const iso = todayISO();
-    const openNow = ((data && data.timeClock) || []).filter((e) => e.date === iso && !e.clockOut)
+    // Anyone still clocked in, including a closer whose shift started yesterday.
+    const openNow = ((data && data.timeClock) || []).filter((e) => !e.clockOut)
         .sort((a, b) => (a.clockIn < b.clockIn ? -1 : 1));
     const flashMsg = (text, tone) => {
         setMsg({ text, tone });
         setTimeout(() => setMsg((m) => (m && m.text === text ? null : m)), 2600);
     };
-    const punch = (pin) => {
+    const punch = async (pin) => {
         const s = findStaffByPin(data, pin);
         if (!s) {
             flashMsg("PIN not recognized", "bad");
             return;
         }
-        const next = JSON.parse(JSON.stringify(data));
+        // Shop-wifi rule. Only a POSITIVE mismatch refuses the punch; if the
+        // check can't run, the punch goes through marked unverified rather
+        // than leaving someone unable to clock in because a function is down.
+        let netTag = "";
+        if (shopNet.required) {
+            let n = netRef.current;
+            if (n.state !== "known" || Date.now() - n.at > 120000) n = await checkNet();
+            if (n.state === "known") {
+                if (!onShopNetwork(data, n.ip)) {
+                    flashMsg("Not recorded \u2014 this device isn't on the shop wifi", "bad");
+                    return;
+                }
+                netTag = "shop";
+            } else {
+                netTag = "unverified";
+            }
+        }
+        // The check took a moment; work from the live document.
+        const next = JSON.parse(JSON.stringify(liveData(data)));
         next.timeClock = next.timeClock || [];
         const open = openClockEntry(next, s.id, iso);
         const firstName = String(s.name || "").split("(")[0].trim();
+        const stamp = new Date().toISOString();
         if (open) {
-            open.clockOut = new Date().toISOString();
+            open.clockOut = stamp;
+            if (netTag) open.outNet = netTag;
             persist(next);
-            flashMsg("Clocked out \u2014 " + firstName + " \u00b7 " + fmtClockTime(open.clockOut), "good");
+            flashMsg("Clocked out \u2014 " + firstName + " \u00b7 " + fmtClockTime(stamp), "good");
         } else {
-            next.timeClock.push({ id: uid(), staffId: s.id, name: firstName, date: iso, clockIn: new Date().toISOString(), clockOut: null });
+            const entry = { id: uid(), staffId: s.id, name: firstName, date: iso, clockIn: stamp, clockOut: null };
+            if (netTag) entry.inNet = netTag;
+            next.timeClock.push(entry);
             persist(next);
-            flashMsg("Clocked in \u2014 " + firstName + " \u00b7 " + fmtClockTime((/* @__PURE__ */ new Date()).toISOString()), "good");
+            flashMsg("Clocked in \u2014 " + firstName + " \u00b7 " + fmtClockTime(stamp), "good");
         }
     };
     const lookupHours = (pin) => {
@@ -3858,9 +4236,9 @@ function TimeClockPanel({ data, persist, isAdmin }) {
         React.createElement(
             "div",
             { className: "flex gap-1.5 mt-2 mb-1" },
-            [["punch", "Clock in / out"], ["hours", "My hours"]].map((m) => React.createElement("button", {
+            [["punch", "Clock in / out"], ["hours", "My hours"], isAdmin && ["week", "All shifts"]].filter(Boolean).map((m) => React.createElement("button", {
                 key: m[0],
-                onClick: () => { setMode(m[0]); setDigits(""); setViewing(null); setAllHours(false); setMsg(null); },
+                onClick: () => { setMode(m[0]); setDigits(""); setViewing(null); setMsg(null); },
                 className: "px-3 py-1.5 rounded-full text-xs",
                 style: {
                     fontFamily: "Inter", fontWeight: 600,
@@ -3869,7 +4247,7 @@ function TimeClockPanel({ data, persist, isAdmin }) {
                     color: mode === m[0] ? "#FFFFFF" : COLORS.crust
                 }
             }, m[1]))),
-        !viewing && !allHours && React.createElement(
+        !viewing && mode !== "week" && React.createElement(
             "div",
             { className: "flex items-center justify-center gap-3 my-3" },
             [0, 1, 2, 3].map((i) => React.createElement("span", {
@@ -3881,7 +4259,7 @@ function TimeClockPanel({ data, persist, isAdmin }) {
                 }
             }))
         ),
-        !viewing && !allHours && mode === "hours" && React.createElement("div", {
+        !viewing && mode === "hours" && React.createElement("div", {
             className: "text-center mb-2",
             style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096" }
         }, "Enter your PIN to see your hours"),
@@ -3889,7 +4267,15 @@ function TimeClockPanel({ data, persist, isAdmin }) {
             className: "text-center mb-3",
             style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: msg.tone === "bad" ? COLORS.alertDark : COLORS.basil }
         }, msg.text),
-        !viewing && !allHours && React.createElement(
+        !viewing && mode === "punch" && shopNet.required && React.createElement("div", {
+            className: "text-center mb-3",
+            style: { fontFamily: "Inter", fontSize: 12.5, fontWeight: 600,
+                     color: net.state === "known" ? (onShopNetwork(data, net.ip) ? COLORS.basil : COLORS.alertDark) : "#8A9096" }
+        }, net.state === "known"
+            ? (onShopNetwork(data, net.ip) ? "On the shop wifi" : "Not on the shop wifi \u2014 clock in on a shop tablet")
+            : net.state === "checking" ? "Checking the network\u2026"
+            : net.state === "unknown" ? "Couldn't check the network \u2014 punches will go through" : ""),
+        !viewing && mode !== "week" && React.createElement(
             "div",
             { className: "grid grid-cols-3 gap-2 mx-auto", style: { maxWidth: 220 } },
             KEYS.map((k, i) => k === "" ? React.createElement("div", { key: i }) : React.createElement(
@@ -3905,12 +4291,8 @@ function TimeClockPanel({ data, persist, isAdmin }) {
                 k
             ))
         ),
-        // Admin shortcut: skip the PIN and see the whole crew.
-        !viewing && !allHours && mode === "hours" && isAdmin && React.createElement("button", {
-            onClick: () => setAllHours(true),
-            className: "block mx-auto mt-3 text-sm",
-            style: { background: "transparent", border: "none", fontFamily: "Inter", fontWeight: 600, color: COLORS.ink }
-        }, "See everyone's hours"),
+        // ---- Every shift this week, editable (admin only) ----
+        mode === "week" && isAdmin && React.createElement(WeekShifts, { data, persist }),
 
         // ---- One person's hours ----
         viewing && React.createElement(HoursReport, {
@@ -3921,29 +4303,7 @@ function TimeClockPanel({ data, persist, isAdmin }) {
             onBack: () => { setViewing(null); setDigits(""); }
         }),
 
-        // ---- Everyone (admin only) ----
-        allHours && isAdmin && React.createElement(
-            "div",
-            { className: "mt-2" },
-            React.createElement("button", {
-                onClick: () => setAllHours(false),
-                className: "text-sm mb-3",
-                style: { background: "transparent", border: "none", fontFamily: "Inter", fontWeight: 600, color: COLORS.ink, padding: 0 }
-            }, "\u2039 Back"),
-            ((data && data.staff) || []).map((s) => {
-                const wks = hoursHistoryFor(data, s.id, 5);
-                if (!wks.length) return null;
-                return React.createElement(
-                    "div",
-                    { key: s.id, className: "flex items-center justify-between py-2", style: { borderBottom: `1px solid ${COLORS.line}` } },
-                    React.createElement("span", { style: { fontFamily: "Inter", fontSize: 14.5, fontWeight: 600, color: COLORS.crust } }, String(s.name).split("(")[0].trim()),
-                    React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13.5, color: COLORS.crust } },
-                        fmtHours(wks[0].hours) + (wks[0].open ? " \u00b7 on now" : ""))
-                );
-            }),
-            React.createElement("div", { className: "text-xs mt-2", style: { fontFamily: "Inter", color: "#8A9096" } }, "Current week. Tap a PIN on the previous screen for one person's full history.")
-        ),
-        isAdmin && openNow.length > 0 && React.createElement(
+        mode !== "week" && openNow.length > 0 && React.createElement(
             "div",
             { className: "mt-4 pt-3", style: { borderTop: `1px solid ${COLORS.line}` } },
             React.createElement("div", { style: { fontFamily: "Inter", fontSize: 11.5, fontWeight: 700, letterSpacing: "0.06em", color: "#8A9096", textTransform: "uppercase", marginBottom: 6 } }, "Clocked in now"),
@@ -8502,9 +8862,9 @@ function LiveOpsTab({ data, persist }) {
       if (out.error) throw new Error(out.error.message || "API error");
       const text = (out.content || []).map((c) => c.text || "").join("\n").trim();
       setLastResult(text || "No read on that one.");
-      const next = JSON.parse(JSON.stringify(data));
+      const next = JSON.parse(JSON.stringify(liveData(data)));
       if (!next.liveOps.stationLog) next.liveOps.stationLog = [];
-      next.liveOps.stationLog.unshift({ id: uid(), station: name, at: new Date().toISOString(), text: text });
+      next.liveOps.stationLog.unshift({ id: uid(), time: new Date().toLocaleString(), station: name, note: text });
       next.liveOps.stationLog = next.liveOps.stationLog.slice(0, 30);
       persist(next);
     } catch (e) {
@@ -8550,7 +8910,9 @@ function LiveOpsTab({ data, persist }) {
       if (json.error) throw new Error(`API error: ${json.error.message || "unknown"}`);
       const text = (json.content || []).map((c) => c.text || "").join("\n").trim() || "Couldn't get a read from that photo \u2014 try again.";
       setLastResult(text);
-      const next = JSON.parse(JSON.stringify(data));
+      // This also runs on the auto-check interval, whose closure holds `data`
+      // from whenever the interval was started. Always clone the live doc.
+      const next = JSON.parse(JSON.stringify(liveData(data)));
       next.liveOps.stationLog.unshift({ id: uid(), time: (/* @__PURE__ */ new Date()).toLocaleString(), station: stationName, note: text });
       next.liveOps.stationLog = next.liveOps.stationLog.slice(0, 30);
       persist(next);
@@ -8694,7 +9056,14 @@ function GuidesTab({ data, persist }) {
       });
       const out = await res.json();
       if (!res.ok || out.error) throw new Error(out.error || "Upload failed");
-      saveGuides(list.map((x) => (x.id === g.id ? { ...x, key, v: Date.now() } : x)));
+      // The upload took a while; work from the live document, not the one
+      // this handler captured before the await.
+      persist((cur) => {
+        const d = JSON.parse(JSON.stringify(cur));
+        const curList = (d.guides && d.guides.length ? d.guides : GUIDES);
+        d.guides = curList.map((x) => (x.id === g.id ? { ...x, key, v: Date.now() } : x));
+        return d;
+      });
     } catch (e) {
       setErr(e.message || "Couldn't upload that photo.");
     }
@@ -9015,13 +9384,14 @@ function SubNav({ items, active, setActive }) {
         })
     );
 }
-// Schedule + Time Off + Staff Directory. Staff Directory holds phone numbers
-// and time-clock PINs, so it stays admin-only inside here just like it was
-// as its own top-level tab.
+// Time Clock + Tips + Schedule + Time Off + Staff Directory. Tips is open to
+// the crew — they're the ones counting it out at the end of the shift. Staff
+// Directory holds phone numbers and time-clock PINs, so it stays admin-only
+// inside here just like it was as its own top-level tab.
 function CrewTab({ data, persist, isAdmin, offSoon, initialSub }) {
     const items = [
         { id: "timeclock", label: "Time Clock", icon: Clock },
-        isAdmin && { id: "tips", label: "Tips", icon: DollarSign },
+        { id: "tips", label: "Tips", icon: DollarSign },
         { id: "schedule", label: "Schedule", icon: Users },
         { id: "timeoff", label: "Time Off", icon: Calendar, badge: offSoon },
         isAdmin && { id: "staff", label: "Staff", icon: Users }
@@ -9033,7 +9403,7 @@ function CrewTab({ data, persist, isAdmin, offSoon, initialSub }) {
         null,
         React.createElement(SubNav, { items, active, setActive: setSub }),
         active === "timeclock" && React.createElement(TimeClockPanel, { data, persist, isAdmin }),
-        active === "tips" && isAdmin && React.createElement(TipsTab, { data, persist }),
+        active === "tips" && React.createElement(TipsTab, { data, persist }),
         active === "schedule" && React.createElement(ScheduleTab, { data, persist, canEdit: isAdmin }),
         active === "timeoff" && React.createElement(TimeOffTab, { data, persist }),
         active === "staff" && isAdmin && React.createElement(StaffTab, { data, persist })
