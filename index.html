@@ -1860,6 +1860,7 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
   return /* @__PURE__ */ React.createElement(
     "div",
     null,
+    /* @__PURE__ */ React.createElement(PhoneVoiceCard, { data, persist, canEdit: role === "admin" }),
     /* @__PURE__ */ React.createElement(
       "div",
       {
@@ -4662,6 +4663,262 @@ function HandoffPanel({ data, persist }) {
     })
   );
 }
+
+// ---- Phone Host: the wait the phone assistant quotes, and the orders it took ----
+// data.wait = { pickupMin, updatedAt, by }   data.phoneOrders / data.phoneFlags written by /agent
+const WAIT_CHOICES = [15, 20, 30, 45, 60, 75, 90];
+function WaitControl({ data, persist, who, card, label }) {
+  const suggestion = useTickets(60000);
+  const wait = (data && data.wait) || {};
+  const cur = wait.pickupMin === undefined ? null : wait.pickupMin;
+  const ageMin = wait.updatedAt ? Math.round((Date.now() - new Date(wait.updatedAt).getTime()) / 6e4) : null;
+  const stale = ageMin !== null && ageMin > 90;
+  const set = (m) => persist && persist((d) => Object.assign(JSON.parse(JSON.stringify(d)), { wait: { pickupMin: m, updatedAt: new Date().toISOString(), by: who || "tablet" } }));
+  const chip = (m, on, txt, wide) => React.createElement("button", { key: String(m), onClick: () => set(m),
+    style: { height: 44, minWidth: wide ? 0 : 58, padding: wide ? "0 14px" : "0 10px", borderRadius: 999, border: on ? "none" : "1px solid " + COLORS.line, fontFamily: "Inter", fontWeight: 700, fontSize: wide ? 14 : 16, background: on ? COLORS.lamp : COLORS.card, color: COLORS.ink } }, txt);
+  return React.createElement("div", { className: "px-4 py-4 mb-3", style: card },
+    label("Phone wait", React.createElement("span", { style: { fontFamily: "Inter", fontSize: 13, fontWeight: 600, color: stale ? COLORS.alertDark : COLORS.steel } },
+      cur === null ? "not set — phones won't promise a time" : cur + " min · set " + (ageMin < 1 ? "just now" : ageMin + " min ago") + (stale ? " — update it" : ""))),
+    React.createElement("div", { className: "flex flex-wrap gap-2" },
+      WAIT_CHOICES.map((m) => chip(m, cur === m, String(m))),
+      chip(null, cur === null, "Not set", true)),
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: COLORS.steel, marginTop: 8 } }, "This is exactly what the phone assistant tells callers. Long is fine — wrong is not."),
+    // Suggestion from the register. Never applied on its own — one tap accepts it.
+    (suggestion.enabled && suggestion.estimate && suggestion.estimate.minutes != null && suggestion.estimate.minutes !== cur)
+      ? React.createElement("div", { className: "flex items-center gap-2 mt-3 px-3 py-2", style: { background: "#F7F7F5", borderRadius: 12, border: "1px solid " + COLORS.line } },
+          React.createElement("div", { style: { flex: 1 } },
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.crust } },
+              "Register suggests " + suggestion.estimate.minutes + " min"),
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: COLORS.steel } }, suggestion.estimate.line || "")),
+          React.createElement(TicketButton, { onClick: () => set(suggestion.estimate.minutes) }, "Use it"))
+      : null);
+}
+function PhoneOrdersCard({ data, persist, card, label }) {
+  const orders = ((data && data.phoneOrders) || []).filter((o) => o.status !== "done").slice(-20).reverse();
+  const flags = ((data && data.phoneFlags) || []).filter((f) => !f.done).slice(-10).reverse();
+  if (!orders.length && !flags.length) return null;
+  const patchOrder = (id, patch) => persist && persist((d) => { const c = JSON.parse(JSON.stringify(d)); c.phoneOrders = (c.phoneOrders || []).map((o) => o.id === id ? Object.assign(o, patch) : o); return c; });
+  const doneFlag = (id) => persist && persist((d) => { const c = JSON.parse(JSON.stringify(d)); c.phoneFlags = (c.phoneFlags || []).map((f) => f.id === id ? Object.assign(f, { done: true }) : f); return c; });
+  const t = (iso) => { try { return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; } };
+  const row = { borderTop: "1px solid " + COLORS.line, padding: "10px 0" };
+  return React.createElement("div", { className: "px-4 py-4 mb-3", style: card },
+    label("Phone orders" + (orders.length ? " · " + orders.length : "")),
+    orders.map((o) => React.createElement("div", { key: o.id, style: row },
+      React.createElement("div", { className: "flex justify-between items-baseline" },
+        React.createElement("div", { style: { fontFamily: "Inter", fontWeight: 700, fontSize: 17 } }, (o.caller && o.caller.name) || "Caller",
+          React.createElement("span", { style: { fontWeight: 400, color: COLORS.steel, fontSize: 13, marginLeft: 8 } }, (o.caller && o.caller.phone) || "")),
+        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: COLORS.steel } }, t(o.createdAt) + " · " + (o.type === "delivery" ? "delivery" : "pickup") + " · quoted " + (o.quotedWaitMin == null ? "—" : o.quotedWaitMin + " min"))),
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, marginTop: 2 } },
+        (o.items || []).map((it, i) => React.createElement("div", { key: i }, it.qty + " " + (it.size ? it.size + " " : "") + it.name + ((it.mods && it.mods.length) ? " (" + it.mods.join(", ") + ")" : "") + (it.notes ? " — " + it.notes : ""))),
+        o.address ? React.createElement("div", { style: { color: COLORS.steel } }, "→ " + o.address) : null,
+        o.notes ? React.createElement("div", { style: { fontStyle: "italic", color: COLORS.steel } }, o.notes) : null),
+      React.createElement("div", { className: "flex gap-2 mt-2 items-center" },
+        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: COLORS.steel, flex: 1 } }, "$" + Number(o.subtotal || 0).toFixed(2) + " · " + ((o.posResult && o.posResult.ok) ? "in Clover via " + (o.posResult.sink || "POS") : (o.keyedIntoPos ? "keyed into Clover" : "needs keying into Clover"))),
+        (!o.keyedIntoPos && !(o.posResult && o.posResult.ok)) ? React.createElement(TicketButton, { onClick: () => patchOrder(o.id, { keyedIntoPos: true }) }, "Keyed in") : null,
+        React.createElement(TicketButton, { onClick: () => patchOrder(o.id, { status: "done" }), color: COLORS.card, style: { border: "1px solid " + COLORS.line } }, o.type === "delivery" ? "Out the door" : "Picked up")))),
+    flags.map((f) => React.createElement("div", { key: f.id, style: row, className: "flex justify-between items-center gap-2" },
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14 } },
+        React.createElement("b", null, f.kind === "transfer" ? "Transfer" : "Call back"), " ", [f.name, f.phone].filter(Boolean).join(" "), " — ", f.reason, " ",
+        React.createElement("span", { style: { color: COLORS.steel } }, t(f.at))),
+      React.createElement(TicketButton, { onClick: () => doneFlag(f.id) }, "Done"))));
+}
+
+
+// ---- Live tickets from Clover (READ ONLY) ----------------------------------
+// Nothing in the kitchen depends on this. Clover exposes no kitchen-display
+// state, so "open" means Clover still calls the order open — a proxy for "not
+// handed over yet", not a bump status. The hand-entered Order Queue below the
+// board stays the source of truth until this has been watched for a few weeks.
+function useTickets(pollMs) {
+  const [state, setState] = useState({ loading: true, tickets: [] });
+  useEffect(() => {
+    let alive = true;
+    const go = () => fetch("/.netlify/functions/tickets")
+      .then((r) => r.json())
+      .then((j) => { if (alive) setState(Object.assign({ loading: false, tickets: [] }, j)); })
+      .catch((e) => { if (alive) setState({ loading: false, tickets: [], error: e.message }); });
+    go();
+    const id = setInterval(go, pollMs);
+    const onFocus = () => { if (!document.hidden) go(); };
+    document.addEventListener("visibilitychange", onFocus);
+    return () => { alive = false; clearInterval(id); document.removeEventListener("visibilitychange", onFocus); };
+  }, [pollMs]);
+  return state;
+}
+
+function ticketTone(ageMin, quoted) {
+  const over = quoted ? ageMin > quoted : ageMin > 45;
+  if (over) return { bg: "#FDECEA", fg: COLORS.alertDark, bd: "rgba(200,56,47,0.25)" };
+  if (ageMin >= 20) return { bg: "#FFF6E8", fg: "#8A5A00", bd: "rgba(179,107,0,0.3)" };
+  return { bg: "#E4F1E6", fg: "#1F6B34", bd: "rgba(31,107,52,0.2)" };
+}
+
+function TicketBoard({ data }) {
+  const [showDiag, setShowDiag] = useState(false);
+  const s = useTickets(20000);
+  const quoted = (data && data.wait && data.wait.pickupMin) || null;
+  const CARD = { background: COLORS.card, borderRadius: 14, border: "1px solid " + COLORS.line };
+  const muted = { fontFamily: "Inter", fontSize: 13, color: "#8A9096" };
+
+  if (s.loading) return React.createElement("div", { className: "px-3 py-3 mb-3", style: CARD },
+    React.createElement("div", { style: muted }, "Checking the register…"));
+
+  if (s.enabled === false) return React.createElement("div", { className: "px-3 py-3 mb-3", style: CARD },
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: COLORS.crust, fontWeight: 600 } }, "Live tickets are off"),
+    React.createElement("div", { style: Object.assign({ marginTop: 3 }, muted) }, s.reason || "Clover isn't connected."));
+
+  if (s.error) return React.createElement("div", { className: "px-3 py-3 mb-3", style: CARD },
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: COLORS.alertDark, fontWeight: 600 } }, "Couldn't reach the register"),
+    React.createElement("div", { style: Object.assign({ marginTop: 3 }, muted) }, s.error),
+    React.createElement("div", { style: Object.assign({ marginTop: 3 }, muted) }, "The hand-entered queue below still works."));
+
+  const est = s.estimate || {};
+  const d = s.diagnostics || {};
+  return React.createElement("div", { className: "mb-3" },
+    // estimate strip
+    React.createElement("div", { className: "px-3 py-3 mb-2", style: Object.assign({}, CARD, { background: COLORS.crust }) },
+      React.createElement("div", { className: "flex items-baseline justify-between" },
+        React.createElement("div", { style: { fontFamily: "Oswald", fontSize: 26, color: "#FFFFFF", letterSpacing: ".01em" } },
+          est.minutes == null ? "—" : est.minutes + " min"),
+        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: est.confidence === "low" ? "#FFC9C2" : "#B8BDC2" } },
+          est.confidence === "low" ? "rough" : "suggested wait")),
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#B8BDC2", marginTop: 2 } }, est.line || ""),
+      (est.notes || []).map((n, i) => React.createElement("div", { key: i, style: { fontFamily: "Inter", fontSize: 12.5, color: "#FFC9C2", marginTop: 3 } }, n)),
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, color: "#8A9096", marginTop: 6 } },
+        "Nobody's wait changes from this — accept it on the Today page.")),
+
+    // tickets
+    s.tickets.length === 0
+      ? React.createElement("div", { className: "px-3 py-3", style: CARD }, React.createElement("div", { style: muted }, "No open tickets on the register right now."))
+      : React.createElement("div", { className: "flex flex-col gap-1.5" },
+          s.tickets.map((t) => {
+            const tone = ticketTone(t.ageMin || 0, quoted);
+            return React.createElement("div", { key: t.id, className: "px-3 py-2", style: Object.assign({}, CARD, { borderColor: tone.bd }) },
+              React.createElement("div", { className: "flex items-baseline justify-between gap-2" },
+                React.createElement("div", { style: { fontFamily: "Inter", fontWeight: 700, fontSize: 15, color: COLORS.crust } },
+                  (t.pizzas ? t.pizzas + " pizza" + (t.pizzas === 1 ? "" : "s") : t.itemCount + " item" + (t.itemCount === 1 ? "" : "s")),
+                  t.title ? React.createElement("span", { style: { fontWeight: 400, color: "#8A9096", marginLeft: 6 } }, t.title) : null),
+                React.createElement("span", { style: { fontFamily: "Inter", fontSize: 13, fontWeight: 700, background: tone.bg, color: tone.fg, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" } },
+                  (t.ageMin == null ? "?" : t.ageMin) + " min")),
+              React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13.5, color: "#5F676E", marginTop: 2 } },
+                t.items.slice(0, 6).map((i, n) => React.createElement("div", { key: n },
+                  i.name, i.mods && i.mods.length ? React.createElement("span", { style: { color: "#8A9096" } }, " · " + i.mods.join(", ")) : null,
+                  i.note ? React.createElement("span", { style: { fontStyle: "italic", color: "#8A9096" } }, " — " + i.note) : null)),
+                t.items.length > 6 ? React.createElement("div", { style: { color: "#8A9096" } }, "+" + (t.items.length - 6) + " more") : null),
+              t.state ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 11.5, color: "#8A9096", marginTop: 3 } }, "Clover state: " + t.state) : null);
+          })),
+
+    // diagnostics — this is how the "do orders show up before payment" question
+    // gets answered from real service, not from the docs
+    React.createElement("button", { onClick: () => setShowDiag(!showDiag),
+      style: { background: "transparent", border: "none", padding: "8px 2px 0", fontFamily: "Inter", fontSize: 12.5, fontWeight: 600, color: "#8A9096" } },
+      showDiag ? "Hide what the register returned" : "What the register returned"),
+    showDiag ? React.createElement("div", { className: "px-3 py-2 mt-1", style: Object.assign({}, CARD, { background: "#F7F7F5" }) },
+      React.createElement("div", { style: muted }, "Orders in the last " + (d.windowHours || 4) + "h: " + (d.ordersReturned == null ? "?" : d.ordersReturned)),
+      React.createElement("div", { style: muted }, "Counted as open: " + (d.openCount == null ? "?" : d.openCount)),
+      React.createElement("div", { style: muted }, "Newest order: " + (d.newestOrderAgeMin == null ? "none" : d.newestOrderAgeMin + " min old")),
+      React.createElement("div", { style: muted }, "States seen: " + Object.entries(d.states || {}).map((e) => e[0] + "×" + e[1]).join(", ")),
+      React.createElement("div", { style: Object.assign({ marginTop: 4 }, muted) }, "If the newest order is always older than a few minutes, the register isn't publishing tickets until payment — tell Claude.")) : null);
+}
+
+
+// ---- Phone voice + languages (Settings) ------------------------------------
+// Both live in data.phoneAgent, and the assistant is rebuilt from that on every
+// inbound call — so a change here is live on the NEXT call, no redeploy.
+const VOICE_CHOICES = [{"id": "vapi:Elliot", "label": "Elliot", "note": "Male, Canadian. Warm and even \u2014 the safe default.", "tier": "standard", "multilingual": true, "voice": {"provider": "vapi", "voiceId": "Elliot", "version": 2, "language": "auto"}}, {"id": "vapi:Savannah", "label": "Savannah", "note": "Female, US Southern. Friendly, unhurried.", "tier": "standard", "multilingual": true, "voice": {"provider": "vapi", "voiceId": "Savannah", "version": 2, "language": "auto"}}, {"id": "vapi:Emma", "label": "Emma", "note": "Female, neutral American. Clear and businesslike.", "tier": "standard", "multilingual": true, "voice": {"provider": "vapi", "voiceId": "Emma", "version": 2, "language": "auto"}}, {"id": "vapi:Clara", "label": "Clara", "note": "Female, softer and conversational.", "tier": "standard", "multilingual": true, "voice": {"provider": "vapi", "voiceId": "Clara", "version": 2, "language": "auto"}}, {"id": "vapi:Kai", "label": "Kai", "note": "Male, younger sounding, upbeat.", "tier": "standard", "multilingual": true, "voice": {"provider": "vapi", "voiceId": "Kai", "version": 2, "language": "auto"}}, {"id": "vapi:Nico", "label": "Nico", "note": "Male, relaxed.", "tier": "standard", "multilingual": true, "voice": {"provider": "vapi", "voiceId": "Nico", "version": 2, "language": "auto"}}, {"id": "deepgram:aura-2-thalia-en", "label": "Thalia", "note": "Female, US. Cheapest option, English + Spanish.", "tier": "cheap", "multilingual": false, "voice": {"provider": "deepgram", "voiceId": "aura-2-thalia-en"}}, {"id": "deepgram:aura-2-apollo-en", "label": "Apollo", "note": "Male, US. Cheapest option, English + Spanish.", "tier": "cheap", "multilingual": false, "voice": {"provider": "deepgram", "voiceId": "aura-2-apollo-en"}}, {"id": "openai:nova", "label": "Nova (OpenAI)", "note": "Female, natural. Cheap, and speaks whatever language it is handed.", "tier": "cheap", "multilingual": true, "voice": {"provider": "openai", "model": "gpt-4o-mini-tts", "voiceId": "nova"}}, {"id": "openai:ash", "label": "Ash (OpenAI)", "note": "Male, easy-going. Cheap, multilingual.", "tier": "cheap", "multilingual": true, "voice": {"provider": "openai", "model": "gpt-4o-mini-tts", "voiceId": "ash"}}, {"id": "11labs:sarah", "label": "Sarah (ElevenLabs)", "note": "The most human-sounding tier. Roughly 10\u00d7 the voice cost \u2014 see the note below.", "tier": "premium", "multilingual": true, "voice": {"provider": "11labs", "model": "eleven_flash_v2_5", "voiceId": "sarah"}}];
+const LANGUAGE_CHOICES = [{"code": "en", "label": "English", "native": "English"}, {"code": "es", "label": "Spanish", "native": "Espa\u00f1ol"}, {"code": "pt", "label": "Portuguese", "native": "Portugu\u00eas"}, {"code": "fr", "label": "French", "native": "Fran\u00e7ais"}, {"code": "it", "label": "Italian", "native": "Italiano"}, {"code": "zh", "label": "Mandarin", "native": "\u4e2d\u6587"}, {"code": "vi", "label": "Vietnamese", "native": "Ti\u1ebfng Vi\u1ec7t"}, {"code": "ru", "label": "Russian", "native": "\u0420\u0443\u0441\u0441\u043a\u0438\u0439"}, {"code": "pl", "label": "Polish", "native": "Polski"}, {"code": "ar", "label": "Arabic", "native": "\u0627\u0644\u0639\u0631\u0628\u064a\u0629"}];
+const VOICE_COST_NOTE = "Voice is billed per character spoken, not per minute. The cheap and standard voices land around a penny or two a minute; ElevenLabs is roughly ten times that. At your volume that is the difference between about $60 and about $700 a month.";
+const MODEL_CHOICES = [{"id": "anthropic:claude-haiku-4-5", "label": "Claude Haiku", "note": "Strong at following a long list of \"never do X\" rules \u2014 and this prompt has ten. Good default.", "cost": "~$0.02/min", "provider": "anthropic", "model": "claude-haiku-4-5"}, {"id": "openai:gpt-5-mini", "label": "GPT-5 mini", "note": "Fast and cheaper. Very capable at this kind of scripted task.", "cost": "~$0.01/min", "provider": "openai", "model": "gpt-5-mini"}, {"id": "google:gemini-3.0-flash", "label": "Gemini Flash", "note": "Fast, cheap, solid tool use. Worth a try if the others feel slow.", "cost": "~$0.03/min", "provider": "google", "model": "gemini-3.0-flash"}, {"id": "openai:gpt-5-nano", "label": "GPT-5 nano", "note": "Cheapest and quickest. Watch it on complicated orders before trusting it.", "cost": "~$0.003/min", "provider": "openai", "model": "gpt-5-nano"}];
+const MODEL_NOTE = "Bigger is not better here. A frontier model adds a pause before every reply and several times the cost, and takes the order no more accurately \u2014 the menu, the prices and the rules are all handled outside the model. Judge these by how quickly they come back and whether they get the order right, not by benchmarks.";
+
+function PhoneVoiceCard({ data, persist, canEdit }) {
+  const [custom, setCustom] = useState("");
+  const agent = (data && data.phoneAgent) || {};
+  const voice = agent.voice || { provider: "vapi", voiceId: "Elliot" };
+  const langs = (agent.languages && agent.languages.length ? agent.languages : ["en"]);
+  const patch = (p) => canEdit && persist && persist((d) => {
+    const c = JSON.parse(JSON.stringify(d));
+    c.phoneAgent = Object.assign({}, c.phoneAgent, p);
+    return c;
+  });
+  const pickVoice = (v) => patch({ voice: v });
+  const toggleLang = (code) => {
+    if (code === "en") return; // English is always on — it's the menu's language
+    const next = langs.indexOf(code) >= 0 ? langs.filter((l) => l !== code) : langs.concat([code]);
+    patch({ languages: next });
+  };
+  const isCurrent = (c) => c.voice.provider === voice.provider && c.voice.voiceId === voice.voiceId;
+  const known = VOICE_CHOICES.some(isCurrent);
+  const tierLabel = { cheap: "cheapest", standard: "standard", premium: "premium — costs much more" };
+
+  const row = (c) => React.createElement("button", { key: c.id, onClick: () => pickVoice(c.voice),
+    className: "w-full text-left px-3 py-2.5",
+    style: { border: "1px solid " + (isCurrent(c) ? COLORS.lamp : COLORS.line), background: isCurrent(c) ? COLORS.lampTint : COLORS.card,
+             borderRadius: 12, marginBottom: 6, display: "block" } },
+    React.createElement("div", { className: "flex items-baseline justify-between gap-2" },
+      React.createElement("span", { style: { fontFamily: "Inter", fontWeight: 700, fontSize: 15.5, color: COLORS.crust } }, c.label),
+      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".05em",
+        color: c.tier === "premium" ? COLORS.alertDark : "#8A9096" } }, tierLabel[c.tier] || c.tier)),
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13.5, color: "#5F676E", marginTop: 1 } }, c.note));
+
+  return React.createElement("div", { className: "px-4 py-4 mb-3", style: { background: COLORS.card, borderRadius: 18, boxShadow: "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)" } },
+    React.createElement("div", { style: { fontFamily: "Oswald", fontSize: 18, letterSpacing: ".02em", marginBottom: 2 } }, "PHONE VOICE"),
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginBottom: 10 } },
+      "Takes effect on the next call. To hear one first: Vapi dashboard \u2192 Resources \u2192 Voice Library has a play button on every voice."),
+    VOICE_CHOICES.map(row),
+
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#8A5A00", background: "#FFF6E8", border: "1px solid rgba(179,107,0,.25)", borderRadius: 10, padding: "8px 10px", margin: "4px 0 12px" } }, VOICE_COST_NOTE),
+
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "#5F676E", marginBottom: 5 } }, "Something else"),
+    React.createElement("div", { className: "flex gap-2" },
+      React.createElement("input", { className: "flex-1 px-3 outline-none opp-field", placeholder: "paste a voice ID from Vapi",
+        value: custom, onChange: (e) => setCustom(e.target.value) }),
+      React.createElement(TicketButton, { onClick: () => { if (custom.trim()) { pickVoice({ provider: "vapi", voiceId: custom.trim(), version: 2, language: "auto" }); setCustom(""); } } }, "Use")),
+    !known ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: COLORS.crust, marginTop: 6 } },
+      "Currently using a custom voice: ", React.createElement("b", null, voice.provider + " / " + voice.voiceId)) : null,
+
+    React.createElement("div", { style: { height: 1, background: COLORS.line, margin: "16px 0 14px" } }),
+
+    React.createElement("div", { style: { fontFamily: "Oswald", fontSize: 18, letterSpacing: ".02em", marginBottom: 2 } }, "BRAIN"),
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginBottom: 10 } },
+      "Which model takes the order. If a call ever fails the moment it connects, a wrong model name here is the first thing to check — Vapi's own model list has the current ones."),
+    MODEL_CHOICES.map((mc) => {
+      const on = mc.provider === (agent.modelProvider || "anthropic") && mc.model === (agent.model || "claude-haiku-4-5");
+      return React.createElement("button", { key: mc.id, onClick: () => patch({ modelProvider: mc.provider, model: mc.model }),
+        className: "w-full text-left px-3 py-2.5",
+        style: { border: "1px solid " + (on ? COLORS.lamp : COLORS.line), background: on ? COLORS.lampTint : COLORS.card,
+                 borderRadius: 12, marginBottom: 6, display: "block" } },
+        React.createElement("div", { className: "flex items-baseline justify-between gap-2" },
+          React.createElement("span", { style: { fontFamily: "Inter", fontWeight: 700, fontSize: 15.5, color: COLORS.crust } }, mc.label),
+          React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, color: "#8A9096" } }, mc.cost)),
+        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13.5, color: "#5F676E", marginTop: 1 } }, mc.note));
+    }),
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#5F676E", background: "#F7F7F5", borderRadius: 10, padding: "8px 10px", margin: "2px 0 4px" } }, MODEL_NOTE),
+    !MODEL_CHOICES.some((mc) => mc.provider === (agent.modelProvider || "anthropic") && mc.model === (agent.model || "claude-haiku-4-5"))
+      ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: COLORS.crust, marginTop: 4 } },
+          "Currently set to ", React.createElement("b", null, (agent.modelProvider || "?") + " / " + (agent.model || "?"))) : null,
+
+    React.createElement("div", { style: { height: 1, background: COLORS.line, margin: "16px 0 14px" } }),
+
+    React.createElement("div", { style: { fontFamily: "Oswald", fontSize: 18, letterSpacing: ".02em", marginBottom: 2 } }, "LANGUAGES"),
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginBottom: 10 } },
+      langs.length > 1
+        ? "The phone will answer a caller in whichever of these they speak, and take the whole order in it."
+        : "English only. Turn one on and the phone will answer callers who speak it."),
+    React.createElement("div", { className: "flex flex-wrap gap-2" },
+      LANGUAGE_CHOICES.map((l) => {
+        const on = langs.indexOf(l.code) >= 0;
+        return React.createElement("button", { key: l.code, onClick: () => toggleLang(l.code), disabled: l.code === "en",
+          style: { fontFamily: "Inter", fontSize: 14.5, fontWeight: 600, borderRadius: 999, padding: "9px 15px", minHeight: 44,
+                   border: "1px solid " + (on ? "transparent" : COLORS.line), background: on ? COLORS.crust : COLORS.card,
+                   color: on ? "#FFFFFF" : COLORS.crust, opacity: l.code === "en" ? 0.75 : 1 } },
+          l.label, l.code === "en" ? " \u00b7 always" : "");
+      })),
+    langs.length > 1 ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#8A9096", marginTop: 10 } },
+      "Menu items keep their English names in any language. Anything the phone can't handle goes to a person.") : null,
+    !canEdit ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginTop: 10 } }, "Unlock admin to change these.") : null);
+}
+
 function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
   const [text, setText] = useState("");
   const [showAllPrep, setShowAllPrep] = useState(false);
@@ -4807,6 +5064,10 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
             style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.ink, padding: 0 } },
             React.createElement(Plus, { size: 15 }), "Don't see your name? Add yourself")
     ),
+
+    // phone host: the wait we quote + orders the phone took
+    React.createElement(WaitControl, { data, persist, who: getWho(), card: CARD, label }),
+    React.createElement(PhoneOrdersCard, { data, persist, card: CARD, label }),
 
     // priorities
     React.createElement(
@@ -8932,7 +9193,7 @@ function LiveOpsTab({ data, persist }) {
       intervalRef.current = setInterval(captureAndAnalyze, seconds * 1e3);
     }
   };
-  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(SectionHeader, null, "Order Queue \u2014 what's left to spread"), liveOps.orderQueue.updatedAt && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-1.5", style: { fontFamily: "Inter", color: "#8A9096" } }, "Last updated ", liveOps.orderQueue.updatedAt), /* @__PURE__ */ React.createElement("div", { className: "space-y-1 mb-2" }, liveOps.orderQueue.sizes.map((r) => /* @__PURE__ */ React.createElement("div", { key: r.id, className: "flex items-center justify-between px-3 py-1.5 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, r.label), /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(SectionHeader, null, "On the register right now"), React.createElement(TicketBoard, { data }), React.createElement(SectionHeader, null, "Order Queue \u2014 what's left to spread"), liveOps.orderQueue.updatedAt && /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-1.5", style: { fontFamily: "Inter", color: "#8A9096" } }, "Last updated ", liveOps.orderQueue.updatedAt), /* @__PURE__ */ React.createElement("div", { className: "space-y-1 mb-2" }, liveOps.orderQueue.sizes.map((r) => /* @__PURE__ */ React.createElement("div", { key: r.id, className: "flex items-center justify-between px-3 py-1.5 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, r.label), /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "number",
