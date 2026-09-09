@@ -249,15 +249,19 @@ function normalizeEightySix(data, menu) {
   return { items, categories, low, notes };
 }
 
+// The shop's normal quote. Nobody has to set a wait on a quiet day — the phone
+// says twenty minutes unless the Today box has been nudged off it.
+export const DEFAULT_WAIT_MIN = 20;
 function normalizeWait(data) {
   const src = firstOf(data, ['wait', 'waitTime', 'quotedWait', 'currentWait']);
-  if (src === undefined) return { pickupMin: null, deliveryMin: null, updatedAt: null, source: 'none' };
+  if (src === undefined) return { pickupMin: DEFAULT_WAIT_MIN, deliveryMin: null, updatedAt: null, source: 'default' };
   if (typeof src === 'number') return { pickupMin: src, deliveryMin: null, updatedAt: null, source: 'manual' };
+  const pickup = num(firstOf(src, ['pickupMin', 'pickup', 'minutes', 'min']));
   return {
-    pickupMin: num(firstOf(src, ['pickupMin', 'pickup', 'minutes', 'min'])),
+    pickupMin: pickup === null ? DEFAULT_WAIT_MIN : pickup,
     deliveryMin: num(firstOf(src, ['deliveryMin', 'delivery'])),
     updatedAt: firstOf(src, ['updatedAt', 'at', 'ts']) ?? null,
-    source: 'manual',
+    source: pickup === null ? 'default' : (src.by === 'stream' ? 'stream' : 'manual'),
   };
 }
 
@@ -330,6 +334,26 @@ function normalizeTempHours(data, tz) {
   };
 }
 
+function normalizeLink(v) {
+  const t = String(v || '').trim();
+  if (!t) return '';
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+}
+function linkFromNote(note) {
+  const m = String(note || '').match(/order online at\s+([a-z0-9.-]+\.[a-z]{2,}(?:\/\S*)?)/i);
+  return m ? `https://${m[1].replace(/[.,;]+$/, '')}` : '';
+}
+function normalizeDeliveryMode(v, data) {
+  if (v === 'link' || v === 'in-house' || v === 'none') return v;
+  if (v === true) return 'in-house';
+  if (v === false) return 'none';
+  // unset: if the menu mentions delivery AND an online-ordering link, it's a link job
+  const note = data?.menu?.info?.note || '';
+  if (/deliver/i.test(note) && linkFromNote(note)) return 'link';
+  if (/deliver/i.test(note)) return 'in-house';
+  return 'none';
+}
+
 function normalizeAgentSettings(data) {
   const a = data?.phoneAgent ?? data?.agent ?? {};
   return {
@@ -348,8 +372,17 @@ function normalizeAgentSettings(data) {
     pausedAnswersQuestions: a.pausedAnswersQuestions !== false,
     extraNotes: a.extraNotes ?? a.notes ?? '',
     upsell: a.upsell ?? false,
-    delivery: a.delivery ?? /deliver/i.test(data?.menu?.info?.note || ''), // On Point's menu note says "delivery available all day"
+    // Delivery is a MODE, not a yes/no:
+    //   'link'     — no in-house drivers; delivery is via the online-ordering page,
+    //                so the agent texts the caller the link (On Point's case)
+    //   'in-house' — the agent takes delivery orders itself (address required)
+    //   'none'     — pickup only
+    // Legacy true/false still works (true → in-house, false → none).
+    delivery: normalizeDeliveryMode(a.delivery, data),
     deliveryNotes: a.deliveryNotes ?? '',
+    // Where "order online" points. Defaults to whatever the menu's info note says
+    // ("Order online at oppgansett.com").
+    orderLink: normalizeLink(a.orderLink) || linkFromNote(data?.menu?.info?.note),
     // Deliberately NOT defaulting to the shop line: if that line forwards to the
     // agent, transferring to it would loop. Set phoneAgent.transferNumber to a
     // counter cell / second line.
