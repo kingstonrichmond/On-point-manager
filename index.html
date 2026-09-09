@@ -4825,6 +4825,11 @@ function HandoffPanel({ data, persist }) {
 // After any wait/pause change, push it to every channel that can take it and
 // record which still need a tap in another dashboard. Fire-and-forget; the
 // result comes back through the normal data sync as data.waitSync.
+// This sets the shop's quoted wait and can pause phone orders, so /wait-sync is
+// gated by _auth.mjs like every other function. The key rides along on its own:
+// installAuthFetch above puts x-opp-key on anything aimed at /.netlify/functions/,
+// which is why there's no header set here — adding one would mark the call a
+// PROBE and skip the role handling in that patch.
 function pushWaitEverywhere(state) {
   try {
     fetch("/.netlify/functions/wait-sync", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(state) }).catch(() => {});
