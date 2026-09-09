@@ -76,8 +76,21 @@ export default async (req) => {
 
     const text = await res.text();
 
-    // Pass the upstream status through so the app can show the real problem
-    // (401 = bad key, 404 = bad model name, 429 = rate limit, 400 = bad request).
+    // A 401/403 from Anthropic means OUR key is bad, not the tablet's code.
+    // The app treats any 401 from this site as "your shop code was refused"
+    // and logs the tablet out, so an expired API key must never come back as
+    // 401 — say what it is instead.
+    if (res.status === 401 || res.status === 403) {
+      return json({
+        error: {
+          message:
+            "Anthropic rejected the site's API key (" + res.status + "). Check ANTHROPIC_API_KEY under Site settings > Environment variables.",
+        },
+      }, 502, ah);
+    }
+
+    // Otherwise pass the upstream status through so the app can show the real
+    // problem (404 = bad model name, 429 = rate limit, 400 = bad request).
     return new Response(text, {
       status: res.status,
       headers: { "content-type": "application/json", "cache-control": "no-store", ...ah },
