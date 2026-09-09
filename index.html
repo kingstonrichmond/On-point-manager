@@ -172,6 +172,7 @@ const Camera = makeIcon(
   /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("path", { d: "M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "14", r: "3.5" }))
 );
 const Activity = makeIcon(/* @__PURE__ */ React.createElement("path", { d: "M22 12h-4l-3 8-6-16-3 8H2" }));
+const PhoneIcon = makeIcon(/* @__PURE__ */ React.createElement("path", { d: "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" }));
 const Thermometer = makeIcon(/* @__PURE__ */ React.createElement("path", { d: "M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" }));
 const Sliders = makeIcon(
   /* @__PURE__ */ React.createElement(React.Fragment, null,
@@ -1860,7 +1861,6 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
   return /* @__PURE__ */ React.createElement(
     "div",
     null,
-    /* @__PURE__ */ React.createElement(PhoneVoiceCard, { data, persist, canEdit: role === "admin" }),
     /* @__PURE__ */ React.createElement(
       "div",
       {
@@ -2542,6 +2542,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
     { id: "invorders", label: "Inventory & Orders", icon: Package, badge: lowStockCount + foodOrderNeed + belmontNeed + boardFlags },
     { id: "preptasks", label: "Prep & Tasks", icon: ClipboardList, badge: prepTodo + openTasks },
     { id: "reference", label: "Reference", icon: BookOpen },
+    { id: "phone", label: "Phone", icon: PhoneIcon, badge: ((data && data.phoneOrders) || []).filter((o) => o.status !== "done").length },
     { id: "liveops", label: "Live Ops", icon: Thermometer },
     { id: "settings", label: "Settings", icon: Sliders, badge: 0 }
   ].filter((t) => isAdmin || !ADMIN_TABS[t.id]);
@@ -2596,7 +2597,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FDECEA", color: COLORS.alertDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab, isAdmin }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { setBase(0, null); dirtyRef.current = false; await pull({ initial: true }); }, data, persist,
+  })), /* @__PURE__ */ React.createElement("div", { className: "p-4", style: { background: COLORS.cream, minHeight: "70vh" } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FDECEA", color: COLORS.alertDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab, isAdmin }), tab === "phone" && /* @__PURE__ */ React.createElement(PhoneTab, { data, persist, isAdmin }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { setBase(0, null); dirtyRef.current = false; await pull({ initial: true }); }, data, persist,
         onHoursChange: (next) => { const d = JSON.parse(JSON.stringify(dataRef.current)); d.shopHours = next; persist(d); } })), /* @__PURE__ */ React.createElement(TimerOverlay, { timers, setTimers, now: timerNow }));
 }
 // ---- What Ask the Manager knows ---------------------------------------------
@@ -4714,10 +4715,12 @@ function WaitSyncStrip({ data }) {
 
 const WAIT_MIN = 0, WAIT_MAX = 120, WAIT_STEP = 5;
 
+const WAIT_DEFAULT = 20; // what the phone quotes until somebody moves it
 function WaitControl({ data, persist, who, card, label }) {
   const suggestion = useTickets(60000);
   const wait = (data && data.wait) || {};
-  const cur = wait.pickupMin === undefined ? null : wait.pickupMin;
+  const cur = wait.pickupMin == null ? WAIT_DEFAULT : wait.pickupMin;
+  const isDefault = wait.pickupMin == null;
   const ageMin = wait.updatedAt ? Math.round((Date.now() - new Date(wait.updatedAt).getTime()) / 6e4) : null;
   const stale = ageMin !== null && ageMin > 90;
   const set = (m) => {
@@ -4727,11 +4730,10 @@ function WaitControl({ data, persist, who, card, label }) {
   };
   const fromStream = wait.by === "stream";
   const clamp = (m) => Math.max(WAIT_STEP, Math.min(WAIT_MAX, m));
-  const step = (delta) => set(cur === null ? (delta > 0 ? 20 : WAIT_STEP) : clamp(cur + delta));
-  const atMax = cur !== null && cur >= WAIT_MAX;
-  const off = (delta) => cur !== null && ((delta > 0 && cur >= WAIT_MAX) || (delta < 0 && cur <= WAIT_STEP));
+  const step = (delta) => set(clamp(cur + delta));
+  const atMax = cur >= WAIT_MAX;
+  const off = (delta) => (delta > 0 && cur >= WAIT_MAX) || (delta < 0 && cur <= WAIT_STEP);
 
-  // One row: [−] 45 min [+] … Not set. Big enough to hit with a thumb, no taller than a button.
   const bump = (delta, txt) => React.createElement("button", { onClick: () => step(delta), disabled: off(delta),
     style: { width: 44, height: 44, borderRadius: 14, border: "1px solid " + COLORS.line, background: COLORS.card,
              fontFamily: "Inter", fontSize: 24, fontWeight: 700, color: COLORS.crust, lineHeight: 1, flex: "0 0 auto",
@@ -4740,20 +4742,17 @@ function WaitControl({ data, persist, who, card, label }) {
 
   return React.createElement("div", { className: "px-4 py-3 mb-3", style: card },
     label("Phone wait", React.createElement("span", { style: { fontFamily: "Inter", fontSize: 13, fontWeight: 600, color: stale ? COLORS.alertDark : COLORS.steel } },
-      (fromStream ? "from Stream · " : "") + (cur === null ? "not set" : "set " + (ageMin < 1 ? "just now" : ageMin + " min ago") + (stale ? " — update it" : "")))),
-
+      (fromStream ? "from Stream · " : "") + (isDefault ? "shop default" : "set " + (ageMin < 1 ? "just now" : ageMin + " min ago") + (stale ? " — still right?" : "")))),
     React.createElement("div", { className: "flex items-center gap-2", style: { marginTop: 6 } },
       bump(-WAIT_STEP, "−"),
       React.createElement("div", { style: { minWidth: 92, textAlign: "center", fontFamily: "Oswald", fontSize: 30, lineHeight: 1, color: atMax ? COLORS.alertDark : COLORS.crust } },
-        cur === null ? "—" : String(cur),
-        React.createElement("span", { style: { fontFamily: "Inter", fontSize: 13, fontWeight: 600, color: COLORS.steel, marginLeft: 5 } }, cur === null ? "" : "min")),
+        String(cur),
+        React.createElement("span", { style: { fontFamily: "Inter", fontSize: 13, fontWeight: 600, color: COLORS.steel, marginLeft: 5 } }, "min")),
       bump(WAIT_STEP, "+"),
       React.createElement("div", { style: { flex: 1 } }),
-      React.createElement("button", { onClick: () => set(null),
-        style: { height: 36, padding: "0 12px", borderRadius: 999, fontFamily: "Inter", fontWeight: 600, fontSize: 13,
-                 border: "1px solid " + COLORS.line, background: cur === null ? COLORS.crust : COLORS.card, color: cur === null ? "#FFFFFF" : COLORS.crust } },
-        "Not set")),
-
+      cur !== WAIT_DEFAULT ? React.createElement("button", { onClick: () => set(WAIT_DEFAULT),
+        style: { height: 36, padding: "0 12px", borderRadius: 999, fontFamily: "Inter", fontWeight: 600, fontSize: 13, border: "1px solid " + COLORS.line, background: COLORS.card, color: COLORS.crust } },
+        "Back to " + WAIT_DEFAULT) : null),
     (atMax || sug !== null)
       ? React.createElement("div", { className: "flex items-center gap-2", style: { marginTop: 6, fontFamily: "Inter", fontSize: 12.5, color: atMax ? COLORS.alertDark : COLORS.steel } },
           atMax
@@ -4763,6 +4762,38 @@ function WaitControl({ data, persist, who, card, label }) {
                  style: { height: 30, padding: "0 12px", borderRadius: 999, border: "1px solid " + COLORS.line, background: COLORS.lamp, fontFamily: "Inter", fontWeight: 700, fontSize: 12.5, color: COLORS.crust, flex: "0 0 auto" } }, "Use it")])
       : null,
     React.createElement(WaitSyncStrip, { data }));
+}
+
+// ---- The Today box ----------------------------------------------------------
+// One line: the number, − and +, and a way into the Phone tab. When the phone
+// is paused the number gives way to that, because a wait means nothing then.
+function WaitMini({ data, persist, who, goTo }) {
+  const wait = (data && data.wait) || {};
+  const cur = wait.pickupMin == null ? WAIT_DEFAULT : wait.pickupMin;
+  const pz = (data && data.phoneAgent && data.phoneAgent.pause) || {};
+  const paused = !!pz.on && !(pz.until && Date.parse(pz.until) < Date.now());
+  const set = (m) => {
+    persist && persist((d) => Object.assign(JSON.parse(JSON.stringify(d)), { wait: { pickupMin: m, updatedAt: new Date().toISOString(), by: who || "tablet" } }));
+    pushWaitEverywhere({ pickupMin: m, paused, pausedUntil: pz.until || null });
+  };
+  const step = (delta) => set(Math.max(WAIT_STEP, Math.min(WAIT_MAX, cur + delta)));
+  const off = (delta) => (delta > 0 && cur >= WAIT_MAX) || (delta < 0 && cur <= WAIT_STEP);
+  const bump = (delta, txt) => React.createElement("button", { key: txt, onClick: () => step(delta), disabled: off(delta),
+    style: { width: 40, height: 40, borderRadius: 12, border: "1px solid " + COLORS.line, background: COLORS.card,
+             fontFamily: "Inter", fontSize: 22, fontWeight: 700, color: COLORS.crust, lineHeight: 1, flex: "0 0 auto", opacity: off(delta) ? 0.35 : 1 } }, txt);
+  const newOrders = ((data && data.phoneOrders) || []).filter((o) => o.status !== "done").length;
+  const untilLabel = pz.until ? new Date(pz.until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : null;
+  return React.createElement("div", { className: "flex items-center gap-2 px-3 mb-3", style: { background: paused ? "#FDECEA" : COLORS.card, borderRadius: 16, boxShadow: "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)", border: paused ? "1px solid rgba(200,56,47,0.3)" : "none", minHeight: 56 } },
+    React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: paused ? COLORS.alertDark : INK2, textTransform: "uppercase", flex: "0 0 auto" } }, paused ? "Phone paused" : "Phone wait"),
+    paused
+      ? React.createElement("span", { style: { flex: 1, fontFamily: "Inter", fontSize: 13, color: COLORS.crust } }, untilLabel ? "back on at " + untilLabel : "until you turn it back on")
+      : [bump(-WAIT_STEP, "−"),
+         React.createElement("span", { key: "n", style: { minWidth: 58, textAlign: "center", fontFamily: "Oswald", fontSize: 24, lineHeight: 1, color: COLORS.crust } }, cur,
+           React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 600, color: COLORS.steel, marginLeft: 3 } }, "min")),
+         bump(WAIT_STEP, "+"),
+         React.createElement("span", { key: "sp", style: { flex: 1 } })],
+    React.createElement("button", { onClick: () => goTo && goTo("phone"), style: { background: "transparent", border: "none", padding: "6px 0 6px 6px", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, color: COLORS.ink, flex: "0 0 auto" } },
+      (newOrders ? newOrders + (newOrders === 1 ? " order" : " orders") : "Phone") + " ›"));
 }
 
 // ---- Pause the phone -------------------------------------------------------
@@ -4856,35 +4887,121 @@ function TodayHoursCard({ data, persist, card, label }) {
               p.closed ? "closed" : hLabel(p.open) + "\u2013" + hLabel(p.close))))));
 }
 
-function PhoneOrdersCard({ data, persist, card, label }) {
-  const orders = ((data && data.phoneOrders) || []).filter((o) => o.status !== "done").slice(-20).reverse();
-  const flags = ((data && data.phoneFlags) || []).filter((f) => !f.done).slice(-10).reverse();
-  if (!orders.length && !flags.length) return null;
-  const patchOrder = (id, patch) => persist && persist((d) => { const c = JSON.parse(JSON.stringify(d)); c.phoneOrders = (c.phoneOrders || []).map((o) => o.id === id ? Object.assign(o, patch) : o); return c; });
-  const doneFlag = (id) => persist && persist((d) => { const c = JSON.parse(JSON.stringify(d)); c.phoneFlags = (c.phoneFlags || []).map((f) => f.id === id ? Object.assign(f, { done: true }) : f); return c; });
-  const t = (iso) => { try { return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; } };
-  const row = { borderTop: "1px solid " + COLORS.line, padding: "10px 0" };
-  return React.createElement("div", { className: "px-4 py-4 mb-3", style: card },
-    label("Phone orders" + (orders.length ? " · " + orders.length : "")),
-    orders.map((o) => React.createElement("div", { key: o.id, style: row },
-      React.createElement("div", { className: "flex justify-between items-baseline" },
-        React.createElement("div", { style: { fontFamily: "Inter", fontWeight: 700, fontSize: 17 } }, (o.caller && o.caller.name) || "Caller",
-          React.createElement("span", { style: { fontWeight: 400, color: COLORS.steel, fontSize: 13, marginLeft: 8 } }, (o.caller && o.caller.phone) || "")),
-        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: COLORS.steel } }, t(o.createdAt) + " · " + (o.type === "delivery" ? "delivery" : "pickup") + " · quoted " + (o.quotedWaitMin == null ? "—" : o.quotedWaitMin + " min"))),
-      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, marginTop: 2 } },
-        (o.items || []).map((it, i) => React.createElement("div", { key: i }, it.qty + " " + (it.size ? it.size + " " : "") + it.name + ((it.mods && it.mods.length) ? " (" + it.mods.join(", ") + ")" : "") + (it.notes ? " — " + it.notes : ""))),
-        o.address ? React.createElement("div", { style: { color: COLORS.steel } }, "→ " + o.address) : null,
-        o.notes ? React.createElement("div", { style: { fontStyle: "italic", color: COLORS.steel } }, o.notes) : null),
-      React.createElement("div", { className: "flex gap-2 mt-2 items-center" },
-        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: COLORS.steel, flex: 1 } }, "$" + Number(o.subtotal || 0).toFixed(2) + " · " + ((o.posResult && o.posResult.ok) ? "in Clover via " + (o.posResult.sink || "POS") : (o.keyedIntoPos ? "keyed into Clover" : "needs keying into Clover"))),
-        (!o.keyedIntoPos && !(o.posResult && o.posResult.ok)) ? React.createElement(TicketButton, { onClick: () => patchOrder(o.id, { keyedIntoPos: true }) }, "Keyed in") : null,
-        React.createElement(TicketButton, { onClick: () => patchOrder(o.id, { status: "done" }), color: COLORS.card, style: { border: "1px solid " + COLORS.line } }, o.type === "delivery" ? "Out the door" : "Picked up")))),
-    flags.map((f) => React.createElement("div", { key: f.id, style: row, className: "flex justify-between items-center gap-2" },
-      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14 } },
-        React.createElement("b", null, f.kind === "transfer" ? "Transfer" : "Call back"), " ", [f.name, f.phone].filter(Boolean).join(" "), " — ", f.reason, " ",
-        React.createElement("span", { style: { color: COLORS.steel } }, t(f.at))),
-      React.createElement(TicketButton, { onClick: () => doneFlag(f.id) }, "Done"))));
+// ---- Calls -------------------------------------------------------------------
+// Every call the phone took, newest first, with the order it produced (if any)
+// pinned to it. This is the "what did they actually say?" screen.
+function fmtPhone(p) {
+  const d = String(p || "").replace(/\D/g, "");
+  if (d.length === 11 && d[0] === "1") return "(" + d.slice(1, 4) + ") " + d.slice(4, 7) + "-" + d.slice(7);
+  if (d.length === 10) return "(" + d.slice(0, 3) + ") " + d.slice(3, 6) + "-" + d.slice(6);
+  return p || "";
 }
+function callDay(iso) { try { return new Date(iso).toLocaleDateString("en-CA"); } catch (e) { return ""; } }
+function CallLog({ data, persist, isAdmin }) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState("");
+  const [days, setDays] = useState(2);
+  const calls = ((data && data.phoneCalls) || []).slice().sort((a, b) => (a.at < b.at ? 1 : -1));
+  const orders = (data && data.phoneOrders) || [];
+  const byCall = {}; orders.forEach((o) => { if (o.callId) byCall[o.callId] = o; });
+  const orphanOrders = orders.filter((o) => !o.callId || !calls.some((c) => c.id === o.callId));
+  const t = (iso) => { try { return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; } };
+  const dur = (s) => (s == null ? "" : s < 60 ? s + "s" : Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"));
+  const cutoff = new Date(Date.now() - days * 864e5).toLocaleDateString("en-CA");
+  const needle = q.trim().toLowerCase();
+  const hit = (c) => {
+    if (!needle) return true;
+    const o = byCall[c.id];
+    const hay = [c.from, fmtPhone(c.from), c.summary, c.transcript, o && o.caller && o.caller.name, o && (o.items || []).map((i) => i.name).join(" ")].filter(Boolean).join(" ").toLowerCase();
+    return hay.indexOf(needle) !== -1;
+  };
+  const shown = calls.filter((c) => (needle ? true : callDay(c.at) >= cutoff)).filter(hit);
+  const patchOrder = (id, patch) => persist && persist((d) => { const c = JSON.parse(JSON.stringify(d)); c.phoneOrders = (c.phoneOrders || []).map((o) => o.id === id ? Object.assign(o, patch) : o); return c; });
+  const orderLine = (o) => {
+    const posOk = o.posResult && o.posResult.ok;
+    return React.createElement("div", { className: "flex items-center gap-2 flex-wrap mt-1" },
+      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12.5, fontWeight: 700, color: posOk ? "#1F6B34" : "#8A5A00", background: posOk ? "#E4F1E6" : "#FFF6E0", border: "1px solid " + (posOk ? "#BFDCC5" : "#F0DDA6"), borderRadius: 999, padding: "2px 9px" } },
+        (posOk ? "\u{1F9FE} Order in Clover" : o.keyedIntoPos ? "\u{1F9FE} Order keyed in" : "\u{1F9FE} Order — needs keying") + (o.caller && o.caller.name ? " · " + o.caller.name : "")),
+      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12.5, color: COLORS.steel } },
+        (o.items || []).reduce((n, i) => n + (i.qty || 1), 0) + " items · $" + Number(o.subtotal || 0).toFixed(2) + " · " + (o.type === "delivery" ? "delivery" : "pickup") + (o.status === "done" ? " · done" : "")));
+  };
+  const orderDetail = (o) => React.createElement("div", { className: "px-3 py-2 rounded mt-2", style: { background: "#FAFAF8", border: "1px solid " + COLORS.line } },
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, fontWeight: 700, color: COLORS.crust } }, (o.caller && o.caller.name) || "No name", React.createElement("span", { style: { fontWeight: 400, color: COLORS.steel, marginLeft: 8, fontSize: 13 } }, fmtPhone(o.caller && o.caller.phone))),
+    (o.items || []).map((it, i) => React.createElement("div", { key: i, style: { fontFamily: "Inter", fontSize: 14 } }, it.qty + " " + (it.size ? it.size + " " : "") + it.name + ((it.mods && it.mods.length) ? " (" + it.mods.join(", ") + ")" : "") + (it.notes ? " — " + it.notes : ""))),
+    o.address ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: COLORS.steel } }, "→ " + o.address) : null,
+    o.notes ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, fontStyle: "italic", color: COLORS.steel } }, o.notes) : null,
+    React.createElement("div", { className: "flex gap-2 mt-2 items-center flex-wrap" },
+      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12.5, color: COLORS.steel, flex: 1 } }, "quoted " + (o.quotedWaitMin == null ? "—" : o.quotedWaitMin + " min") + " · " + ((o.posResult && o.posResult.ok) ? "sent via " + (o.posResult.sink || "POS") : (o.keyedIntoPos ? "keyed into Clover" : "needs keying into Clover"))),
+      (!o.keyedIntoPos && !(o.posResult && o.posResult.ok)) ? React.createElement(TicketButton, { onClick: () => patchOrder(o.id, { keyedIntoPos: true }) }, "Keyed in") : null,
+      o.status !== "done" ? React.createElement(TicketButton, { onClick: () => patchOrder(o.id, { status: "done" }), color: COLORS.card, style: { border: "1px solid " + COLORS.line } }, o.type === "delivery" ? "Out the door" : "Picked up") : null));
+  const card = { background: COLORS.card, borderRadius: 18, boxShadow: "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)" };
+  return React.createElement("div", { className: "px-4 py-4 mb-3", style: card },
+    React.createElement("div", { className: "flex items-baseline justify-between mb-2" },
+      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, "Calls"),
+      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12.5, color: COLORS.steel } }, calls.length ? calls.length + " on file" : "")),
+    React.createElement("input", { placeholder: "Search a number, a name, or something they said…", value: q, onChange: (e) => setQ(e.target.value), className: "w-full px-3 outline-none opp-field mb-2" }),
+    !needle ? React.createElement("div", { className: "flex gap-1.5 mb-2" },
+      [[1, "Today"], [2, "2 days"], [7, "Week"], [30, "Month"]].map(([n, l]) => React.createElement("button", { key: n, onClick: () => setDays(n), className: "text-xs px-2.5 py-1.5 rounded-full",
+        style: { fontFamily: "Inter", fontWeight: 600, border: "1px solid " + (days === n ? COLORS.crust : COLORS.line), background: days === n ? COLORS.crust : "transparent", color: days === n ? COLORS.cream : COLORS.crust } }, l))) : null,
+    !calls.length ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: INK3, padding: "8px 0" } }, "No calls yet. Once the phone assistant is live, every call lands here with a summary, the transcript, and the order it made.") : null,
+    calls.length && !shown.length ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: INK3, padding: "8px 0" } }, needle ? "Nothing matches." : "No calls in this window.") : null,
+    shown.map((c) => {
+      const o = byCall[c.id];
+      const isOpen = open === c.id;
+      return React.createElement("div", { key: c.id, style: { borderTop: "1px solid " + COLORS.line, padding: "10px 0" } },
+        React.createElement("button", { onClick: () => setOpen(isOpen ? "" : c.id), className: "w-full text-left", style: { background: "transparent", border: "none", padding: 0 } },
+          React.createElement("div", { className: "flex items-baseline justify-between gap-2" },
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 16, fontWeight: 700, color: COLORS.crust } },
+              (o && o.caller && o.caller.name) ? o.caller.name : fmtPhone(c.from) || "Unknown number",
+              (o && o.caller && o.caller.name) ? React.createElement("span", { style: { fontWeight: 400, fontSize: 13, color: COLORS.steel, marginLeft: 8 } }, fmtPhone(c.from)) : null),
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: COLORS.steel, flex: "0 0 auto" } }, (callDay(c.at) === new Date().toLocaleDateString("en-CA") ? "" : new Date(c.at).toLocaleDateString([], { month: "short", day: "numeric" }) + " ") + t(c.at) + (c.durationSec != null ? " · " + dur(c.durationSec) : ""))),
+          React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: COLORS.crust, marginTop: 2, display: "-webkit-box", WebkitLineClamp: isOpen ? "unset" : 2, WebkitBoxOrient: "vertical", overflow: "hidden" } }, c.summary || (c.endedReason ? "No summary · " + c.endedReason : "No summary")),
+          o ? orderLine(o) : null),
+        isOpen ? React.createElement("div", null,
+          o ? orderDetail(o) : null,
+          c.transcript ? React.createElement("pre", { className: "text-xs whitespace-pre-wrap p-2.5 rounded mt-2", style: { background: "#FAFAF8", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono", color: COLORS.crust, maxHeight: 320, overflowY: "auto" } }, c.transcript) : React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: INK3, marginTop: 6 } }, "No transcript came back for this call."),
+          c.recordingUrl && isAdmin ? React.createElement("a", { href: c.recordingUrl, target: "_blank", rel: "noopener", style: { display: "inline-block", marginTop: 8, fontFamily: "Inter", fontSize: 13, fontWeight: 600, color: COLORS.ink } }, "Listen to the recording ›") : null) : null);
+    }),
+    orphanOrders.length ? React.createElement("div", { style: { borderTop: "1px solid " + COLORS.line, paddingTop: 10, marginTop: 4 } },
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase", marginBottom: 4 } }, "Orders without a call record"),
+      orphanOrders.slice(-10).reverse().map((o) => React.createElement("div", { key: o.id, style: { padding: "6px 0" } }, orderLine(o), open === o.id ? orderDetail(o) : React.createElement("button", { onClick: () => setOpen(o.id), style: { background: "transparent", border: "none", padding: 0, fontFamily: "Inter", fontSize: 12.5, color: COLORS.ink, marginTop: 2 } }, "Details ›")))) : null);
+}
+
+// ---- The Phone tab ------------------------------------------------------------
+// Everything about the phone assistant in one place: the wait, pausing, today's
+// hours, what it says, and the calls it took. The voice/brain/greeting settings
+// come from inject-voice.py (the slot below); the menu and 86 board it reads are
+// the same ones the rest of the app edits, so there's nothing to set up twice.
+function PhoneTab({ data, persist, isAdmin }) {
+  const CARD = { background: COLORS.card, borderRadius: 18, boxShadow: "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)" };
+  const label = (t, right) => React.createElement("div", { className: "flex items-baseline justify-between mb-2.5" },
+    React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, t),
+    right || null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const pz = (data && data.phoneAgent && data.phoneAgent.pause) || {};
+  const paused = !!pz.on && !(pz.until && Date.parse(pz.until) < Date.now());
+  const today = new Date().toLocaleDateString("en-CA");
+  const callsToday = ((data && data.phoneCalls) || []).filter((c) => callDay(c.at) === today).length;
+  const ordersToday = ((data && data.phoneOrders) || []).filter((o) => callDay(o.createdAt) === today).length;
+  const openOrders = ((data && data.phoneOrders) || []).filter((o) => o.status !== "done").length;
+  const wait = (data && data.wait) || {};
+  const cur = wait.pickupMin == null ? WAIT_DEFAULT : wait.pickupMin;
+  return React.createElement("div", null,
+    React.createElement("div", { className: "px-5 py-4 mb-3", style: { background: COLORS.crust, borderRadius: 20, borderLeft: "6px solid " + (paused ? COLORS.alert : COLORS.basil) } },
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: paused ? "#F26B5E" : "#7CC48A", textTransform: "uppercase" } }, paused ? "Phone orders paused" : "Phone answering · quoting " + cur + " min"),
+      React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontWeight: 600, fontSize: 27, lineHeight: 1.12, color: "#FFFFFF", marginTop: 5 } },
+        callsToday ? callsToday + (callsToday === 1 ? " call" : " calls") + " today · " + ordersToday + (ordersToday === 1 ? " order" : " orders") : "No calls yet today"),
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginTop: 5 } }, openOrders ? openOrders + " phone order" + (openOrders === 1 ? "" : "s") + " not picked up yet" : "The menu, prices and the 86 board come from the rest of the app — nothing to keep in sync.")),
+    React.createElement(PausePhoneCard, { data, persist, card: CARD, label }),
+    React.createElement(WaitControl, { data, persist, who: getWho(), card: CARD, label }),
+    React.createElement(TodayHoursCard, { data, persist, card: CARD, label }),
+    React.createElement(CallLog, { data, persist, isAdmin }),
+    isAdmin ? React.createElement("div", { className: "mb-3" },
+      React.createElement("button", { onClick: () => setSettingsOpen(!settingsOpen), className: "w-full text-left px-4 py-3", style: Object.assign({}, CARD, { border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.crust }) },
+        (settingsOpen ? "▾ " : "▸ ") + "Voice, greetings, languages, delivery, temporary hours"),
+      settingsOpen ? React.createElement("div", { className: "mt-3" }, React.createElement(PhoneVoiceCard, { data, persist, canEdit: true })) : null) : null);
+}
+
 
 
 // ---- Live tickets from Clover (READ ONLY) ----------------------------------
@@ -5245,6 +5362,12 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
   const dropFocus = (id) => { const n = clone(); n.focus = (n.focus || []).filter((x) => x.id !== id); persist(n); };
   const bringForward = () => { const n = clone(); (n.focus || []).forEach((f) => { if (f.date !== today && !f.done) f.date = today; }); persist(n); };
   const togglePrep = (id) => { const n = clone(); const r = (n.prep.par || []).find((x) => x.id === id); if (r) r.done = !r.done; persist(n); };
+  const doneTask = (id) => { const n = clone(); const t = (n.tasks || []).find((x) => x.id === id); if (t) t.done = !t.done; persist(n); };
+  const unmarkPrep = (id) => { const n = clone(); const r = (n.prep.par || []).find((x) => x.id === id); if (r) r.star = false; persist(n); };
+  const unmarkTask = (id) => { const n = clone(); const t = (n.tasks || []).find((x) => x.id === id); if (t) t.star = false; persist(n); };
+  const markedPrep = par.filter((r) => r.star && Number(r.need) > 0 && !r.done);
+  const markedTasks = openTasks.filter((t) => t.star);
+  const anyPriority = mine.length > 0 || carry.length > 0 || markedPrep.length > 0 || markedTasks.length > 0;
   // People work the same shifts most weeks, so letting them put themselves on
   // when they don't see their name builds the schedule from the bottom up —
   // he only has to take off whoever isn't actually working.
@@ -5289,7 +5412,7 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
       React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontWeight: 600, fontSize: 27, lineHeight: 1.12, color: "#FFFFFF", marginTop: 5 } },
         alert ? alert.text : "Nothing needs you right now"),
       React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginTop: 5 } },
-        [prepLeft.length + " prep", openFocus.length + " priorities", openTaskCount + " tasks", eighty.length + " 86'd"].join(" \u00b7 "))
+        [prepLeft.length + " prep", (openFocus.length + markedPrep.length + markedTasks.length) + " marked", openTaskCount + " tasks", eighty.length + " 86'd"].join(" \u00b7 "))
     ),
 
     // who's actually here
@@ -5328,40 +5451,36 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
             React.createElement(Plus, { size: 15 }), "Don't see your name? Add yourself")
     ),
 
-    // phone host: the wait we quote + orders the phone took
-    React.createElement(TodayHoursCard, { data, persist, card: CARD, label }),
-    React.createElement(PausePhoneCard, { data, persist, card: CARD, label }),
-    React.createElement(WaitControl, { data, persist, who: getWho(), card: CARD, label }),
-    React.createElement(PhoneOrdersCard, { data, persist, card: CARD, label }),
+    // phone host: just the wait. Everything else lives on the Phone tab.
+    React.createElement(WaitMini, { data, persist, who: getWho(), goTo }),
 
-    // priorities
-    React.createElement(
+    // priorities: whatever's been marked on the prep list or the task list
+    anyPriority ? React.createElement(
       "div",
       { className: "px-4 py-4 mb-3", style: CARD },
-      label("Today's priorities"),
+      label("Marked today", React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12.5, color: INK3 } }, "the dot on the prep list and tasks")),
       carry.length > 0 && React.createElement("button", { onClick: bringForward, className: "w-full mb-2.5 px-3 py-2 text-left",
         style: { background: "#FFF6E8", border: "1px solid rgba(179,107,0,0.35)", borderRadius: 12, fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, color: "#8A5A00" } },
         carry.length + " unfinished from before \u2014 bring forward"),
-      mine.length === 0 && React.createElement("div", { className: "pb-2", style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, "Nothing flagged yet."),
-      mine.map((f, i) => React.createElement("div", { key: f.id, className: "flex items-center gap-3",
-          style: { borderBottom: i === mine.length - 1 ? "none" : "1px solid " + COLORS.line, minHeight: D.row } },
-        React.createElement("button", { onClick: () => toggleFocus(f.id), className: "flex-1 min-w-0 flex items-center gap-3 text-left",
+      [].concat(
+        markedPrep.map((r) => ({ key: "p" + r.id, text: r.item + (r.need > 1 ? "  \u00d7" + r.need : ""), sub: r.note || "", done: false, onCheck: () => togglePrep(r.id), onDrop: () => unmarkPrep(r.id), kind: "prep" })),
+        markedTasks.map((t) => ({ key: "t" + t.id, text: t.text, sub: t.assignee || "", done: false, onCheck: () => doneTask(t.id), onDrop: () => unmarkTask(t.id), kind: "task" })),
+        mine.map((f) => ({ key: "f" + f.id, text: f.text, sub: "", done: !!f.done, onCheck: () => toggleFocus(f.id), onDrop: () => dropFocus(f.id), kind: "focus" }))
+      ).map((row, i, all) => React.createElement("div", { key: row.key, className: "flex items-center gap-3",
+          style: { borderBottom: i === all.length - 1 ? "none" : "1px solid " + COLORS.line, minHeight: D.row } },
+        React.createElement("button", { onClick: row.onCheck, className: "flex-1 min-w-0 flex items-center gap-3 text-left",
             style: { background: "transparent", border: "none", minHeight: D.row } },
           React.createElement("span", { className: "flex items-center justify-center flex-shrink-0",
-            style: { width: D.check, height: D.check, borderRadius: 999, border: f.done ? "none" : "2px solid #CDD0D3", background: f.done ? COLORS.basil : "transparent" } },
-            f.done ? React.createElement(Check, { size: 15, color: "#FFFFFF" }) : null),
-          React.createElement("span", { className: "truncate", style: { fontFamily: "Inter", fontSize: D.name, fontWeight: 600, letterSpacing: "-0.012em",
-            color: f.done ? INK3 : COLORS.crust, textDecoration: f.done ? "line-through" : "none", textDecorationThickness: "2px" } }, f.text)),
-        React.createElement("button", { onClick: () => dropFocus(f.id), style: { background: "transparent", border: "none", padding: 10, flexShrink: 0 } },
-          React.createElement(Trash2, { size: 15, color: INK3 })))),
-      React.createElement("div", { className: "flex gap-2 mt-2.5" },
-        React.createElement("input", { placeholder: "e.g. Detroit dough needs spreading", value: text,
-          onChange: (e) => setText(e.target.value), onKeyDown: (e) => { if (e.key === "Enter") addFocus(); },
-          className: "flex-1 px-3 outline-none opp-field" }),
-        React.createElement("button", { onClick: addFocus, className: "flex items-center justify-center",
-          style: { background: COLORS.lamp, color: COLORS.ink, border: "none", borderRadius: 12, minHeight: 46, padding: "0 18px" } },
-          React.createElement(Plus, { size: 17 })))
-    ),
+            style: { width: D.check, height: D.check, borderRadius: 999, border: row.done ? "none" : "2px solid #CDD0D3", background: row.done ? COLORS.basil : "transparent" } },
+            row.done ? React.createElement(Check, { size: 15, color: "#FFFFFF" }) : null),
+          React.createElement("span", { className: "min-w-0 flex-1" },
+            React.createElement("span", { className: "truncate", style: { display: "block", fontFamily: "Inter", fontSize: D.name, fontWeight: 600, letterSpacing: "-0.012em",
+              color: row.done ? INK3 : COLORS.crust, textDecoration: row.done ? "line-through" : "none", textDecorationThickness: "2px" } }, row.text),
+            row.sub ? React.createElement("span", { className: "truncate", style: { display: "block", fontFamily: "Inter", fontSize: 13, color: INK2 } }, row.sub) : null),
+          React.createElement("span", { className: "flex-shrink-0", style: { fontFamily: "Inter", fontSize: 11.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: INK3 } }, row.kind === "prep" ? "prep" : row.kind === "task" ? "task" : "")),
+        React.createElement("button", { onClick: row.onDrop, title: row.kind === "focus" ? "Remove" : "Unmark", style: { background: "transparent", border: "none", padding: 10, flexShrink: 0 } },
+          row.kind === "focus" ? React.createElement(Trash2, { size: 15, color: INK3 }) : React.createElement("span", { style: { display: "block", width: 12, height: 12, borderRadius: 999, background: COLORS.alert } }))))
+    ) : null,
 
     // prep, trimmed to what fits
     React.createElement(
@@ -9005,6 +9124,19 @@ function todayLong() {
     const d = new Date();
     return PREP_DAYS_LONG[d.getDay()] + ", " + MON3[d.getMonth()] + " " + d.getDate();
 }
+// ---- Marks ------------------------------------------------------------------
+// The asterisk next to an item on the paper list: "look at this one". A red
+// dot after the name; the marked things are what Today calls priorities.
+function MarkDot({ on, size }) {
+    if (!on) return null;
+    return React.createElement("span", { title: "Marked", style: { display: "inline-block", width: size || 9, height: size || 9, borderRadius: 999, background: COLORS.alert, flexShrink: 0, marginLeft: 6, verticalAlign: "middle" } });
+}
+function MarkToggle({ on, onClick, size }) {
+    const s = size || 36;
+    return React.createElement("button", { onClick: (e) => { e.stopPropagation(); onClick(); }, title: on ? "Unmark" : "Mark as a priority", className: "flex items-center justify-center flex-shrink-0",
+        style: { width: s, height: s, borderRadius: 999, border: on ? "none" : "2px solid " + COLORS.line, background: on ? "#FDECEA" : "transparent", padding: 0 } },
+        React.createElement("span", { style: { width: on ? 12 : 8, height: on ? 12 : 8, borderRadius: 999, background: on ? COLORS.alert : "#CDD0D3", display: "block" } }));
+}
 function PrepListTab({ data, persist, listKey, mode }) {
     const key = listKey || "par";
     const isOrder = mode === "order";
@@ -9047,7 +9179,7 @@ function PrepListTab({ data, persist, listKey, mode }) {
     };
     const resetDay = () => {
         const next = JSON.parse(JSON.stringify(data));
-        next.prep[key].forEach((r) => { r.need = null; r.done = false; r.note = ""; });
+        next.prep[key].forEach((r) => { r.need = null; r.done = false; r.note = ""; r.star = false; });
         persist(next);
     };
     const onList = list.filter((r) => Number(r.need) > 0);
@@ -9092,6 +9224,7 @@ function PrepListTab({ data, persist, listKey, mode }) {
                             textDecoration: r.done ? "line-through" : "none",
                             textDecorationColor: INK3, textDecorationThickness: "2px"
                         } }, r.item),
+                    React.createElement(MarkDot, { on: !!r.star && !r.done }),
                     React.createElement("span", { className: "flex-shrink-0", style: {
                             fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: D.chip,
                             color: r.done ? INK3 : "#FFFFFF",
@@ -9099,7 +9232,8 @@ function PrepListTab({ data, persist, listKey, mode }) {
                             padding: "3px 10px", borderRadius: 8, letterSpacing: "-0.02em", lineHeight: 1.35
                         } }, "\u00d7" + r.need)),
                 r.note ? React.createElement("span", { className: "truncate", style: { fontFamily: "Inter", fontSize: D.note, fontWeight: 500, color: INK2, marginTop: 3 } }, r.note) : null)),
-        React.createElement("div", { className: "flex items-center pr-3 flex-shrink-0", style: { borderBottom: last ? "none" : "1px solid " + COLORS.line } },
+        React.createElement("div", { className: "flex items-center gap-1 pr-3 flex-shrink-0", style: { borderBottom: last ? "none" : "1px solid " + COLORS.line } },
+            React.createElement(MarkToggle, { on: !!r.star, size: 32, onClick: () => patch(r.id, { star: !r.star }) }),
             React.createElement("button", { onClick: () => setNoteOpen(noteOpen === r.id ? "" : r.id), style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, color: INK3, padding: "12px 6px" } }, r.note ? "Edit" : "Note"))));
 
     const noteEditor = (r) => (React.createElement("div", { key: r.id + "-note", className: "px-4 py-3", style: { background: "#F6F5F2", borderBottom: "1px solid " + COLORS.line } },
@@ -9113,6 +9247,7 @@ function PrepListTab({ data, persist, listKey, mode }) {
             React.createElement("div", { className: "flex items-center justify-between gap-3 mb-3" },
                 React.createElement("div", { className: "min-w-0 flex items-center gap-2" },
                     React.createElement("span", { style: { fontFamily: "Inter", fontSize: 17, fontWeight: 700, letterSpacing: "-0.012em", color: COLORS.crust } }, r.item),
+                    React.createElement(MarkToggle, { on: !!r.star, size: 30, onClick: () => patch(r.id, { star: !r.star }) }),
                     on ? React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: 15, color: "#FFFFFF", background: COLORS.ink, padding: "3px 10px", borderRadius: 8 } }, "\u00d7" + need) : null,
                     isSet ? React.createElement("span", { style: { fontFamily: "Inter", fontSize: 13, fontWeight: 600, color: COLORS.basil, background: "rgba(31,138,76,0.10)", padding: "3px 9px", borderRadius: 999 } }, "All set") : null),
                 confirmDel === r.id
@@ -10536,6 +10671,12 @@ function TasksTab({ data, persist }) {
     t.done = !t.done;
     persist(next);
   };
+  const markTask = (id) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const t = next.tasks.find((t2) => t2.id === id);
+    if (t) t.star = !t.star;
+    persist(next);
+  };
   const remove = (id) => {
     const next = JSON.parse(JSON.stringify(data));
     next.tasks = next.tasks.filter((t) => t.id !== id);
@@ -10726,10 +10867,12 @@ function TasksTab({ data, persist }) {
       React.createElement("span", { className: "min-w-0 flex-1 flex items-center gap-2",
         style: { borderBottom: last ? "none" : "1px solid " + COLORS.line, minHeight: D.row, paddingRight: 8 } },
         React.createElement("span", { className: "truncate", style: { fontFamily: "Inter", fontSize: D.name, fontWeight: 600, letterSpacing: "-0.012em", color: COLORS.crust } }, t.text),
+        React.createElement(MarkDot, { on: !!t.star }),
         React.createElement("span", { className: "flex-shrink-0", style: { fontFamily: "Inter", fontSize: 13, fontWeight: 600, color: INK2, background: "#F2F2EF", borderRadius: 7, padding: "3px 9px" } }, t.assignee || "Anyone"))
     ),
     React.createElement(
       "div", { className: "flex items-center gap-1 pr-3 flex-shrink-0", style: { borderBottom: last ? "none" : "1px solid " + COLORS.line } },
+      React.createElement(MarkToggle, { on: !!t.star, size: 32, onClick: () => markTask(t.id) }),
       React.createElement("select", {
           value: stationOf(t), onChange: (e) => move(t.id, e.target.value),
           className: "outline-none",
