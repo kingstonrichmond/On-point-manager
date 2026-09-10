@@ -92,6 +92,9 @@ function snapshot(shop) {
 }
 import * as shopFns from './lib/shop-data.mjs';
 
+const CALL_KEEP_DAYS = 7;
+const CALL_KEEP_MAX = 500;
+
 async function saveCall(env, rec) {
   try {
     const { getStore } = await import('@netlify/blobs');
@@ -99,7 +102,18 @@ async function saveCall(env, rec) {
     const key = env.OPP_BLOB_KEY || 'data';
     const doc = (await store.get(key, { type: 'json' })) ?? { rev: 0, data: {} };
     const data = doc.data ?? {};
-    const calls = [...(Array.isArray(data.phoneCalls) ? data.phoneCalls : []).filter((c) => c.id !== rec.id), rec].slice(-500);
+    // Age out, then cap. A slow week used to keep months of transcripts and
+    // recordings on the board simply because 500 hadn't been reached; the call
+    // log only ever looks back a month, and the blob is read whole on every
+    // sync. Seven days is the window that matters, 500 is the ceiling that
+    // stops a busy Saturday from bloating the document.
+    const cutoff = Date.now() - CALL_KEEP_DAYS * 86400_000;
+    // An undated record can't be aged, so keep it and let the ceiling bound it
+    // — dropping calls on a missing timestamp would lose the whole log if the
+    // vendor ever changed the field.
+    const recent = (c) => { const t = Date.parse(c?.at); return Number.isNaN(t) || t >= cutoff; };
+    const prior = (Array.isArray(data.phoneCalls) ? data.phoneCalls : []).filter((c) => c.id !== rec.id && recent(c));
+    const calls = [...prior, rec].slice(-CALL_KEEP_MAX);
     await store.setJSON(key, { rev: (doc.rev ?? 0) + 1, data: { ...data, phoneCalls: calls } });
   } catch (e) {
     console.error('saveCall failed', e.message);

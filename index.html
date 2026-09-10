@@ -5098,7 +5098,7 @@ function CallLog({ data, persist, isAdmin }) {
         isOpen ? React.createElement("div", null,
           o ? orderDetail(o) : null,
           c.transcript ? React.createElement("pre", { className: "text-xs whitespace-pre-wrap p-2.5 rounded mt-2", style: { background: "#FAFAF8", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono", color: COLORS.crust, maxHeight: 320, overflowY: "auto" } }, c.transcript) : React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: INK3, marginTop: 6 } }, "No transcript came back for this call."),
-          c.recordingUrl && isAdmin ? React.createElement("a", { href: c.recordingUrl, target: "_blank", rel: "noopener", style: { display: "inline-block", marginTop: 8, fontFamily: "Inter", fontSize: 13, fontWeight: 600, color: COLORS.ink } }, "Listen to the recording ›") : null) : null);
+          c.recordingUrl ? React.createElement("a", { href: c.recordingUrl, target: "_blank", rel: "noopener", style: { display: "inline-block", marginTop: 8, fontFamily: "Inter", fontSize: 13, fontWeight: 600, color: COLORS.ink } }, "Listen to the recording ›") : null) : null);
     }),
     orphanOrders.length ? React.createElement("div", { style: { borderTop: "1px solid " + COLORS.line, paddingTop: 10, marginTop: 4 } },
       React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase", marginBottom: 4 } }, "Orders without a call record"),
@@ -7138,6 +7138,37 @@ function Stars({ value, onChange }) {
     },
     "\u2605"
   )));
+}
+// The crew's view of the Staff tab. Same people, none of the levers: no edit, no
+// delete, no PIN, no ADP ID, and no notes log — the notes are the owner's private
+// record about people and never belonged in front of the crew. What's left is
+// what someone on a shift actually opens this for: who works here, what they can
+// work, and a way to reach them when a shift needs covering. Former staff stay
+// hidden; "who used to work here" is bookkeeping, not a shift question.
+function CrewList({ data }) {
+  const firstName = (s) => String(s.name || "").split("(")[0].trim();
+  const crew = (data.staff || []).filter((s) => !s.inactive).sort((a, b) => firstName(a).localeCompare(firstName(b)));
+  const digits = (ph) => String(ph || "").replace(/[^\d+]/g, "");
+  const linkBtn = (href, txt, key) => React.createElement("a", { key, href, className: "text-xs px-2 py-1 rounded",
+    style: { fontFamily: "Inter", fontWeight: 600, background: "#F2F2EF", color: COLORS.crust, textDecoration: "none", border: "1px solid " + COLORS.line } }, txt);
+
+  const card = (s) => {
+    const ph = digits(s.phone);
+    const positions = (s.positions || []).map((p) => p.name).filter(Boolean);
+    return React.createElement("div", { key: s.id, className: "rounded px-3 py-2.5", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } },
+      React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, s.name),
+      React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8A9096" } },
+        positions.length ? positions.join(", ") : "No positions listed yet."),
+      ph ? React.createElement("div", { className: "flex gap-1.5 mt-1.5" },
+        linkBtn("sms:" + ph, "Text", "t"),
+        linkBtn("tel:" + ph, "Call", "c"))
+        : React.createElement("div", { className: "text-xs mt-1.5", style: { fontFamily: "Inter", color: "#8A9096" } }, "No number on file."));
+  };
+
+  return React.createElement("div", { className: "space-y-1.5" },
+    crew.length
+      ? crew.map(card)
+      : React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", color: "#8A9096", padding: "8px 2px" } }, "No one on the crew list yet."));
 }
 function StaffTab({ data, persist }) {
   const staff = data.staff || [];
@@ -10795,7 +10826,7 @@ function CrewTab({ data, persist, isAdmin, offSoon, initialSub, onSub }) {
         { id: "tips", label: "Tips", icon: DollarSign },
         { id: "schedule", label: "Schedule", icon: Users },
         { id: "timeoff", label: "Time Off", icon: Calendar, badge: offSoon },
-        isAdmin && { id: "staff", label: "Staff", icon: Users }
+        { id: "staff", label: "Staff", icon: Users }
     ].filter(Boolean);
     const sub = initialSub || "timeclock";
     const setSub = onSub || (() => {});
@@ -10808,7 +10839,9 @@ function CrewTab({ data, persist, isAdmin, offSoon, initialSub, onSub }) {
         active === "tips" && React.createElement(TipsTab, { data, persist, canSeeLog: isAdmin }),
         active === "schedule" && React.createElement(ScheduleTab, { data, persist, canEdit: isAdmin }),
         active === "timeoff" && React.createElement(TimeOffTab, { data, persist }),
-        active === "staff" && isAdmin && React.createElement(StaffTab, { data, persist })
+        active === "staff" && (isAdmin
+            ? React.createElement(StaffTab, { data, persist })
+            : React.createElement(CrewList, { data }))
     );
 }
 // Inventory (incl. Storage Map) + Food Order + Drinks + Belmont Order + 86
