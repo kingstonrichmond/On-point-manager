@@ -3599,6 +3599,16 @@ function openPunchFor(data, iso, name) {
     if (!n) return null;
     return ((data && data.timeClock) || []).find((e) => e.date === iso && !e.clockOut && normPerson(e.name) === n) || null;
 }
+// The other half of openPunchFor: a punch for this person today that has been
+// closed. They came, they worked, they've gone. Without this the Today board
+// forgot the punch the moment it closed and fell back to the schedule, so
+// someone who'd clocked out came back as a plain "on now" pill — and nobody
+// could tell whether they'd forgotten to clock in or had already left.
+function closedPunchFor(data, iso, name) {
+    const n = normPerson(name);
+    if (!n) return null;
+    return ((data && data.timeClock) || []).find((e) => e.date === iso && !!e.clockOut && normPerson(e.name) === n) || null;
+}
 function normPerson(s) {
     return String(s || "").toLowerCase().split("(")[0].replace(/[^a-z]/g, "").trim();
 }
@@ -4707,10 +4717,14 @@ function crewForDate(data, iso, nowDate) {
     const off = !unfilled && isOffThatDay(data, iso, person);
     const win = scheduleWindow(shift.time, hrs);
     const punch = unfilled ? null : openPunchFor(data, iso, person);
+    // An OPEN punch is checked first on purpose: clock out by mistake, clock
+    // back in, and the new open punch puts them back to "in".
+    const worked = !unfilled && !punch && closedPunchFor(data, iso, person);
     if (!unfilled) seen[normPerson(person)] = true;
     let status = "tbd";
     if (unfilled) status = "unfilled";
     else if (punch) status = "in";
+    else if (worked) status = "done";
     else if (off) status = "off";
     else if (win && now < win.start) status = "later";
     else if (win && now <= win.end) status = "now";
