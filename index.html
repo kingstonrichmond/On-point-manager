@@ -2655,7 +2655,10 @@ function assistantContext(data, isAdmin) {
   const thisMon = weekStartISO(today);
   const staff = (data.staff || []).map((s) => {
     const o = { id: s.id, name: s.name, inactive: !!s.inactive, positions: (s.positions || []).map((p) => ({ name: p.name, skill: p.skill })) };
-    if (isAdmin) { o.phone = s.phone || ""; o.notes = (s.notes || []).slice(0, 5).map((n) => ({ date: n.date, text: n.text })); }
+    // Same line the Staff tab draws: the crew sees numbers for people who work
+    // here now, the owner sees everyone's. Notes are the owner's private log.
+    if (isAdmin || !s.inactive) o.phone = s.phone || "";
+    if (isAdmin) o.notes = (s.notes || []).slice(0, 5).map((n) => ({ date: n.date, text: n.text }));
     return o; // never PIN, never ADP id
   });
   const inventory = (data.inventory || []).map((i) => {
@@ -2708,7 +2711,7 @@ WHAT THE DATA MEANS
 "crewNow" is who is on today and their status RIGHT NOW: "in" = clocked in on the time clock (this beats the schedule — they're in the building), "now" = scheduled to be on but not clocked in, "later" = scheduled later today, "done" = their shift ended, "off" = booked off, "unfilled" = an open shift nobody's covering. For "who's here", answer from crewNow, listing "in" first.
 "thisWeek" is the actual schedule for the current Monday–Sunday with real dates; "usualWeek" is the standing pattern each week starts from. Answer "who's working Friday" from thisWeek. Shift names look like "Pop (cooking)" — first name, position in parentheses.
 "timeOff" is the time-off calendar, upcoming dates only. Whenever you're asked about the schedule, who's working, or covering a shift, check timeOff first and warn about anyone who is off that day before anything else. If someone says they need a day off, add it with add_time_off and confirm the date back in words. Resolve "next Friday" yourself using "now".
-"staff" is the crew and the positions each person can work, skill 1-5 (phone numbers are included only for the owner). Someone with "inactive": true no longer works here — never schedule or suggest them. For "who can cover the fryer", list active people with that position, highest skill first.${isAdmin ? ' "notes" on a staff record are the owner\'s private log — use them if the owner asks, never volunteer them.' : ""} You never have PINs or payroll IDs; if asked, say the owner can look those up in Staff.
+"staff" is the crew and the positions each person can work, skill 1-5, and their phone number when there is one on file${isAdmin ? "" : " (for the crew, that's only people who currently work here — the same list as the Staff tab)"}. Someone with "inactive": true no longer works here — never schedule or suggest them. For "who can cover the fryer", list active people with that position, highest skill first.${isAdmin ? ' "notes" on a staff record are the owner\'s private log — use them if the owner asks, never volunteer them.' : ""} You never have PINs or payroll IDs; if asked, say the owner can look those up in Staff.
 "tasks" is today's task list (text, station, assignee, done). "recurringDue" is the standing chores that are due or overdue right now (daysLate 0 = due today). "What's overdue" means recurringDue with daysLate > 0, plus open tasks.
 "prep" has: "par" (the daily PREP LIST — need null = nobody's looked, 0 = all set, N = that many to make; done = crossed off). "What still needs to be prepped" = need > 0 and not done. "produce" is the Belmont produce ORDER (same shape; need > 0 = on the order). "lowStock" is the 86 / low-stock board — MENU items only, status ok/low/86. When something is 86'd, say so plainly if anyone asks about that dish.
 "needList" is the running list of supplies and parts the shop needs (drain plug, wax paper). "We need X" where X isn't a menu item is an add_need, not a flag_stock.
