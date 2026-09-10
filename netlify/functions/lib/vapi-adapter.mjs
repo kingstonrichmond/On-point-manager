@@ -35,7 +35,11 @@ export function buildVapiAssistant(shop, env = process.env, { serverUrl } = {}) 
       tools: [...functionTools, ...transfer],
     },
     transcriber: parseJSON(env.VAPI_TRANSCRIBER_JSON, { provider: 'deepgram', model: 'nova-3', language: 'en', keywords: keywordsFor(shop) }),
-    voice: parseJSON(env.VAPI_VOICE_JSON, { provider: 'vapi', voiceId: 'Paige' }), // pick in the Vapi dashboard; any provider works
+    // Vapi retired Paige on 1 March 2026 and now REJECTS any assistant that asks
+    // for a retired voice, which fails assistant-request outright — no call, no
+    // fallback. version 2 is what Vapi's own voices need (see DEFAULT_VOICE in
+    // shop-data.mjs). Pick a different one in the Vapi dashboard; any provider works.
+    voice: parseJSON(env.VAPI_VOICE_JSON, { provider: 'vapi', voiceId: 'Savannah', version: 2 }),
     silenceTimeoutSeconds: 20,
     maxDurationSeconds: 900,
     backgroundSound: 'off',
