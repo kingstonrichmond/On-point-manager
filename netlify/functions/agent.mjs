@@ -22,18 +22,26 @@ export const config = { path: '/agent' };
 const json = (body, status = 200, extra = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...extra } });
 
-function authorized(req, env) {
+// Vapi's dashboard has nowhere to put a plain shared secret — its credential
+// screens are OAuth client-credentials forms — so the secret can ride in the
+// URL instead: one long Server URL pasted once, no credential screen. `k` is
+// checked LAST, after the headers, so nothing that already works changes. It's
+// short and doesn't say what it is. Never log the URL.
+function authorized(req, env, url) {
   const secret = env.AGENT_SECRET;
   if (!secret) { console.warn('AGENT_SECRET not set — /agent is OPEN'); return true; }
   const h = req.headers;
-  const given = h.get('x-vapi-secret') || h.get('x-agent-token') || (h.get('authorization') || '').replace(/^Bearer\s+/i, '');
+  const given = h.get('x-vapi-secret') || h.get('x-agent-token')
+    || (h.get('authorization') || '').replace(/^Bearer\s+/i, '')
+    || (url && url.searchParams.get('k')) || '';
   return given === secret;
 }
 
 export default async (req, context) => {
   const env = process.env;
   if (req.method === 'OPTIONS') return new Response('', { status: 204, headers: { 'access-control-allow-origin': env.AGENT_CORS_ORIGIN || '', 'access-control-allow-headers': 'authorization,x-agent-token,content-type' } });
-  if (!authorized(req, env)) return json({ error: 'unauthorized' }, 401);
+  const url = new URL(req.url);
+  if (!authorized(req, env, url)) return json({ error: 'unauthorized' }, 401);
 
   let shop;
   try {
@@ -43,8 +51,10 @@ export default async (req, context) => {
     return json({ error: 'shop data unavailable', detail: e.message }, 503);
   }
 
-  const url = new URL(req.url);
-  const serverUrl = `${url.origin}/agent`;
+  // Hand out the same door we were let in through: an assistant built from a
+  // ?k= request points its tools at a ?k= URL, or every tool call would 401.
+  const k = url.searchParams.get('k');
+  const serverUrl = `${url.origin}/agent${k ? '?k=' + encodeURIComponent(k) : ''}`;
 
   if (req.method === 'GET') {
     if (url.searchParams.get('assistant') === 'vapi') return json(buildVapiAssistant(shop, env, { serverUrl }));
