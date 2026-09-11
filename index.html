@@ -2738,10 +2738,10 @@ Keep "reply" concise so the JSON is never cut off.
 - {"type": "add_task", "text": "...", "station": "one of: Front, Line, Pizza, Oven, Fryer, Salad, Sandwich, Prep, Dish, Back of House, Manager", "assignee": "..."}
 - {"type": "complete_task", "text_match": "substring of an existing task's text"}
 - {"type": "update_inventory", "item_match": "substring of an existing inventory item name", "qty": number}
-- {"type": "add_shift", "day": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "name": "...", "time": "..."}  (goes on the upcoming instance of that day only, not the usual week)
+- {"type": "add_shift", "day": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "name": "...", "time": "..."}  (goes on the upcoming instance of that day only, not the usual week. "name" must be one of the names in "staff", spelled exactly as there — the app refuses anyone else; if the person named isn't on staff, say so and that a manager can add them in Crew)
 - {"type": "set_produce", "item_match": "romaine", "need": 2}  (Belmont produce order; need 0 = all set, null = not looked at)
 - {"type": "set_order", "item_match": "all trumps", "orderNeed": 4, "orderVendor": "QFC"}  (put an inventory item on that vendor's order; orderNeed 0 = all set, null = clear it; orderVendor is QFC, Thomsen or Pepsi)
-- {"type": "add_time_off", "date": "YYYY-MM-DD", "name": "...", "note": "optional reason"}
+- {"type": "add_time_off", "date": "YYYY-MM-DD", "name": "...", "note": "optional reason"}  ("name" must be one of the names in "staff", spelled exactly as there — same rule as add_shift)
 - {"type": "remove_time_off", "date": "YYYY-MM-DD", "name": "..."}  (they can work after all)
 - {"type": "flag_stock", "item": "...", "status": "ok|low|86"}  (menu items only)
 - {"type": "add_need", "text": "...", "who": "optional first name"}  (supplies and parts — anything that isn't a menu item)
@@ -3181,9 +3181,20 @@ function AssistantTab({ data, persist, isAdmin }) {
       // as it is NOW, not the copy this tablet had when the question went out.
       let next = JSON.parse(JSON.stringify(liveData(dataNowRef.current)));
       let changed = false;
+      // Same rule as every other door: a name has to be someone on the Staff
+      // tab, spelled the way their record spells it. The assistant hears
+      // shorthand — "put pap on tuesday" — and that's exactly how a second
+      // "Pap" used to land next to "Pop". Anyone it can't match is refused
+      // and named in the reply, so the person hears why nothing happened.
+      const refused = [];
+      const staffOnly = (raw) => {
+        const hit = matchStaffName(next, raw);
+        if (!hit && String(raw || "").trim()) refused.push(String(raw).trim());
+        return hit;
+      };
       for (const action of Array.isArray(parsed.actions) ? parsed.actions : []) {
         if (action.type === "add_time_off") {
-          const nm = String(action.name || "").trim();
+          const nm = staffOnly(action.name);
           const dt = String(action.date || "").trim();
           if (nm && /^\d{4}-\d{2}-\d{2}$/.test(dt)) {
             next.timeOff = next.timeOff || [];
@@ -3216,10 +3227,17 @@ function AssistantTab({ data, persist, isAdmin }) {
             changed = true;
           }
         } else if (action.type === "add_shift") {
-          if (DAYS.indexOf(action.day) !== -1) {
+          // No more "TBD" placeholder either — that's a stray name by another
+          // route. A shift with nobody matched is not added.
+          const who = staffOnly(action.name);
+          if (who && DAYS.indexOf(action.day) !== -1) {
             const wk = ensureWeek(next, weekStartISO(nextDateForDow(action.day)));
-            wk[action.day].push({ id: uid(), name: action.name || "TBD", time: action.time || "" });
-            changed = true;
+            const name = joinShiftName(who, splitShiftName(action.name).position);
+            const dup = wk[action.day].some((sh) => normPerson(sh.name) === normPerson(who));
+            if (!dup) {
+              wk[action.day].push({ id: uid(), name, time: action.time || "" });
+              changed = true;
+            }
           }
         } else if (action.type === "set_par" || action.type === "set_prep_par") {
           const r = matchRow(next.prep && next.prep.par, "item", action.item_match);
@@ -3292,7 +3310,10 @@ function AssistantTab({ data, persist, isAdmin }) {
         }
       }
       if (changed) await persist(next);
-      const replyText = parsed.reply || "Done.";
+      const unknown = refused.filter((n, i) => refused.indexOf(n) === i);
+      const replyText = (parsed.reply || "Done.") + (unknown.length
+        ? " I don't have " + unknown.map((n) => "\u201c" + n + "\u201d").join(" or ") + " on staff, so I didn't add " + (unknown.length === 1 ? "them" : "those") + " \u2014 names have to match the Staff tab. Not on it? A manager can add them in Crew."
+        : "");
       setMessages((m) => { const out = [...m, { role: "assistant", text: replyText }]; messagesRef.current = out; return out; });
       speak(replyText, () => {
         if (voiceModeRef.current === "off") return;
@@ -3572,6 +3593,21 @@ function ensureWeek(next, weekISO) {
     }
     return next.scheduleWeeks[weekISO];
 }
+// The other direction. He edits a real week as reality changes; once it's
+// right, that corrected week IS the new normal. What the week shows — its own
+// copy where it has one, the pattern where it doesn't — becomes the usual
+// week, with fresh ids so a pattern row and a week row can never share one.
+// Then the week's own copy is dropped: it now matches the pattern exactly, and
+// keeping it would only stop it following the next pattern edit. Mutates the
+// clone it's handed.
+function promoteWeek(next, weekISO) {
+    next.schedule = next.schedule || {};
+    const rows = {};
+    DAYS.forEach((d, i) => { rows[d] = shiftsOn(next, addDaysISO(weekISO, i)).map((s) => ({ id: uid(), name: s.name, time: s.time || "" })); });
+    DAYS.forEach((d) => { next.schedule[d] = rows[d]; });
+    if (next.scheduleWeeks) delete next.scheduleWeeks[weekISO];
+    return next;
+}
 // Display order for a day: by start time, "open"/"day" first, anything the
 // parser can't read at the end in the order it was typed. Stored order is left
 // alone so ids stay stable.
@@ -3635,6 +3671,15 @@ function staffNameList(data) {
         out.push(n);
     });
     return out.sort((a, b) => a.localeCompare(b));
+}
+// One person, one spelling. Every door that adds a name resolves it here, so a
+// typed "pap" can't become a second person next to "Pop": a name is either one
+// of the active staff, spelled the way their record spells it, or it isn't
+// allowed in. Returns "" for anyone who isn't on staff.
+function matchStaffName(data, raw) {
+    const n = normPerson(raw);
+    if (!n) return "";
+    return staffNameList(data).find((s) => normPerson(s) === n) || "";
 }
 function money(n) {
     const v = Math.round((Number(n) || 0) * 100) / 100;
@@ -4540,7 +4585,6 @@ function TimeOffTab({ data, persist }) {
     const t0 = new Date();
     const [cursor, setCursor] = useState({ y: t0.getFullYear(), m: t0.getMonth() });
     const [sel, setSel] = useState(todayISO());
-    const [typed, setTyped] = useState("");
     const [note, setNote] = useState("");
     const [confirmId, setConfirmId] = useState("");
     const [confirmText, setConfirmText] = useState("");
@@ -4548,8 +4592,11 @@ function TimeOffTab({ data, persist }) {
     const names = staffNameList(data);
     const today = todayISO();
     const CARD_SHADOW = "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)";
+    // Only someone on staff can be marked off. The name chips are the only door
+    // now and this is the lock behind it — the free-text field is how "Pap"
+    // ended up as a second person next to "Pop". Not on staff? Ask a manager.
     const addFor = (name) => {
-        const nm = String(name || "").trim();
+        const nm = matchStaffName(data, name);
         if (!nm)
             return;
         const next = JSON.parse(JSON.stringify(data));
@@ -4558,7 +4605,6 @@ function TimeOffTab({ data, persist }) {
         if (!dup)
             next.timeOff.push({ id: uid(), date: sel, name: nm, note: note.trim(), added: today });
         persist(next);
-        setTyped("");
         setNote("");
     };
     // Anyone can take time off back down, but not by accident. You have to type
@@ -4602,7 +4648,7 @@ function TimeOffTab({ data, persist }) {
             React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: COLORS.lamp, textTransform: "uppercase" } }, "Time off"),
             React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontWeight: 600, fontSize: 34, lineHeight: 1.05, color: "#FFFFFF", marginTop: 4 } },
                 upcoming.length === 0 ? "Nobody's off" : upcoming.length + (upcoming.length === 1 ? " day booked" : " days booked")),
-            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginTop: 6 } }, "Next three weeks \u00b7 anyone can add their own")),
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginTop: 6 } }, "Next three weeks \u00b7 tap your name to mark yourself off")),
 
         upcoming.length > 0 && (React.createElement("div", { className: "px-4 py-4 mb-4", style: { background: "#FDECEA", borderRadius: 16, border: "1px solid rgba(200,56,47,0.22)" } },
             React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: COLORS.alertDark, textTransform: "uppercase", marginBottom: 10 } }, "Heads up \u2014 next 3 weeks"),
@@ -4664,8 +4710,9 @@ function TimeOffTab({ data, persist }) {
                                 style: { background: nameMatches(r) ? COLORS.ink : "#E7E8E6", color: nameMatches(r) ? "#FFFFFF" : INK3,
                                          border: "none", borderRadius: 12, fontFamily: "Inter", fontSize: 15, fontWeight: 600, padding: "0 18px", minHeight: 46 } }, "Remove"))));
             })),
-            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: INK3, textTransform: "uppercase", marginBottom: 8 } }, "Tap a name to mark them off"),
-            React.createElement("div", { className: "flex flex-wrap gap-2 mb-4" }, names.map((n) => {
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: INK3, textTransform: "uppercase", marginBottom: 8 } }, "Tap your name to mark yourself off"),
+            React.createElement("input", { placeholder: "Reason (optional)", value: note, onChange: (e) => setNote(e.target.value), className: "w-full px-3 outline-none opp-field mb-3" }),
+            React.createElement("div", { className: "flex flex-wrap gap-2 mb-3" }, names.map((n) => {
                 const already = selRows.some((r) => normPerson(r.name) === normPerson(n));
                 return (React.createElement("button", { key: n, onClick: () => { if (!already) addFor(n); }, style: {
                         background: already ? COLORS.ink : "#F2F2EF",
@@ -4674,12 +4721,7 @@ function TimeOffTab({ data, persist }) {
                         fontFamily: "Inter", fontSize: 15, fontWeight: 600
                     } }, n));
             })),
-            React.createElement("div", { className: "flex flex-col sm:flex-row gap-2" },
-                React.createElement("input", { placeholder: "Someone not on the list", value: typed, onChange: (e) => setTyped(e.target.value), className: "px-3 outline-none opp-field flex-1" }),
-                React.createElement("input", { placeholder: "Reason (optional)", value: note, onChange: (e) => setNote(e.target.value), className: "px-3 outline-none opp-field flex-1" }),
-                React.createElement("button", { onClick: () => addFor(typed), className: "flex items-center justify-center gap-1.5",
-                    style: { background: COLORS.lamp, color: COLORS.ink, border: "none", borderRadius: 12, fontFamily: "Inter", fontSize: 15, fontWeight: 600, minHeight: 46, padding: "0 20px" } },
-                    React.createElement(Plus, { size: 16 }), "Add")))));
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#8A9096" } }, "Not on the list? Ask a manager to add you in Crew."))));
 }
 // ===================== TODAY =====================
 // The screen that stays up. Everything a shift actually needs to glance at,
@@ -5459,6 +5501,7 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
   const [showAllPrep, setShowAllPrep] = useState(false);
   const [addMe, setAddMe] = useState(false);
   const [addName, setAddName] = useState("");
+  const [addErr, setAddErr] = useState("");
   const [addTime, setAddTime] = useState("");
   const D = DENSITY[useDensity()];
   const today = todayISO();
@@ -5523,15 +5566,20 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
   // People work the same shifts most weeks, so letting them put themselves on
   // when they don't see their name builds the schedule from the bottom up —
   // he only has to take off whoever isn't actually working.
+  // Only someone on staff goes on the board. The select is already limited to
+  // staff, but the "(this tablet)" fallback is the device's stored name — free
+  // text — and that's how a stray spelling became a second person. Resolve it
+  // against staff and refuse, visibly, when it isn't one.
+  const meStaff = matchStaffName(data, getWho());
   const addToSchedule = () => {
-    const nm = String(addName || getWho() || "").trim();
-    if (!nm) return;
+    const nm = matchStaffName(data, addName || getWho());
+    if (!nm) { setAddErr("Pick your name from the list \u2014 not on it? Ask a manager to add you in Crew."); return; }
     const n = clone();
     const key = DOW3[isoToDate(today).getDay()];
     // Today only. The usual week is edited on the Schedule tab on purpose.
     ensureWeek(n, weekStartISO(today))[key].push({ id: uid(), name: nm, time: String(addTime || "").trim() });
     persist(n);
-    setAddMe(false); setAddName(""); setAddTime("");
+    setAddMe(false); setAddName(""); setAddTime(""); setAddErr("");
   };
 
   const label = (t, right) => React.createElement("div", { className: "flex items-baseline justify-between mb-2.5" },
@@ -5587,16 +5635,19 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
       addMe
         ? React.createElement("div", { className: "mt-3" },
             React.createElement("div", { className: "flex gap-2 mb-2" },
-              React.createElement("select", { value: addName, onChange: (e) => setAddName(e.target.value), className: "flex-1 px-3 outline-none opp-field" },
-                React.createElement("option", { value: "" }, getWho() ? getWho() + " (this tablet)" : "Who?"),
-                staffNameList(data).map((n2) => React.createElement("option", { key: n2, value: n2 }, n2))),
+              React.createElement("select", { value: addName, onChange: (e) => { setAddName(e.target.value); setAddErr(""); }, className: "flex-1 px-3 outline-none opp-field" },
+                meStaff
+                  ? React.createElement("option", { value: meStaff }, meStaff + " (this tablet)")
+                  : React.createElement("option", { value: "" }, "Who?"),
+                staffNameList(data).filter((n2) => n2 !== meStaff).map((n2) => React.createElement("option", { key: n2, value: n2 }, n2))),
               React.createElement("input", { placeholder: "e.g. 4-close", value: addTime, onChange: (e) => setAddTime(e.target.value),
                 onKeyDown: (e) => { if (e.key === "Enter") addToSchedule(); }, className: "px-3 outline-none opp-field", style: { width: 130 } })),
+            addErr ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: COLORS.alertDark, marginBottom: 8 } }, addErr) : null,
             React.createElement("div", { className: "flex gap-2" },
               React.createElement("button", { onClick: addToSchedule, className: "flex items-center justify-center gap-1.5",
                 style: { background: COLORS.lamp, color: COLORS.ink, border: "none", borderRadius: 12, minHeight: 44, padding: "0 18px", fontFamily: "Inter", fontSize: 15, fontWeight: 600 } },
                 React.createElement(Check, { size: 16 }), "Add to today"),
-              React.createElement("button", { onClick: () => setAddMe(false),
+              React.createElement("button", { onClick: () => { setAddMe(false); setAddErr(""); },
                 style: { background: "transparent", color: INK2, border: "1px solid " + COLORS.line, borderRadius: 12, minHeight: 44, padding: "0 16px", fontFamily: "Inter", fontSize: 15, fontWeight: 600 } }, "Cancel")))
         : React.createElement("button", { onClick: () => { setAddMe(true); setAddName(getWho() || ""); }, className: "mt-3 flex items-center gap-1.5",
             style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.ink, padding: 0 } },
@@ -5854,10 +5905,7 @@ function evenOut(rows, pot) {
 // 11-to-close shift lands in both, which is right, they cashed out twice.
 function crewFromRecords(data, iso) {
     const sc = shopHours(data).shiftChange;
-    const canon = (n) => {
-        const k = normPerson(n);
-        return staffNameList(data).find((s) => normPerson(s) === k) || String(n || "").trim();
-    };
+    const canon = (n) => matchStaffName(data, n) || String(n || "").trim();
     const day = [], night = [], seenD = {}, seenN = {};
     const add = (list, seen, n) => { const c = canon(n); const k = normPerson(c); if (k && !seen[k]) { seen[k] = true; list.push(c); } };
     const punches = ((data && data.timeClock) || []).filter((e) => e.date === iso);
@@ -6578,6 +6626,10 @@ function ScheduleTab({ data, persist, canEdit }) {
     // signed in as whoever touched it last.
     const [me, setMe] = useState(null);
     const [pinOpen, setPinOpen] = useState(false);
+    // Two taps to make this week the usual week — it rewrites the standing
+    // pattern for every week that hasn't been edited on its own. Arms for a
+    // few seconds, then stands down by itself.
+    const [confirmPromote, setConfirmPromote] = useState(false);
     useEffect(() => { if (!me) return; const t = setTimeout(() => setMe(null), 5 * 60 * 1000); return () => clearTimeout(t); }, [me]);
     const meName = me ? String(me.name || "").split("(")[0].trim() : "";
     const mayEdit = (person) => !!canEdit || (!!me && normPerson(person) === normPerson(meName));
@@ -6605,7 +6657,15 @@ function ScheduleTab({ data, persist, canEdit }) {
         const d = draft[day] || {};
         const person = String(d.name || "").trim();
         if (!person) return;
-        const name = person === "__open__" ? "Open shift" : joinShiftName(person, d.position);
+        const isOpen = person === "__open__";
+        // One row per person per day. Open shifts are exempt — a day can need
+        // filling twice — and the refusal is said out loud rather than doing
+        // nothing, which reads as "the tap didn't take".
+        if (!isOpen && rowsFor(day).some((s) => normPerson(s.name) === normPerson(person))) {
+            setD(day, { note: "Already on " + day });
+            return;
+        }
+        const name = isOpen ? "Open shift" : joinShiftName(person, d.position);
         write(day, (list) => list.push({ id: uid(), name, time: String(d.time || "").trim() }));
         setDraft({ ...draft, [day]: { open: true, name: "", position: "", time: "" } });
     };
@@ -6631,6 +6691,11 @@ function ScheduleTab({ data, persist, canEdit }) {
         const next = JSON.parse(JSON.stringify(data));
         if (next.scheduleWeeks) delete next.scheduleWeeks[weekISO];
         persist(next);
+    };
+    const promote = () => {
+        if (!confirmPromote) { setConfirmPromote(true); setTimeout(() => setConfirmPromote(false), 6000); return; }
+        persist(promoteWeek(JSON.parse(JSON.stringify(data)), weekISO));
+        setConfirmPromote(false);
     };
     const setD = (day, patch) => setDraft({ ...draft, [day]: { ...(draft[day] || {}), ...patch } });
 
@@ -6690,9 +6755,12 @@ function ScheduleTab({ data, persist, canEdit }) {
                                 React.createElement("button", { onClick: () => setPinOpen(false), style: { background: "transparent", border: "none", padding: 0, fontFamily: "Inter", fontSize: 12.5, color: "#B8BDC2", textDecoration: "underline" } }, "Cancel")))
                         : React.createElement("button", { onClick: () => setPinOpen(true), style: { background: "transparent", color: "#FFFFFF", border: "1px solid rgba(255,255,255,0.22)", borderRadius: 10, fontFamily: "Inter", fontSize: 14, fontWeight: 600, minHeight: 38, padding: "0 14px" } }, "Edit my shifts")),
             canEdit && React.createElement("div", { className: "flex items-center gap-2 mt-4 flex-wrap" },
-                React.createElement("button", { onClick: () => { setUsual(!usual); setEditing(null); }, style: { background: usual ? COLORS.lamp : "transparent", color: usual ? COLORS.ink : "#FFFFFF", border: "1px solid " + (usual ? COLORS.lamp : "rgba(255,255,255,0.22)"), borderRadius: 10, fontFamily: "Inter", fontSize: 14, fontWeight: 600, minHeight: 38, padding: "0 14px" } },
+                React.createElement("button", { onClick: () => { setUsual(!usual); setEditing(null); setConfirmPromote(false); }, style: { background: usual ? COLORS.lamp : "transparent", color: usual ? COLORS.ink : "#FFFFFF", border: "1px solid " + (usual ? COLORS.lamp : "rgba(255,255,255,0.22)"), borderRadius: 10, fontFamily: "Inter", fontSize: 14, fontWeight: 600, minHeight: 38, padding: "0 14px" } },
                     usual ? "Back to the calendar" : "Edit the usual week"),
                 !usual && override && React.createElement("button", { onClick: resetWeek, style: { background: "transparent", color: "#8A9096", border: "none", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, minHeight: 38, padding: "0 6px" } }, "Reset to usual week"),
+                !usual && React.createElement("button", { onClick: promote, style: { background: confirmPromote ? COLORS.lamp : "transparent", color: confirmPromote ? COLORS.ink : "#8A9096", border: confirmPromote ? "1px solid " + COLORS.lamp : "none", borderRadius: 10, fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, minHeight: 38, padding: confirmPromote ? "0 14px" : "0 6px" } },
+                    confirmPromote ? "Sure? This replaces the usual week" : "Make this the usual week"),
+                !usual && confirmPromote && React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#8A9096" } }, "Every week that hasn't been edited on its own will follow this."),
                 usual && React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#8A9096" } }, "Changes here reach every week that hasn't been edited on its own."))),
         React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" }, DAYS.map((day) => {
             const iso = dayDate[day];
@@ -6741,11 +6809,12 @@ function ScheduleTab({ data, persist, canEdit }) {
                         style: { background: "transparent", color: COLORS.crust, border: "1px dashed " + COLORS.line, borderRadius: 12, fontFamily: "Inter", fontSize: 14, fontWeight: 600, minHeight: 40 } },
                         React.createElement(Plus, { size: 15 }), "Add shift")
                     : React.createElement("div", { className: "flex flex-col gap-2 pt-1" },
-                        React.createElement("select", { value: canEdit ? (d.name || "") : meName, disabled: !canEdit, onChange: (e) => setD(day, { name: e.target.value }), className: "px-3 outline-none", style: FIELD },
+                        React.createElement("select", { value: canEdit ? (d.name || "") : meName, disabled: !canEdit, onChange: (e) => setD(day, { name: e.target.value, note: "" }), className: "px-3 outline-none", style: FIELD },
                             React.createElement("option", { value: "" }, "Who?"),
                             !canEdit && meName ? React.createElement("option", { value: meName }, meName) : null,
                             names.map((n2) => React.createElement("option", { key: n2, value: n2 }, n2)),
                             React.createElement("option", { value: "__open__" }, "Open shift \u2014 needs filling")),
+                        d.note && React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: COLORS.alertDark } }, d.note),
                         d.name !== "__open__" && React.createElement("select", { value: d.position || "", onChange: (e) => setD(day, { position: e.target.value }), className: "px-3 outline-none", style: FIELD },
                             React.createElement("option", { value: "" }, "Position (optional)"),
                             positions.map((p2) => React.createElement("option", { key: p2, value: p2 }, p2))),
@@ -10837,6 +10906,176 @@ function SubNav({ items, active, setActive }) {
 // the crew — they're the ones counting it out at the end of the shift. Staff
 // Directory holds phone numbers and time-clock PINs, so it stays admin-only
 // inside here just like it was as its own top-level tab.
+// ---- Names that don't match a staff member ----------------------------------
+// The free-text doors are closed now (time off, Today and the schedule all pick
+// from staff), but the strays they let in are still in the data: "Samoya
+// (front)" on the schedule next to "Samoia" on staff. normPerson() sees two
+// people, so nothing about them lines up — not their punches, not their time
+// off. This can't be a script: deciding that Samoya IS Samoia is a judgment
+// call, and a script guessing wrong silently merges two people's hours. So the
+// app finds every mismatch, a human says what each one is, and the app does
+// the rewrite in one save. No "fix all" — each name is its own decision.
+const STRAY_PLACES = ["schedule", "timeOff", "timeClock", "tips"];
+const STRAY_LABELS = { schedule: "schedule", timeOff: "time off", timeClock: "time clock", tips: "tips" };
+function isOpenShiftName(raw) { return /^open\b|needs? filling/i.test(String(raw || "").trim()); }
+// Every distinct normPerson key in the data that no staff record (active OR
+// inactive) answers to, with the spellings it's written as, where, and when.
+function strayNames(data) {
+    const staffKeys = {};
+    ((data && data.staff) || []).forEach((s) => { const k = normPerson(s.name); if (k) staffKeys[k] = true; });
+    const found = {};
+    const hit = (raw, where, date) => {
+        const person = splitShiftName(raw).person;
+        if (!person || isOpenShiftName(person)) return;
+        const k = normPerson(person);
+        if (!k || staffKeys[k]) return;
+        const f = found[k] || (found[k] = { key: k, spellings: {}, counts: { schedule: 0, timeOff: 0, timeClock: 0, tips: 0 }, latest: "", usual: false });
+        f.spellings[person] = (f.spellings[person] || 0) + 1;
+        f.counts[where] += 1;
+        if (date) { if (date > f.latest) f.latest = date; } else f.usual = true;
+    };
+    DAYS.forEach((d) => ((((data && data.schedule) || {})[d]) || []).forEach((s) => hit(s.name, "schedule", "")));
+    const weeks = (data && data.scheduleWeeks) || {};
+    Object.keys(weeks).forEach((wk) => DAYS.forEach((d, i) => (((weeks[wk] || {})[d]) || []).forEach((s) => hit(s.name, "schedule", addDaysISO(wk, i)))));
+    ((data && data.timeOff) || []).forEach((r) => hit(r.name, "timeOff", r.date));
+    ((data && data.timeClock) || []).forEach((e) => hit(e.name, "timeClock", e.date));
+    ((data && data.tips) || []).forEach((e) => [e.day, e.night].forEach((side) => {
+        if (!side) return;
+        (side.rows || []).forEach((r) => hit(r.name, "tips", e.date));
+        (side.crew || []).forEach((n) => hit(n, "tips", e.date)); // entries saved before rows existed
+    }));
+    return Object.keys(found).map((k) => {
+        const f = found[k];
+        return { ...f, spellings: Object.keys(f.spellings).sort((a, b) => f.spellings[b] - f.spellings[a]), total: STRAY_PLACES.reduce((n, p) => n + f.counts[p], 0) };
+    }).sort((a, b) => (b.latest || "").localeCompare(a.latest || "") || a.key.localeCompare(b.key));
+}
+// Rewrite every row carrying a stray name to `to` — or, with `to` empty,
+// remove those rows. Mutates the clone it's handed. Shift ids never change;
+// only the name string does, and a shift keeps its position suffix.
+function rewriteStrayName(next, key, to, toStaff) {
+    const isKey = (raw) => normPerson(raw) === key;
+    const toKey = normPerson(to);
+    // One row per person per day. If the person we're merging into is already
+    // on this day, the stray row is a duplicate and goes. Open shifts are not
+    // people and are never the key, so they never collide.
+    const fixShifts = (list) => {
+        if (!Array.isArray(list)) return list;
+        let has = list.some((s) => !isKey(s.name) && normPerson(s.name) === toKey);
+        const out = [];
+        list.forEach((s) => {
+            if (!isKey(s.name)) { out.push(s); return; }
+            if (!to || has) return;
+            has = true;
+            out.push({ ...s, name: joinShiftName(to, splitShiftName(s.name).position) });
+        });
+        return out;
+    };
+    next.schedule = next.schedule || {};
+    DAYS.forEach((d) => { if (next.schedule[d]) next.schedule[d] = fixShifts(next.schedule[d]); });
+    Object.keys(next.scheduleWeeks || {}).forEach((wk) => DAYS.forEach((d) => {
+        if (next.scheduleWeeks[wk] && next.scheduleWeeks[wk][d]) next.scheduleWeeks[wk][d] = fixShifts(next.scheduleWeeks[wk][d]);
+    }));
+    // Time off: the same date for the same person is one booking, not two.
+    if (Array.isArray(next.timeOff)) {
+        const has = {};
+        next.timeOff.forEach((r) => { if (!isKey(r.name) && normPerson(r.name) === toKey) has[r.date] = true; });
+        const out = [];
+        next.timeOff.forEach((r) => {
+            if (!isKey(r.name)) { out.push(r); return; }
+            if (!to || has[r.date]) return;
+            has[r.date] = true;
+            out.push({ ...r, name: to });
+        });
+        next.timeOff = out;
+    }
+    // Time clock and tips are records of real hours and money: every row is
+    // kept, even where it makes two on a day. A punch merged into a staff
+    // member also takes their id — hours reports look punches up by staffId,
+    // not by name, so without that the merge would move the label and leave
+    // the hours behind.
+    if (Array.isArray(next.timeClock)) {
+        next.timeClock = next.timeClock.filter((e) => to || !isKey(e.name))
+            .map((e) => (isKey(e.name) ? Object.assign({}, e, { name: to }, toStaff ? { staffId: toStaff.id } : {}) : e));
+    }
+    (next.tips || []).forEach((e) => [e.day, e.night].forEach((side) => {
+        if (!side) return;
+        if (Array.isArray(side.rows)) side.rows = side.rows.filter((r) => to || !isKey(r.name)).map((r) => (isKey(r.name) ? { ...r, name: to } : r));
+        if (Array.isArray(side.crew)) side.crew = side.crew.filter((n) => to || !isKey(n)).map((n) => (isKey(n) ? to : n));
+    }));
+    return next;
+}
+function NameCleanupPanel({ data, persist }) {
+    const [open, setOpen] = useState(false);
+    const [target, setTarget] = useState({});
+    const [confirmKey, setConfirmKey] = useState("");
+    const [confirmText, setConfirmText] = useState("");
+    const strays = strayNames(data);
+    if (!strays.length) return null; // the goal state — nothing to show
+    const staff = data.staff || [];
+    const cleanName = (s) => String(s.name || "").split("(")[0].trim();
+    // Inactive people are still people here — an old row can be merged home —
+    // so the picker carries them, tagged, even though staffNameList hides them.
+    const choices = staff.map((s) => ({ name: cleanName(s), inactive: !!s.inactive, rec: s })).filter((c) => c.name)
+        .sort((a, b) => (a.inactive === b.inactive ? a.name.localeCompare(b.name) : a.inactive ? 1 : -1));
+    const clone = () => JSON.parse(JSON.stringify(data));
+    const merge = (f) => {
+        const to = target[f.key];
+        const c = choices.find((x) => x.name === to);
+        if (!c) return;
+        persist(rewriteStrayName(clone(), f.key, c.name, c.rec));
+        setTarget(Object.assign({}, target, { [f.key]: "" }));
+    };
+    const addToStaff = (f) => {
+        const next = clone();
+        next.staff = next.staff || [];
+        next.staff.push({ id: uid(), name: f.spellings[0], phone: "", pin: "", adpId: "", positions: [], notes: [] });
+        persist(next);
+    };
+    const remove = (f) => {
+        persist(rewriteStrayName(clone(), f.key, "", null));
+        setConfirmKey(""); setConfirmText("");
+    };
+    const typedMatches = (f) => confirmText.trim().length > 0 && normPerson(confirmText) === f.key;
+    const whereLine = (f) => STRAY_PLACES.filter((p) => f.counts[p]).map((p) => STRAY_LABELS[p] + " " + f.counts[p]).join(" · ")
+        + (f.latest ? " · last seen " + shortDate(f.latest) : "") + (f.usual ? " · in the usual week" : "");
+    const FIELD = { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, minHeight: 40, background: "#FAFAF8", borderRadius: 10 };
+    const btn = (onClick, txt, kind) => React.createElement("button", { onClick, className: "text-xs px-2.5 py-1.5 rounded",
+        style: kind === "danger" ? { background: "transparent", color: COLORS.alertDark, border: "1px solid " + COLORS.line, fontFamily: "Inter", fontWeight: 600 }
+             : kind === "go" ? { background: COLORS.lamp, color: COLORS.ink, border: "none", fontFamily: "Inter", fontWeight: 700 }
+             : { background: "#F2F2EF", color: COLORS.crust, border: "1px solid " + COLORS.line, fontFamily: "Inter", fontWeight: 600 } }, txt);
+
+    return React.createElement("div", { className: "p-4 opp-card mt-3", style: { background: COLORS.card } },
+        React.createElement("button", { onClick: () => setOpen(!open), className: "w-full flex items-center justify-between" },
+            React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#8A5A00" } },
+                "Names that don't match a staff member · " + strays.length),
+            React.createElement("span", { style: { color: COLORS.steel, fontFamily: "Inter" } }, open ? "▴" : "▾")),
+        open ? React.createElement("div", { className: "mt-3 space-y-2" },
+            React.createElement("div", { className: "text-sm pb-1", style: { fontFamily: "Inter", color: "#5F676E" } },
+                "These names are on the schedule, time off, the clock or tips, but no one on Staff is spelled that way — so their hours and time off don't line up with anyone. Say who each one is."),
+            strays.map((f) => {
+                const confirming = confirmKey === f.key;
+                return React.createElement("div", { key: f.key, className: "rounded px-3 py-2.5", style: { background: COLORS.cream, border: "1px solid " + (confirming ? COLORS.alert : COLORS.line) } },
+                    React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.crust } }, f.spellings.join("  /  ")),
+                    React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8A9096" } }, whereLine(f)),
+                    React.createElement("div", { className: "flex flex-wrap items-center gap-1.5 mt-2" },
+                        React.createElement("select", { value: target[f.key] || "", onChange: (e) => setTarget(Object.assign({}, target, { [f.key]: e.target.value })), className: "px-2 outline-none", style: Object.assign({}, FIELD, { flex: "1 1 160px" }) },
+                            React.createElement("option", { value: "" }, "This is…"),
+                            choices.map((c) => React.createElement("option", { key: c.name, value: c.name }, c.name + (c.inactive ? " (inactive)" : "")))),
+                        target[f.key] ? btn(() => merge(f), "Merge into " + target[f.key], "go") : null,
+                        btn(() => addToStaff(f), "Add to staff"),
+                        btn(() => { setConfirmKey(confirming ? "" : f.key); setConfirmText(""); }, "Remove", "danger")),
+                    confirming ? React.createElement("div", { className: "mt-2 px-3 py-3", style: { background: "#FDECEA", borderRadius: 12 } },
+                        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13.5, fontWeight: 500, color: COLORS.alertDark, marginBottom: 8 } },
+                            "This deletes every row above — time-clock history included. Type " + f.spellings[0] + " to confirm."),
+                        React.createElement("div", { className: "flex gap-2" },
+                            React.createElement("input", { autoFocus: true, value: confirmText, placeholder: f.spellings[0],
+                                onChange: (e) => setConfirmText(e.target.value),
+                                onKeyDown: (e) => { if (e.key === "Enter" && typedMatches(f)) remove(f); },
+                                className: "flex-1 px-3 outline-none opp-field" }),
+                            React.createElement("button", { onClick: () => { if (typedMatches(f)) remove(f); }, disabled: !typedMatches(f),
+                                style: { background: typedMatches(f) ? COLORS.alert : "#E7E8E6", color: typedMatches(f) ? "#FFFFFF" : INK3, border: "none", borderRadius: 12, fontFamily: "Inter", fontSize: 15, fontWeight: 600, padding: "0 18px", minHeight: 44 } }, "Remove"))) : null);
+            })) : null);
+}
 function CrewTab({ data, persist, isAdmin, offSoon, initialSub, onSub }) {
     const items = [
         { id: "timeclock", label: "Time Clock", icon: Clock },
@@ -10857,7 +11096,9 @@ function CrewTab({ data, persist, isAdmin, offSoon, initialSub, onSub }) {
         active === "schedule" && React.createElement(ScheduleTab, { data, persist, canEdit: isAdmin }),
         active === "timeoff" && React.createElement(TimeOffTab, { data, persist }),
         active === "staff" && (isAdmin
-            ? React.createElement(StaffTab, { data, persist })
+            ? React.createElement(React.Fragment, null,
+                React.createElement(StaffTab, { data, persist }),
+                React.createElement(NameCleanupPanel, { data, persist }))
             : React.createElement(CrewList, { data }))
     );
 }
