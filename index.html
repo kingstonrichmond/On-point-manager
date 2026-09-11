@@ -5203,9 +5203,12 @@ function PhoneTab({ data, persist, isAdmin }) {
 
 // ---- Live tickets from Clover (READ ONLY) ----------------------------------
 // Nothing in the kitchen depends on this. Clover exposes no kitchen-display
-// state, so "open" means Clover still calls the order open — a proxy for "not
-// handed over yet", not a bump status. The hand-entered Order Queue below the
-// board stays the source of truth until this has been watched for a few weeks.
+// state, and at this shop "open" means nothing at all — paper slips, nobody
+// closes a ticket, prepaid online orders are "paid" at ring-in. So the board
+// shows what rang in inside the last N minutes (the same set the suggested
+// wait is built from) and labels it that way, so nobody reads it as a live
+// queue that empties. The hand-entered Order Queue below stays the source of
+// truth until this has been watched for a few weeks.
 function useTickets(pollMs) {
   const [state, setState] = useState({ loading: true, tickets: [] });
   useEffect(() => {
@@ -5230,7 +5233,7 @@ function ticketTone(ageMin, quoted) {
   return { bg: "#E4F1E6", fg: "#1F6B34", bd: "rgba(31,107,52,0.2)" };
 }
 
-function TicketBoard({ data }) {
+function TicketBoard({ data, persist }) {
   const [showDiag, setShowDiag] = useState(false);
   const s = useTickets(20000);
   const quoted = (data && data.wait && data.wait.pickupMin) || null;
@@ -5251,6 +5254,15 @@ function TicketBoard({ data }) {
 
   const est = s.estimate || {};
   const d = s.diagnostics || {};
+  const wip = d.wipMinutes || (s.kitchen && s.kitchen.wipMinutes) || 45;
+  const tickets = Array.isArray(s.tickets) ? s.tickets : [];
+  const pizzas = tickets.reduce((n, t) => n + (t.pizzas || 0), 0);
+  const other = tickets.reduce((n, t) => n + (t.otherItems || 0), 0);
+  const front = tickets.reduce((n, t) => n + (t.frontItems || 0), 0);
+  const kf = d.kitchenFilter || {};
+  const filterLine = kf.mode === "tag" ? "counting items tagged “" + kf.tag + "”"
+    : kf.mode === "categories" ? "counting " + (kf.categories || []).join(", ")
+    : "counting everything" + (kf.tagMissing ? " — tag “" + kf.tag + "” isn't on any item" : "");
   return React.createElement("div", { className: "mb-3" },
     // estimate strip
     React.createElement("div", { className: "px-3 py-3 mb-2", style: Object.assign({}, CARD, { background: COLORS.crust }) },
@@ -5258,49 +5270,132 @@ function TicketBoard({ data }) {
         React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontSize: 26, color: "#FFFFFF", letterSpacing: ".01em" } },
           est.minutes == null ? "—" : est.minutes + " min"),
         React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: est.confidence === "low" ? "#FFC9C2" : "#B8BDC2" } },
-          est.confidence === "low" ? "rough" : "suggested wait")),
+          est.minutes == null ? "no suggestion" : est.confidence === "low" ? "rough" : "suggested wait")),
       React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#B8BDC2", marginTop: 2 } }, est.line || ""),
       (est.notes || []).map((n, i) => React.createElement("div", { key: i, style: { fontFamily: "Inter", fontSize: 12.5, color: "#FFC9C2", marginTop: 3 } }, n)),
       React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, color: "#8A9096", marginTop: 6 } },
         "Nobody's wait changes from this — accept it on the Today page.")),
 
+    // what this list IS — the last N minutes of arrivals, not a queue that empties
+    React.createElement("div", { className: "flex items-baseline justify-between mb-1.5", style: { padding: "0 2px" } },
+      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, "Last " + wip + " minutes"),
+      tickets.length ? React.createElement("span", { style: muted },
+        pizzas + " pizza" + (pizzas === 1 ? "" : "s") + (other ? " · " + other + " other for the kitchen" : "") + (front ? " · " + front + " front-only" : "")) : null),
+
     // tickets
-    s.tickets.length === 0
-      ? React.createElement("div", { className: "px-3 py-3", style: CARD }, React.createElement("div", { style: muted }, "No open tickets on the register right now."))
+    tickets.length === 0
+      ? React.createElement("div", { className: "px-3 py-3", style: CARD }, React.createElement("div", { style: muted }, "Nothing rang in in the last " + wip + " minutes."))
       : React.createElement("div", { className: "flex flex-col gap-1.5" },
-          s.tickets.map((t) => {
+          tickets.map((t) => {
             const tone = ticketTone(t.ageMin || 0, quoted);
-            return React.createElement("div", { key: t.id, className: "px-3 py-2", style: Object.assign({}, CARD, { borderColor: tone.bd }) },
+            const items = Array.isArray(t.items) ? t.items : [];
+            return React.createElement("div", { key: t.id, className: "px-3 py-2", style: Object.assign({}, CARD, { borderColor: tone.bd, opacity: t.kitchenItems === 0 && items.length ? 0.7 : 1 }) },
               React.createElement("div", { className: "flex items-baseline justify-between gap-2" },
                 React.createElement("div", { style: { fontFamily: "Inter", fontWeight: 700, fontSize: 15, color: COLORS.crust } },
                   (() => {
                     // Clover doesn't always give a count back; fall back to the
                     // lines we did get rather than printing "undefined items".
-                    const n = t.itemCount != null ? t.itemCount : (Array.isArray(t.items) ? t.items.length : 0);
-                    return t.pizzas ? t.pizzas + " pizza" + (t.pizzas === 1 ? "" : "s") : n + " item" + (n === 1 ? "" : "s");
+                    const n = t.itemCount != null ? t.itemCount : items.length;
+                    if (t.pizzas) return t.pizzas + " pizza" + (t.pizzas === 1 ? "" : "s");
+                    if (t.kitchenItems === 0 && n) return n + " item" + (n === 1 ? "" : "s") + " · front only";
+                    return n + " item" + (n === 1 ? "" : "s");
                   })(),
                   t.title ? React.createElement("span", { style: { fontWeight: 400, color: "#8A9096", marginLeft: 6 } }, t.title) : null),
                 React.createElement("span", { style: { fontFamily: "Inter", fontSize: 13, fontWeight: 700, background: tone.bg, color: tone.fg, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" } },
                   (t.ageMin == null ? "?" : t.ageMin) + " min")),
               React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13.5, color: "#5F676E", marginTop: 2 } },
-                (Array.isArray(t.items) ? t.items : []).slice(0, 6).map((i, n) => React.createElement("div", { key: n },
+                items.slice(0, 6).map((i, n) => React.createElement("div", { key: n, style: i.kitchen === false ? { color: "#B8BDC2" } : null },
                   i.name, i.mods && i.mods.length ? React.createElement("span", { style: { color: "#8A9096" } }, " · " + i.mods.join(", ")) : null,
-                  i.note ? React.createElement("span", { style: { fontStyle: "italic", color: "#8A9096" } }, " — " + i.note) : null)),
-                (Array.isArray(t.items) ? t.items.length : 0) > 6 ? React.createElement("div", { style: { color: "#8A9096" } }, "+" + (t.items.length - 6) + " more") : null),
-              t.state ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 11.5, color: "#8A9096", marginTop: 3 } }, "Clover state: " + t.state) : null);
+                  i.note ? React.createElement("span", { style: { fontStyle: "italic", color: "#8A9096" } }, " — " + i.note) : null,
+                  i.kitchen === false ? React.createElement("span", { style: { color: "#B8BDC2" } }, " · front") : null)),
+                items.length > 6 ? React.createElement("div", { style: { color: "#8A9096" } }, "+" + (items.length - 6) + " more") : null));
           })),
 
-    // diagnostics — this is how the "do orders show up before payment" question
-    // gets answered from real service, not from the docs
+    React.createElement(KitchenWorkCard, { data, persist, diag: d, filterLine }),
+
+    // diagnostics — this is how "does the register even show a ticket at
+    // ring-in" and "is there a kitchen-printer tag" get answered from real
+    // service, not from the docs
     React.createElement("button", { onClick: () => setShowDiag(!showDiag),
       style: { background: "transparent", border: "none", padding: "8px 2px 0", fontFamily: "Inter", fontSize: 12.5, fontWeight: 600, color: "#8A9096" } },
       showDiag ? "Hide what the register returned" : "What the register returned"),
     showDiag ? React.createElement("div", { className: "px-3 py-2 mt-1", style: Object.assign({}, CARD, { background: "#F7F7F5" }) },
       React.createElement("div", { style: muted }, "Orders in the last " + (d.windowHours || 4) + "h: " + (d.ordersReturned == null ? "?" : d.ordersReturned)),
-      React.createElement("div", { style: muted }, "Counted as open: " + (d.openCount == null ? "?" : d.openCount)),
+      React.createElement("div", { style: muted }, "Rang in in the last " + wip + " min: " + (d.inWindow == null ? "?" : d.inWindow)),
+      React.createElement("div", { style: muted }, "Still “open” in Clover: " + (d.openCount == null ? "?" : d.openCount) + " — means nothing here, nobody closes tickets"),
       React.createElement("div", { style: muted }, "Newest order: " + (d.newestOrderAgeMin == null ? "none" : d.newestOrderAgeMin + " min old")),
       React.createElement("div", { style: muted }, "States seen: " + Object.entries(d.states || {}).map((e) => e[0] + "×" + e[1]).join(", ")),
+      React.createElement("div", { style: Object.assign({ marginTop: 6 }, muted) }, "Kitchen filter: " + filterLine),
+      React.createElement("div", { style: muted }, "Tags on your items: " + ((d.tagsSeen || []).length ? d.tagsSeen.join(", ") : "none came back")),
+      React.createElement("div", { style: muted }, "Categories: " + ((d.categoriesSeen || []).length ? d.categoriesSeen.join(", ") : "none came back")),
+      d.inventoryError ? React.createElement("div", { style: Object.assign({}, muted, { color: COLORS.alertDark }) }, "Couldn't read the inventory: " + d.inventoryError) : null,
+      (d.sample || []).length ? React.createElement("div", { style: { marginTop: 6 } },
+        React.createElement("div", { style: muted }, "What a few items carry:"),
+        d.sample.map((it, i) => React.createElement("div", { key: i, style: Object.assign({ paddingLeft: 8 }, muted) },
+          it.name + " — tags: " + (it.tags.length ? it.tags.join(", ") : "none") + " · categories: " + (it.categories.length ? it.categories.join(", ") : "none")))) : null,
       React.createElement("div", { style: Object.assign({ marginTop: 4 }, muted) }, "If the newest order is always older than a few minutes, the register isn't publishing tickets until payment — tell Claude.")) : null);
+}
+
+// ---- What counts as kitchen work ---------------------------------------------
+// The shop already maintains the right answer: Clover's printer routing. An
+// item that prints to the kitchen printer is kitchen work; slices and knots
+// don't and aren't. Clover routes printing by item tags, so if the register
+// returns a kitchen-printer tag, pick it here and only tagged items feed the
+// estimate. If tags don't come through (or aren't clean), tick the categories
+// that count instead. Nothing ticked means everything counts — conservative,
+// never broken. All of it lives in data.kitchen next to pizzasPerHour.
+function KitchenWorkCard({ data, persist, diag, filterLine }) {
+  const [open, setOpen] = useState(false);
+  const k = (data && data.kitchen) || {};
+  const wip = Number(k.wipMinutes) > 0 ? Number(k.wipMinutes) : 45;
+  const tag = String(k.kitchenTag || "").trim();
+  const tagsSeen = (diag && diag.tagsSeen) || [];
+  const catsSeen = (diag && diag.categoriesSeen) || [];
+  const allowed = Array.isArray(k.countCategories) && k.countCategories.length ? k.countCategories : null; // null = everything
+  const lc = (x) => String(x || "").trim().toLowerCase();
+  const isOn = (c) => !allowed || allowed.some((a) => lc(a) === lc(c));
+  const set = (patch) => {
+    if (!persist) return;
+    const next = JSON.parse(JSON.stringify(data));
+    next.kitchen = Object.assign({}, next.kitchen || {}, patch);
+    persist(next);
+  };
+  const toggleCat = (c) => {
+    const on = catsSeen.filter(isOn);
+    const nextOn = isOn(c) ? on.filter((x) => lc(x) !== lc(c)) : [...on, c];
+    // everything ticked is the same as no list at all — store it that way so a
+    // category added on the register later isn't silently excluded
+    set({ countCategories: nextOn.length >= catsSeen.length ? null : nextOn });
+  };
+  const CARD = { background: COLORS.card, borderRadius: 14, border: "1px solid " + COLORS.line };
+  const muted = { fontFamily: "Inter", fontSize: 13, color: "#8A9096" };
+  const chip = (txt, on, onClick) => React.createElement("button", { key: txt, onClick, style: {
+    background: on ? COLORS.ink : "#F2F2EF", color: on ? "#FFFFFF" : COLORS.crust, border: "none", borderRadius: 999,
+    padding: "0 12px", minHeight: 34, fontFamily: "Inter", fontSize: 13.5, fontWeight: 600 } }, txt);
+  return React.createElement("div", { className: "px-3 py-2.5 mt-2", style: CARD },
+    React.createElement("button", { onClick: () => setOpen(!open), className: "w-full flex items-center justify-between", style: { background: "transparent", border: "none", padding: 0 } },
+      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: INK2 } }, "What counts as kitchen work"),
+      React.createElement("span", { style: { color: COLORS.steel, fontFamily: "Inter" } }, open ? "▴" : "▾")),
+    React.createElement("div", { style: Object.assign({ marginTop: 2 }, muted) }, "Last " + wip + " min · " + filterLine),
+    open ? React.createElement("div", { className: "mt-3" },
+      React.createElement("div", { className: "flex items-center gap-2 mb-3" },
+        React.createElement("span", { style: { fontFamily: "Inter", fontSize: 14, color: COLORS.crust, flex: 1 } }, "An order older than this is out the door"),
+        React.createElement("button", { onClick: () => set({ wipMinutes: Math.max(15, wip - 5) }), style: { width: 36, height: 36, borderRadius: 10, border: "1px solid " + COLORS.line, background: COLORS.card, fontFamily: "Inter", fontSize: 18, fontWeight: 700, color: COLORS.crust } }, "−"),
+        React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 15, fontWeight: 700, minWidth: 58, textAlign: "center", color: COLORS.crust } }, wip + " min"),
+        React.createElement("button", { onClick: () => set({ wipMinutes: Math.min(120, wip + 5) }), style: { width: 36, height: 36, borderRadius: 10, border: "1px solid " + COLORS.line, background: COLORS.card, fontFamily: "Inter", fontSize: 18, fontWeight: 700, color: COLORS.crust } }, "+")),
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: COLORS.crust, marginBottom: 6 } }, "Kitchen printer tag"),
+      tagsSeen.length
+        ? React.createElement("div", { className: "flex flex-wrap gap-1.5 mb-1" },
+            chip("none — use categories", !tag, () => set({ kitchenTag: "" })),
+            tagsSeen.map((t) => chip(t, lc(t) === lc(tag), () => set({ kitchenTag: lc(t) === lc(tag) ? "" : t }))))
+        : React.createElement("div", { style: Object.assign({ marginBottom: 4 }, muted) }, "Clover didn't return any tags on your items" + (tag ? " — “" + tag + "” is set but can't be used" : "") + ". Tick categories below instead."),
+      React.createElement("div", { style: Object.assign({ marginBottom: 12 }, muted) }, "Only items carrying this tag count toward the wait. It's whatever tag routes to the kitchen printer on the register."),
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: COLORS.crust, marginBottom: 6, opacity: tag && tagsSeen.some((t) => lc(t) === lc(tag)) ? 0.5 : 1 } },
+        "Categories that count" + (tag && tagsSeen.some((t) => lc(t) === lc(tag)) ? " (not used while a tag is picked)" : "")),
+      catsSeen.length
+        ? React.createElement("div", { className: "flex flex-wrap gap-1.5 mb-1" }, catsSeen.map((c) => chip(c, isOn(c), () => toggleCat(c))))
+        : React.createElement("div", { style: muted }, "No categories came back from the register yet."),
+      React.createElement("div", { style: muted }, "Untick slices, knots, drinks — anything the front handles without a kitchen ticket. Everything ticked means everything counts.")) : null);
 }
 
 
@@ -10459,7 +10554,7 @@ function LiveOpsTab({ data, persist }) {
       intervalRef.current = setInterval(captureAndAnalyze, seconds * 1e3);
     }
   };
-   return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(SectionHeader, null, "On the register right now"), React.createElement(TicketBoard, { data }), /* @__PURE__ */ React.createElement(ShopCamPanel, { data, busyAnalyze: analyzing, onAnalyze: analyzeShopCam }), /* @__PURE__ */ React.createElement(TempPanel, { data, persist }), /* @__PURE__ */ React.createElement(SectionHeader, null, "Station Check (camera)"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap items-center gap-1.5 mb-2" }, liveOps.stations.map((s) => /* @__PURE__ */ React.createElement(
+   return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(SectionHeader, null, "On the register right now"), React.createElement(TicketBoard, { data, persist }), /* @__PURE__ */ React.createElement(ShopCamPanel, { data, busyAnalyze: analyzing, onAnalyze: analyzeShopCam }), /* @__PURE__ */ React.createElement(TempPanel, { data, persist }), /* @__PURE__ */ React.createElement(SectionHeader, null, "Station Check (camera)"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap items-center gap-1.5 mb-2" }, liveOps.stations.map((s) => /* @__PURE__ */ React.createElement(
     "button",
     {
       key: s.id,
