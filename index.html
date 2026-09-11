@@ -2738,10 +2738,10 @@ Keep "reply" concise so the JSON is never cut off.
 - {"type": "add_task", "text": "...", "station": "one of: Front, Line, Pizza, Oven, Fryer, Salad, Sandwich, Prep, Dish, Back of House, Manager", "assignee": "..."}
 - {"type": "complete_task", "text_match": "substring of an existing task's text"}
 - {"type": "update_inventory", "item_match": "substring of an existing inventory item name", "qty": number}
-- {"type": "add_shift", "day": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "name": "...", "time": "..."}  (goes on the upcoming instance of that day only, not the usual week)
+- {"type": "add_shift", "day": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "name": "...", "time": "..."}  (goes on the upcoming instance of that day only, not the usual week. "name" must be one of the names in "staff", spelled exactly as there — the app refuses anyone else; if the person named isn't on staff, say so and that a manager can add them in Crew)
 - {"type": "set_produce", "item_match": "romaine", "need": 2}  (Belmont produce order; need 0 = all set, null = not looked at)
 - {"type": "set_order", "item_match": "all trumps", "orderNeed": 4, "orderVendor": "QFC"}  (put an inventory item on that vendor's order; orderNeed 0 = all set, null = clear it; orderVendor is QFC, Thomsen or Pepsi)
-- {"type": "add_time_off", "date": "YYYY-MM-DD", "name": "...", "note": "optional reason"}
+- {"type": "add_time_off", "date": "YYYY-MM-DD", "name": "...", "note": "optional reason"}  ("name" must be one of the names in "staff", spelled exactly as there — same rule as add_shift)
 - {"type": "remove_time_off", "date": "YYYY-MM-DD", "name": "..."}  (they can work after all)
 - {"type": "flag_stock", "item": "...", "status": "ok|low|86"}  (menu items only)
 - {"type": "add_need", "text": "...", "who": "optional first name"}  (supplies and parts — anything that isn't a menu item)
@@ -3181,9 +3181,20 @@ function AssistantTab({ data, persist, isAdmin }) {
       // as it is NOW, not the copy this tablet had when the question went out.
       let next = JSON.parse(JSON.stringify(liveData(dataNowRef.current)));
       let changed = false;
+      // Same rule as every other door: a name has to be someone on the Staff
+      // tab, spelled the way their record spells it. The assistant hears
+      // shorthand — "put pap on tuesday" — and that's exactly how a second
+      // "Pap" used to land next to "Pop". Anyone it can't match is refused
+      // and named in the reply, so the person hears why nothing happened.
+      const refused = [];
+      const staffOnly = (raw) => {
+        const hit = matchStaffName(next, raw);
+        if (!hit && String(raw || "").trim()) refused.push(String(raw).trim());
+        return hit;
+      };
       for (const action of Array.isArray(parsed.actions) ? parsed.actions : []) {
         if (action.type === "add_time_off") {
-          const nm = String(action.name || "").trim();
+          const nm = staffOnly(action.name);
           const dt = String(action.date || "").trim();
           if (nm && /^\d{4}-\d{2}-\d{2}$/.test(dt)) {
             next.timeOff = next.timeOff || [];
@@ -3216,10 +3227,17 @@ function AssistantTab({ data, persist, isAdmin }) {
             changed = true;
           }
         } else if (action.type === "add_shift") {
-          if (DAYS.indexOf(action.day) !== -1) {
+          // No more "TBD" placeholder either — that's a stray name by another
+          // route. A shift with nobody matched is not added.
+          const who = staffOnly(action.name);
+          if (who && DAYS.indexOf(action.day) !== -1) {
             const wk = ensureWeek(next, weekStartISO(nextDateForDow(action.day)));
-            wk[action.day].push({ id: uid(), name: action.name || "TBD", time: action.time || "" });
-            changed = true;
+            const name = joinShiftName(who, splitShiftName(action.name).position);
+            const dup = wk[action.day].some((sh) => normPerson(sh.name) === normPerson(who));
+            if (!dup) {
+              wk[action.day].push({ id: uid(), name, time: action.time || "" });
+              changed = true;
+            }
           }
         } else if (action.type === "set_par" || action.type === "set_prep_par") {
           const r = matchRow(next.prep && next.prep.par, "item", action.item_match);
@@ -3292,7 +3310,10 @@ function AssistantTab({ data, persist, isAdmin }) {
         }
       }
       if (changed) await persist(next);
-      const replyText = parsed.reply || "Done.";
+      const unknown = refused.filter((n, i) => refused.indexOf(n) === i);
+      const replyText = (parsed.reply || "Done.") + (unknown.length
+        ? " I don't have " + unknown.map((n) => "\u201c" + n + "\u201d").join(" or ") + " on staff, so I didn't add " + (unknown.length === 1 ? "them" : "those") + " \u2014 names have to match the Staff tab. Not on it? A manager can add them in Crew."
+        : "");
       setMessages((m) => { const out = [...m, { role: "assistant", text: replyText }]; messagesRef.current = out; return out; });
       speak(replyText, () => {
         if (voiceModeRef.current === "off") return;
