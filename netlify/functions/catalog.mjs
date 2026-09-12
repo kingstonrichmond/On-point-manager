@@ -14,7 +14,7 @@
 // tablet. ?fresh=1 bypasses the cache. Never logs the token.
 
 import { checkAuth, authHeaders } from './_auth.mjs';
-import { openStore } from './lib/shop-data.mjs';
+import { openStore, loadShopData } from './lib/shop-data.mjs';
 import { ordersConfigured } from './lib/clover-orders.mjs';
 import { fetchCatalog, catalogSummary, reportText } from './lib/clover-catalog.mjs';
 
@@ -58,7 +58,10 @@ export default async (req) => {
     console.error('catalog fetch failed', e.message);
     return json({ enabled: true, error: e.message }, 200, ah);
   }
-  const summary = catalogSummary(catalog);
+  // The app's own menu, for the topping-tier comparison only. Read, never written.
+  let appMenu = null;
+  try { appMenu = (await loadShopData(env))?.menu ?? null; } catch { /* comparison just says "not available" */ }
+  const summary = catalogSummary(catalog, appMenu);
   const body = { enabled: true, fetchedAt: catalog.fetchedAt, catalog, summary, report: reportText(summary) };
   try { await store?.setJSON(CACHE_KEY, { at: Date.now(), body }); } catch { /* ignore */ }
   return json({ ...body, cached: false }, 200, ah);

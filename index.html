@@ -1742,6 +1742,48 @@ function CloverCatalogCard() {
           React.createElement("span", { style: muted }, (s.cached ? "cached · " : "") + "read " + new Date(s.fetchedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))),
         React.createElement("textarea", { id: "opp-catalog-report", readOnly: true, value: s.report, rows: 18, onFocus: (e) => e.target.select(),
           className: "w-full px-3 py-2 rounded outline-none", style: { fontFamily: "JetBrains Mono", fontSize: 12, lineHeight: 1.4, color: COLORS.crust, background: "#FAFAF8", border: "1px solid " + COLORS.line, whiteSpace: "pre", overflowX: "auto" } }),
+        // 1b. every price that isn't on a 5-cent boundary — the fixing list.
+        // Shown as Clover has it; nothing here rounds.
+        (() => {
+          const odd = (s.summary && s.summary.oddPrices) || [];
+          return React.createElement("div", { className: "mt-3" },
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: odd.length ? "#8A5A00" : INK2, marginBottom: 4 } },
+              "Prices not on a 5-cent boundary · " + odd.length),
+            React.createElement("div", { style: Object.assign({ marginBottom: 6 }, muted) }, odd.length
+              ? "Fix these in Clover by hand, to the nearest 5¢. The app never rounds — if it did, the phone would quote one number and the register charge another."
+              : "None. Every item and modifier price ends in 0 or 5."),
+            odd.map((r, i) => React.createElement("div", { key: i, className: "flex items-baseline justify-between gap-2", style: { padding: "4px 0", borderTop: "1px solid " + COLORS.line } },
+              React.createElement("span", { style: { fontFamily: "Inter", fontSize: 13.5, color: COLORS.crust } },
+                React.createElement("span", { style: { color: "#8A9096" } }, r.category + " · "),
+                r.group ? React.createElement("span", null, r.group + " → " + r.modifier, React.createElement("span", { style: { color: "#8A9096" } }, " on " + r.item)) : r.item),
+              React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13, fontWeight: 700, color: "#8A5A00", whiteSpace: "nowrap" } }, money(r.price)))));
+        })(),
+        // 1b. Large Cheese Pizza's groups beside the app's topping tiers
+        (() => {
+          const cp = (s.summary && s.summary.cheesePizza) || {};
+          const app = cp.app;
+          return React.createElement("div", { className: "mt-3" },
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: INK2, marginBottom: 4 } },
+              (cp.item ? cp.item.name + " · " + money(cp.item.price) : "Large Cheese Pizza — not found") + " · toppings"),
+            React.createElement("div", { style: Object.assign({ marginBottom: 6 }, muted) }, "Register on the left, app on the right. Same structure is expected; different prices are expected too — this captures the real numbers, it doesn't decide anything."),
+            React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-3" },
+              React.createElement("div", null,
+                React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, fontWeight: 700, color: COLORS.crust, marginBottom: 2 } }, "Clover"),
+                (cp.groups || []).length ? cp.groups.map((g) => React.createElement("div", { key: g.id, style: { padding: "3px 0", borderTop: "1px solid " + COLORS.line } },
+                  React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13.5, color: COLORS.crust } }, g.name, React.createElement("span", { style: { color: "#8A9096" } }, " · " + (g.required ? "required" : "optional") + " · " + g.min + "–" + (g.max == null ? "∞" : g.max))),
+                  React.createElement("div", { style: muted }, g.modifiers.length ? g.modifiers.map((m) => m.name + " " + money(m.price)).join(" · ") : "no modifiers")))
+                : React.createElement("div", { style: muted }, cp.item ? "No modifier groups on this item." : "—"),
+                (cp.otherSizes || []).length ? React.createElement("div", { style: Object.assign({ marginTop: 4 }, muted) }, "Same groups on: " + cp.otherSizes.map((o) => o.name + (o.sameGroups ? " ✓" : " ✗")).join(", ")) : null),
+              React.createElement("div", null,
+                React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, fontWeight: 700, color: COLORS.crust, marginBottom: 2 } }, "App (data.menu)"),
+                app ? [
+                  React.createElement("div", { key: "sz", style: muted }, "Sizes: " + (app.sizes.join(" / ") || "none")),
+                  (app.tiers || []).map((t, i) => React.createElement("div", { key: i, style: { padding: "3px 0", borderTop: "1px solid " + COLORS.line } },
+                    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13.5, color: COLORS.crust } }, t.tier),
+                    React.createElement("div", { style: muted }, t.prices.map((p, j) => (app.sizes[j] || "size " + (j + 1)) + " $" + p).join(" · ")),
+                    t.items ? React.createElement("div", { style: Object.assign({}, muted, { fontSize: 12 }) }, t.items) : null))
+                ] : React.createElement("div", { style: muted }, "App menu not available for comparison."))));
+        })(),
         showItems ? React.createElement("div", { className: "mt-3" },
           Object.keys(byCat).sort().map((k) => React.createElement("div", { key: k, className: "mb-3" },
             React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: INK2, marginBottom: 4 } }, k + " · " + byCat[k].length),
