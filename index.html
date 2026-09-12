@@ -880,6 +880,54 @@ const DENSITY = {
   comfortable: { row: 60, doneRow: 54, name: 17, chip: 16, note: 13.5, check: 27, pad: "pl-4 pr-2" },
   compact:     { row: 42, doneRow: 40, name: 15, chip: 14, note: 12.5, check: 21, pad: "pl-3 pr-2" }
 };
+// How many rows of a list there's actually room for, so a card can fill the
+// screen instead of stopping at a flat number. A hard four wasted half a tablet
+// and the prep list is the one thing worth seeing as much of as possible.
+//
+// Measured from where the list really sits rather than guessed from the window,
+// because what's above it on Today moves around — crew pills wrap, the marked
+// card comes and goes, the density setting changes every row height. Two things
+// keep it steady: the offset is taken inside the scrolling area (so it doesn't
+// change while you scroll), and it's the list's OWN top, which doesn't move when
+// the list gets longer — so this can't feed back on itself. The effect runs
+// after every render and only sets a new count when it actually differs, which
+// is what lets it notice layout shifts above without looping.
+function useFitCount(rowPx, min, max, reserve) {
+  const ref = useRef(null);
+  const [n, setN] = useState(min);
+  useEffect(() => {
+    const measure = () => {
+      const el = ref.current;
+      if (!el || !(rowPx > 0)) return;
+      let sc = el.parentElement;
+      while (sc && sc !== document.body) {
+        let oy = "";
+        try { oy = window.getComputedStyle(sc).overflowY; } catch (e) {}
+        if ((oy === "auto" || oy === "scroll") && sc.scrollHeight > sc.clientHeight) break;
+        sc = sc.parentElement;
+      }
+      let top, viewH;
+      if (sc && sc !== document.body) {
+        top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop;
+        viewH = sc.clientHeight;
+      } else {
+        top = el.getBoundingClientRect().top + (window.scrollY || document.documentElement.scrollTop || 0);
+        viewH = window.innerHeight || document.documentElement.clientHeight || 0;
+      }
+      const fits = Math.floor((viewH - top - (reserve || 0)) / rowPx);
+      const want = Math.max(min, Math.min(max, fits));
+      setN((cur) => (cur === want ? cur : want));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("orientationchange", measure);
+    };
+  });
+  return [ref, n];
+}
 const INK2 = "#5F676E";
 const INK3 = "#8A9096";
 const TASK_STATIONS = ["Front", "Line", "Pizza", "Oven", "Fryer", "Salad", "Sandwich", "Prep", "Dish", "Back of House", "Manager"];
@@ -5803,7 +5851,10 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
   const tapPill = (txt, tab, sub, bg, fg, bd) => React.createElement("button", { key: txt, onClick: () => goTo(tab, sub),
     style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, background: bg, color: fg, border: bd ? "1px solid " + bd : "none", borderRadius: 999, padding: "6px 13px", minHeight: 34 } }, txt);
 
-  const shownPrep = showAllPrep ? prepLeft : prepLeft.slice(0, 4);
+  // Never fewer than four, so a short phone is no worse than it was; never more
+  // than there are. `reserve` leaves room for the "+N more" line under the list.
+  const [prepRef, prepFits] = useFitCount(D.row + 1, 4, prepLeft.length, 44);
+  const shownPrep = showAllPrep ? prepLeft : prepLeft.slice(0, prepFits);
 
   return React.createElement(
     "div",
@@ -5892,22 +5943,22 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
           row.kind === "focus" ? React.createElement(Trash2, { size: 15, color: INK3 }) : React.createElement("span", { style: { display: "block", width: 12, height: 12, borderRadius: 999, background: COLORS.alert } }))))
     ) : null,
 
-    // prep, trimmed to what fits
+    // prep — as many as the screen has room for, the rest behind "+N more"
     React.createElement(
       "div",
       { className: "px-4 py-4 mb-3", style: CARD },
       label("Prep left", link("preptasks", "preplist", "Full list")),
       prepLeft.length === 0
         ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 15, color: INK2 } }, prepDone > 0 ? "All " + prepDone + " done." : "Nothing set for today yet.")
-        : React.createElement("div", null,
+        : React.createElement("div", { ref: prepRef },
             shownPrep.map((r, i) => React.createElement("button", { key: r.id, onClick: () => togglePrep(r.id), className: "w-full flex items-center gap-3 text-left",
                 style: { background: "transparent", border: "none", minHeight: D.row, borderBottom: i === shownPrep.length - 1 ? "none" : "1px solid " + COLORS.line } },
               React.createElement("span", { className: "flex-shrink-0", style: { width: D.check, height: D.check, borderRadius: 999, border: "2px solid #CDD0D3" } }),
               React.createElement("span", { className: "truncate flex-1", style: { fontFamily: "Inter", fontSize: D.name, fontWeight: 600, letterSpacing: "-0.012em", color: COLORS.crust } }, r.item),
               React.createElement("span", { className: "flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, fontSize: D.chip, color: "#FFFFFF", background: COLORS.ink, borderRadius: 8, padding: "3px 10px" } }, "\u00d7" + r.need))),
-            prepLeft.length > 4 && React.createElement("button", { onClick: () => setShowAllPrep(!showAllPrep), className: "mt-2",
+            prepLeft.length > prepFits && React.createElement("button", { onClick: () => setShowAllPrep(!showAllPrep), className: "mt-2",
               style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, color: COLORS.ink, padding: 0 } },
-              showAllPrep ? "Show fewer" : "+" + (prepLeft.length - 4) + " more"))
+              showAllPrep ? "Show fewer" : "+" + (prepLeft.length - prepFits) + " more"))
     ),
 
     // 86 / low / timers / cooler-temp problems, all in one strip
