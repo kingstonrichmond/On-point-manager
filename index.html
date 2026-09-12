@@ -1688,6 +1688,74 @@ function TicketButton({ children, onClick, color = COLORS.lamp, style = {}, ...r
     children
   );
 }
+// ---- Register (Clover) — what the register's menu actually looks like -------
+// Phase 1 of the Clover → menu sync: READ ONLY. Clover is the source of truth
+// for prices now and the app's menu has drifted, so before anything syncs we
+// need to see the shape of the catalog: where prices live (on the item, or in
+// a required size group), whether names are full words or register shorthand,
+// whether tags mark the kitchen printer. The card fetches the catalog, answers
+// those questions from the data, and puts the report in a box the owner can
+// copy and paste to Claude. Nothing here writes to data.menu.
+function CloverCatalogCard() {
+  const [open, setOpen] = useState(false);
+  const [s, setS] = useState({ loading: false });
+  const [copied, setCopied] = useState(false);
+  const [showItems, setShowItems] = useState(false);
+  const load = (fresh) => {
+    setS((x) => Object.assign({}, x, { loading: true, error: null }));
+    fetch("/.netlify/functions/catalog" + (fresh ? "?fresh=1" : ""))
+      .then((r) => r.status === 403 ? { enabled: true, error: "Owner only." } : r.json())
+      .then((j) => setS(Object.assign({ loading: false }, j)))
+      .catch((e) => setS({ loading: false, error: e.message }));
+  };
+  const toggle = () => { const next = !open; setOpen(next); if (next && !s.catalog && !s.loading) load(false); };
+  const copy = () => {
+    const t = s.report || "";
+    const done = () => { setCopied(true); setTimeout(() => setCopied(false), 2000); };
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(done, () => {}); return; } } catch (e) {}
+    try { const el = document.getElementById("opp-catalog-report"); if (el) { el.select(); document.execCommand("copy"); done(); } } catch (e) {}
+  };
+  const money = (c) => (c == null ? "—" : "$" + (c / 100).toFixed(2));
+  const CARD = { background: COLORS.card, borderRadius: 14, border: "1px solid " + COLORS.line };
+  const muted = { fontFamily: "Inter", fontSize: 13, color: "#8A9096" };
+  const btn = (txt, onClick, on) => React.createElement("button", { key: txt, onClick, className: "text-xs px-2.5 py-1.5 rounded",
+    style: { background: on ? COLORS.ink : "#F2F2EF", color: on ? "#FFFFFF" : COLORS.crust, border: "1px solid " + COLORS.line, fontFamily: "Inter", fontWeight: 600 } }, txt);
+  const cat = s.catalog || {};
+  const items = cat.items || [];
+  const byCat = {};
+  items.forEach((it) => { const k = (it.categories && it.categories[0]) || "(no category)"; (byCat[k] = byCat[k] || []).push(it); });
+
+  return React.createElement("div", { className: "px-3 py-3 mb-3", style: CARD },
+    React.createElement("button", { onClick: toggle, className: "w-full flex items-center justify-between", style: { background: "transparent", border: "none", padding: 0 } },
+      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.crust } }, "What the register's menu looks like"),
+      React.createElement("span", { style: { color: COLORS.steel, fontFamily: "Inter" } }, open ? "▴" : "▾")),
+    React.createElement("div", { style: Object.assign({ marginTop: 2 }, muted) }, "Read-only. Prices, sizes and availability as Clover has them — nothing here changes the app's menu."),
+    open ? React.createElement("div", { className: "mt-3" },
+      s.loading ? React.createElement("div", { style: muted }, "Reading the register…") : null,
+      s.enabled === false ? React.createElement("div", { style: muted }, s.reason || "Clover isn't connected.") : null,
+      s.error ? React.createElement("div", { style: Object.assign({}, muted, { color: COLORS.alertDark }) }, "Couldn't read the catalog: " + s.error) : null,
+      s.report ? React.createElement("div", null,
+        React.createElement("div", { className: "flex flex-wrap items-center gap-1.5 mb-2" },
+          btn(copied ? "Copied" : "Copy report", copy, copied),
+          btn("Refresh from Clover", () => load(true)),
+          btn(showItems ? "Hide every item" : "Show every item", () => setShowItems(!showItems), showItems),
+          React.createElement("span", { style: muted }, (s.cached ? "cached · " : "") + "read " + new Date(s.fetchedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))),
+        React.createElement("textarea", { id: "opp-catalog-report", readOnly: true, value: s.report, rows: 18, onFocus: (e) => e.target.select(),
+          className: "w-full px-3 py-2 rounded outline-none", style: { fontFamily: "JetBrains Mono", fontSize: 12, lineHeight: 1.4, color: COLORS.crust, background: "#FAFAF8", border: "1px solid " + COLORS.line, whiteSpace: "pre", overflowX: "auto" } }),
+        showItems ? React.createElement("div", { className: "mt-3" },
+          Object.keys(byCat).sort().map((k) => React.createElement("div", { key: k, className: "mb-3" },
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: INK2, marginBottom: 4 } }, k + " · " + byCat[k].length),
+            byCat[k].map((it) => React.createElement("div", { key: it.id, style: { padding: "5px 0", borderTop: "1px solid " + COLORS.line } },
+              React.createElement("div", { className: "flex items-baseline justify-between gap-2" },
+                React.createElement("span", { style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: it.available ? COLORS.crust : COLORS.alertDark, textDecoration: it.available ? "none" : "line-through" } }, it.name,
+                  !it.available ? React.createElement("span", { style: { fontWeight: 600, fontSize: 11, marginLeft: 6, color: COLORS.alertDark } }, "unavailable") : null,
+                  it.hidden ? React.createElement("span", { style: { fontWeight: 600, fontSize: 11, marginLeft: 6, color: "#8A9096" } }, "hidden") : null),
+                React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13, color: COLORS.crust } }, money(it.price) + (it.priceType && it.priceType !== "FIXED" ? " " + it.priceType.toLowerCase() : ""))),
+              (it.tags && it.tags.length) || it.alternateName ? React.createElement("div", { style: muted }, [it.alternateName ? "aka " + it.alternateName : "", it.tags && it.tags.length ? "tags: " + it.tags.join(", ") : ""].filter(Boolean).join(" · ")) : null,
+              (it.modifierGroups || []).map((g) => React.createElement("div", { key: g.id, style: Object.assign({ paddingLeft: 10 }, muted) },
+                g.name + (g.required ? " (required" : " (optional") + (g.maxAllowed != null ? ", " + g.minRequired + "–" + g.maxAllowed : ", " + g.minRequired + "+") + "): " +
+                (g.modifiers.length ? g.modifiers.map((m) => m.name + " " + money(m.price)).join(" · ") : "no modifiers")))))))) : null) : null) : null);
+}
 function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServer, rev, role, enforced, onRoleChange, onSignOut, data, persist, onHoursChange }) {
   const [who, setWhoState] = useState(getWho);
   const [adminCode, setAdminCode] = useState("");
@@ -2057,6 +2125,8 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
       )
     ),
 
+    role === "admin" && /* @__PURE__ */ React.createElement(SectionHeader, null, "Register (Clover)"),
+    role === "admin" && React.createElement(CloverCatalogCard, null),
     role === "admin" && /* @__PURE__ */ React.createElement(SectionHeader, null, "Payroll (ADP)"),
     role === "admin" && Row(
       "ADP Company Code",

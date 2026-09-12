@@ -36,7 +36,8 @@ export function ordersConfigured(env = process.env) {
   return !!(env.CLOVER_API_TOKEN && env.CLOVER_MERCHANT_ID);
 }
 
-async function cloverGet(env, path, params = {}) {
+/** The one authenticated GET everything Clover-side goes through (sends the User-Agent Clover requires). */
+export async function cloverGet(env, path, params = {}) {
   const url = new URL(`${base(env)}/v3/merchants/${env.CLOVER_MERCHANT_ID}${path}`);
   for (const [k, v] of Object.entries(params)) {
     if (v === undefined) continue;
