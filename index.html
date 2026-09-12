@@ -1602,10 +1602,10 @@ function migrateOrders(d) {
   return { data: d, changed: true };
 }
 // ---- Drinks ------------------------------------------------------------------
-// The drinks order is the register crew's job and runs separately from food,
-// so items carry a `drink` flag. Seeded once from the names (every Pepsi item,
-// the Yacht Club sodas and Del's from Thomsen); after that it's a toggle in the
-// item's price panel, and this migration never touches a row it already set.
+// Items carry a `drink` flag from when drinks were a separate order. There is
+// one order now and the flag splits nothing — a Pepsi can lands on Pepsi
+// because Pepsi is who carries it — but old documents still have it, so the
+// migration stays harmless and nothing reads it for ordering.
 const DRINKS_VERSION = 1;
 function looksLikeDrink(r) {
   if (r && r.pepsiSku) return true;
@@ -2652,8 +2652,8 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   const boardFlags = (((_a = data.prep) == null ? void 0 : _a.lowStock) || []).filter((i) => i.status === "low" || i.status === "86").length;
   const prepTodo = (((_a = data.prep) == null ? void 0 : _a.par) || []).filter((i) => Number(i.need) > 0 && !i.done).length;
   const belmontNeed = (((_a = data.prep) == null ? void 0 : _a.produce) || []).filter((i) => Number(i.need) > 0).length;
-  const foodOrderNeed = (data.inventory || []).filter((i) => !isDrink(i) && onAnyOrder(i)).length;
-  const drinksNeed = (data.inventory || []).filter((i) => isDrink(i) && onAnyOrder(i)).length;
+  // One order now, drinks included — each line carries its own vendor.
+  const foodOrderNeed = (data.inventory || []).filter(onAnyOrder).length;
   const _t0 = todayISO(), _t7 = addDaysISO(_t0, 7);
   const offSoon = ((data.timeOff || []).filter((r) => r.date >= _t0 && r.date <= _t7).map((r) => r.date).filter((v, i, a) => a.indexOf(v) === i)).length;
   // Admin-only tabs are the ones holding money, people's details, or pictures
@@ -2665,7 +2665,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   const tabs = [
     { id: "today", label: "Today", icon: Activity },
     { id: "crew", label: "Crew", icon: Users, badge: offSoon },
-    { id: "invorders", label: "Inventory & Orders", icon: Package, badge: lowStockCount + foodOrderNeed + drinksNeed + belmontNeed + boardFlags },
+    { id: "invorders", label: "Inventory & Orders", icon: Package, badge: lowStockCount + foodOrderNeed + belmontNeed + boardFlags },
     { id: "preptasks", label: "Prep & Tasks", icon: ClipboardList, badge: prepTodo + openTasks },
     { id: "reference", label: "Reference", icon: BookOpen },
     { id: "phone", label: "Phone", icon: PhoneIcon, badge: ((data && data.phoneOrders) || []).filter((o) => o.status !== "done").length },
@@ -2727,7 +2727,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "opp-content p-4", style: { background: COLORS.cream } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FDECEA", color: COLORS.alertDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab, onSub }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, drinksNeed, belmontNeed, boardFlags, initialSub: subTab, onSub }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab, onSub }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab, isAdmin, onSub }), tab === "phone" && /* @__PURE__ */ React.createElement(PhoneTab, { data, persist, isAdmin }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { setBase(0, null); dirtyRef.current = false; await pull({ initial: true }); }, data, persist,
+  })), /* @__PURE__ */ React.createElement("div", { className: "opp-content p-4", style: { background: COLORS.cream } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FDECEA", color: COLORS.alertDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab, onSub }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab, onSub }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab, onSub }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab, isAdmin, onSub }), tab === "phone" && /* @__PURE__ */ React.createElement(PhoneTab, { data, persist, isAdmin }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { setBase(0, null); dirtyRef.current = false; await pull({ initial: true }); }, data, persist,
         onHoursChange: (next) => { const d = JSON.parse(JSON.stringify(dataRef.current)); d.shopHours = next; persist(d); } })),
   /* @__PURE__ */ React.createElement("nav", { className: "opp-tabbar", style: { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 9000, background: COLORS.crust, borderTop: "1px solid rgba(255,255,255,0.10)", paddingBottom: "env(safe-area-inset-bottom, 0px)" } },
     tabs.map((t) => {
@@ -8859,10 +8859,7 @@ function PriceDetail({ i, vendorOf, patch }) {
                 i.qty != null ? i.qty : "?",
                 " ",
                 i.unit || "",
-                i.low != null ? " \u00b7 low at " + i.low : ""),
-            React.createElement("button", { onClick: () => patch(i.id, { drink: !isDrink(i) }), className: "text-xs ml-auto px-2.5 py-1.5 rounded-full",
-                style: { fontFamily: "Inter", fontWeight: 600, border: "1px solid " + (isDrink(i) ? COLORS.crust : COLORS.line), background: isDrink(i) ? COLORS.crust : "transparent", color: isDrink(i) ? "#FFFFFF" : COLORS.crust } },
-                isDrink(i) ? "On the drinks order" : "Not a drink")),
+                i.low != null ? " \u00b7 low at " + i.low : "")),
         React.createElement("div", { className: "flex items-center gap-2 mt-2" },
             React.createElement("span", { className: "text-xs flex-shrink-0", style: { fontFamily: "Inter", color: "#5F676E" } }, "Where it lives"),
             React.createElement("select", { value: stationOf(i), onChange: (e) => patch(i.id, { station: e.target.value }), className: "text-sm px-2 py-1.5 rounded outline-none flex-1", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", background: COLORS.cream } }, WALK_STATIONS.map((w) => React.createElement("option", { key: w.name, value: w.name }, w.name))))));
@@ -9323,27 +9320,43 @@ function PriceQuotePanel({ data, persist }) {
             pill(mode === "send", "Send our list", () => setMode("send"))),
         mode === "send" ? sendView() : checkView());
 }
-// `drinks` flips this into the Drinks order: only items flagged as drinks, and
-// only the vendors that carry any (Thomsen and Pepsi). The food order shows
-// everything else. Both read and write the same per-vendor order slots, so an
-// item can't be counted twice — it's either a drink or it isn't.
-function FoodOrderTab({ data, persist, drinks }) {
-    const allInv = (data && data.inventory) || [];
-    const inv = allInv.filter((i) => (drinks ? isDrink(i) : !isDrink(i)));
-    const inScope = (r) => (drinks ? isDrink(r) : !isDrink(r));
-    const VLIST = VENDORS.filter((v) => (drinks ? inv.some((i) => carriedBy(i, v.id)) : true));
-    // Open on whichever vendor already has something on it, else Quality (food) or Pepsi (drinks).
-    const firstOpen = VLIST.find((v) => inv.some((i) => Number(orderNeedOf(i, v.id)) > 0));
-    const [vendor, setVendor] = useState(firstOpen ? firstOpen.id : (drinks ? (VLIST.some((v) => v.id === "Pepsi") ? "Pepsi" : (VLIST[0] || VENDORS[0]).id) : "QFC"));
+// One food order, item-first. You go down the row once and say what you need;
+// every line carries a vendor chip. Drinks are just items — a Pepsi can lands
+// on Pepsi because Pepsi is the only one who carries it, not because it's on a
+// separate "drinks" screen. The chip is set by MEMORY, not by price: it's the
+// vendor the item went to last time (i.vendor, learned when an order is sent),
+// so cheese keeps coming from Quality and flour from Thomsen until you tap it
+// somewhere else. Price is one input; delivery day and the product are others,
+// and only a person knows those. So the app SHOWS the saving — the "Quality is
+// $0.40/lb cheaper" nudge on the line, the savings card up top with its
+// move-all — and never takes it by itself. The per-vendor lists are the output,
+// under Send; nobody builds an order vendor-first anymore.
+function FoodOrderTab({ data, persist }) {
+    const inv = (data && data.inventory) || [];
     const [view, setView] = useState("order");
     const [q, setQ] = useState("");
     const [copied, setCopied] = useState("");
     const [openId, setOpenId] = useState("");
     const [numbersOn, setNumbersOn] = useState(false);
-    const [repOpen, setRepOpen] = useState(false);
-    const [repDraft, setRepDraft] = useState(null);
-    const V = VENDOR_BY_ID[vendor] || VENDORS[0];
-    const contacts = (data.vendorContacts && data.vendorContacts[vendor]) || { rep: "", phone: "", email: "", notes: "" };
+    const [repOpen, setRepOpen] = useState("");     // vendor id whose rep panel is open
+    const [repDraft, setRepDraft] = useState(null); // { vid, rep, phone, email, notes }
+    const [pick, setPick] = useState({});           // item id → vendor chosen before a quantity is set
+    const contactsOf = (vid) => (data.vendorContacts && data.vendorContacts[vid]) || { rep: "", phone: "", email: "", notes: "" };
+
+    const carriers = (i) => VENDORS.filter((v) => carriedBy(i, v.id));
+    // Which vendor an item is on right now: the slot with a quantity. One at most —
+    // a move deletes the old slot — so a line can never be counted twice.
+    const onVid = (i) => { const v = VENDORS.find((x) => orderNeedOf(i, x.id) != null); return v ? v.id : null; };
+    // Where it goes if you put it on: where it went last, if they still carry it;
+    // else whoever has its item number; else whoever prices it; else Quality.
+    const defaultVid = (i) => {
+        if (i.vendor && carriedBy(i, i.vendor)) return i.vendor;
+        const bySku = VENDORS.find((v) => vendorSku(i, v.id));
+        if (bySku) return bySku.id;
+        const byPrice = VENDORS.find((v) => carriedBy(i, v.id));
+        return byPrice ? byPrice.id : "QFC";
+    };
+    const vidOf = (i) => onVid(i) || pick[i.id] || defaultVid(i);
 
     const patch = (id, changes) => {
         const next = JSON.parse(JSON.stringify(data));
@@ -9363,69 +9376,85 @@ function FoodOrderTab({ data, persist, drinks }) {
         persist(next);
     };
     const setNote = (id, note) => {
-        const cur = orderOf(inv.find((r) => r.id === id), vendor);
-        if (cur) setNeed(id, vendor, cur.need, note);
+        const i = inv.find((r) => r.id === id);
+        const vid = i && onVid(i);
+        const cur = vid && orderOf(i, vid);
+        if (cur) setNeed(id, vid, cur.need, note);
     };
     // Notes belong to one order. Clearing the quantity clears the note with it.
-    const clearNeed = (id) => setNeed(id, vendor, null);
-    const reset = () => {
+    const clearNeed = (id) => { const i = inv.find((r) => r.id === id); if (i) setNeed(id, onVid(i) || vidOf(i), null); };
+    const clearVendor = (vid) => {
         const next = JSON.parse(JSON.stringify(data));
-        next.inventory.forEach((r) => { if (r.order && inScope(r)) delete r.order[vendor]; });
+        next.inventory.forEach((r) => { if (r.order) delete r.order[vid]; });
         persist(next);
     };
-    // "Quality's cheaper — put it there": the quantity and note walk over to the
-    // other vendor's order and this one lets go of it.
+    const clearAll = () => {
+        const next = JSON.parse(JSON.stringify(data));
+        next.inventory.forEach((r) => { delete r.order; });
+        persist(next);
+    };
+    // "Quality's cheaper — put it there", or just a tap on the chip: the quantity
+    // and note walk over to the other vendor's slot and this one lets go of it.
     const moveTo = (id, toVid) => {
         const next = JSON.parse(JSON.stringify(data));
         const row = next.inventory.find((r) => r.id === id);
-        if (!row || !row.order || !row.order[vendor]) return;
-        const o = row.order[vendor];
+        const from = row && VENDORS.find((v) => row.order && row.order[v.id] != null);
+        if (!row || !from || from.id === toVid) return;
+        const o = row.order[from.id];
         row.order[toVid] = { need: o.need, note: o.note || "" };
-        delete row.order[vendor];
+        delete row.order[from.id];
         persist(next);
     };
-    const moveAllTo = (ids, toVid) => {
+    const moveAll = (moves) => {
         const next = JSON.parse(JSON.stringify(data));
         let n = 0;
-        next.inventory.forEach((row) => {
-            if (!ids.includes(row.id) || !row.order || !row.order[vendor]) return;
-            const o = row.order[vendor];
+        moves.forEach(({ id, toVid }) => {
+            const row = next.inventory.find((r) => r.id === id);
+            const from = row && VENDORS.find((v) => row.order && row.order[v.id] != null);
+            if (!row || !from || from.id === toVid) return;
+            const o = row.order[from.id];
             row.order[toVid] = { need: o.need, note: o.note || "" };
-            delete row.order[vendor];
+            delete row.order[from.id];
             n++;
         });
         if (n) persist(next);
     };
-    // One tap builds the standing order; take off what isn't needed this time.
+    // Tapping a chip: on the order already → move it; not yet → remember the pick
+    // for when a quantity goes on.
+    const chooseVendor = (i, vid) => {
+        if (onVid(i)) { if (onVid(i) !== vid) moveTo(i.id, vid); }
+        else setPick(Object.assign({}, pick, { [i.id]: vid }));
+    };
+    // One tap builds the standing order, each item on its own remembered vendor.
     const fillUsual = () => {
         const next = JSON.parse(JSON.stringify(data));
         let n = 0;
         next.inventory.forEach((r) => {
-            if (!inScope(r)) return;
-            const u = usualOf(r, vendor);
-            if (u && carriedBy(r, vendor) && orderNeedOf(r, vendor) == null) { r.order = r.order || {}; r.order[vendor] = { need: u, note: "" }; n++; }
+            const vid = vidOf(r);
+            const u = usualOf(r, vid);
+            if (u && carriedBy(r, vid) && !onAnyOrder(r) && VENDORS.every((v) => orderNeedOf(r, v.id) == null)) { r.order = r.order || {}; r.order[vid] = { need: u, note: "" }; n++; }
         });
         if (n) persist(next);
     };
-    // Sending the order is when we learn what "usual" is for each item.
-    const learnUsual = (next) => {
+    // Sending is when we learn two things about each item: its usual quantity
+    // with this vendor, and that this vendor is where it comes from now.
+    const learnUsual = (next, vid) => {
         next.inventory.forEach((r) => {
-            const need = orderNeedOf(r, vendor);
-            if (Number(need) > 0) { r.usual = r.usual || {}; r.usual[vendor] = Number(need); }
+            const need = orderNeedOf(r, vid);
+            if (Number(need) > 0) { r.usual = r.usual || {}; r.usual[vid] = Number(need); r.vendor = vid; }
         });
     };
 
-    const carried = inv.filter((i) => carriedBy(i, vendor));
-    const onList = carried.filter((i) => Number(orderNeedOf(i, vendor)) > 0);
-    const allSet = carried.filter((i) => orderNeedOf(i, vendor) === 0).length;
-    const untouched = carried.filter((i) => orderNeedOf(i, vendor) == null).length;
-    const unlinked = inv.filter((i) => !VENDORS.some((v) => carriedBy(i, v.id))).length;
-    const usualAvail = carried.filter((i) => usualOf(i, vendor) && orderNeedOf(i, vendor) == null).length;
+    const carried = inv.filter((i) => carriers(i).length > 0);
+    const onList = inv.filter(onAnyOrder);
+    const allSet = inv.filter((i) => VENDORS.some((v) => orderNeedOf(i, v.id) === 0)).length;
+    const untouched = carried.filter((i) => VENDORS.every((v) => orderNeedOf(i, v.id) == null)).length;
+    const unlinked = inv.length - carried.length;
+    const usualAvail = carried.filter((i) => usualOf(i, vidOf(i)) && VENDORS.every((v) => orderNeedOf(i, v.id) == null)).length;
     const toggleOpen = (id) => setOpenId(openId === id ? "" : id);
     // The worklist. Two kinds of gap end up here: a pack size that was never
     // filled in, and a comparison that runs but on two units nobody has vouched
-    // for — a box against a case. Both produce a number you can't trust, so both
-    // belong on the same list.
+    // for — a box against a case. Both produce a number you can't trust.
     const needsCompare = (i) => {
         if (needsPack(i, "qfc") || needsPack(i, "thomsen")) return true;
         const c = cheaperSide(i);
@@ -9433,58 +9462,65 @@ function FoodOrderTab({ data, persist, drinks }) {
     };
     const packTodo = inv.filter(needsCompare).length;
     const countFor = (vid) => inv.filter((i) => Number(orderNeedOf(i, vid)) > 0).length;
+    const listFor = (vid) => inv.filter((i) => Number(orderNeedOf(i, vid)) > 0);
     const match = (i) => !q.trim() || i.item.toLowerCase().includes(q.trim().toLowerCase());
     const digits = (ph) => String(ph || "").replace(/[^\d+]/g, "");
 
     // The other food vendor, if it's cheaper on this item and actually carries it.
     const cheaperElsewhere = (i) => {
-        if (V.kind !== "food") return null;
+        const vid = vidOf(i);
+        if ((VENDOR_BY_ID[vid] || {}).kind !== "food") return null;
         const c = cheaperSide(i);
         if (!c.comparable || c.side === "even") return null;
         const win = c.side === "qfc" ? "QFC" : "Thomsen";
-        if (win === vendor || !carriedBy(i, win)) return null;
+        if (win === vid || !carriedBy(i, win)) return null;
         return { vid: win, diff: c.diff, base: c.basis || i.unit || "ea", trusted: c.trusted };
     };
 
     // What the rep sees. Names and quantities, notes in parentheses, item
     // numbers only if asked for. No prices, no station names, no comparison.
-    const orderText = (withSku) => {
+    const orderText = (vid, withSku) => {
+        const V = VENDOR_BY_ID[vid];
+        const list = listFor(vid);
         const lines = [];
-        groupByStation(onList).forEach((g) => g.items.forEach((i) => {
-            const o = orderOf(i, vendor);
-            const sku = withSku ? vendorSku(i, vendor) : "";
-            lines.push("\u2022 " + i.item + "  \u00d7 " + o.need + (o.note ? "  (" + o.note + ")" : "") + (sku ? "   #" + sku : ""));
+        groupByStation(list).forEach((g) => g.items.forEach((i) => {
+            const o = orderOf(i, vid);
+            const sku = withSku ? vendorSku(i, vid) : "";
+            lines.push("• " + i.item + "  × " + o.need + (o.note ? "  (" + o.note + ")" : "") + (sku ? "   #" + sku : ""));
         }));
         const shop = (data.shopProfile && data.shopProfile.name) || "Shop";
-        return shop + " \u2014 " + V.label + " order  \u00b7  " + onList.length + (onList.length === 1 ? " item" : " items") + "\n" + lines.join("\n");
+        return shop + " — " + V.label + " order  ·  " + list.length + (list.length === 1 ? " item" : " items") + "\n" + lines.join("\n");
     };
-    const send = (how) => {
-        if (!onList.length) return;
-        const text = orderText(numbersOn);
+    const send = (vid, how) => {
+        if (!countFor(vid)) return;
+        const V = VENDOR_BY_ID[vid];
+        const contacts = contactsOf(vid);
+        const text = orderText(vid, numbersOn);
         const next = JSON.parse(JSON.stringify(data));
-        learnUsual(next);
+        learnUsual(next, vid);
         persist(next);
         if (how === "copy") {
             if (navigator.clipboard) navigator.clipboard.writeText(text);
-            setCopied("order");
+            setCopied(vid);
             setTimeout(() => setCopied(""), 1800);
             return;
         }
         // sms: wants ?&body on iOS and ?body on Android; the combined form works on both.
         if (how === "text") window.location.href = "sms:" + digits(contacts.phone) + "?&body=" + encodeURIComponent(text);
-        if (how === "email") window.location.href = "mailto:" + (contacts.email || "") + "?subject=" + encodeURIComponent(V.label + " order \u2014 " + ((data.shopProfile && data.shopProfile.name) || "")) + "&body=" + encodeURIComponent(text);
+        if (how === "email") window.location.href = "mailto:" + (contacts.email || "") + "?subject=" + encodeURIComponent(V.label + " order — " + ((data.shopProfile && data.shopProfile.name) || "")) + "&body=" + encodeURIComponent(text);
     };
     const saveRep = () => {
+        if (!repDraft) return;
         const next = JSON.parse(JSON.stringify(data));
         next.vendorContacts = next.vendorContacts || {};
-        next.vendorContacts[vendor] = { rep: repDraft.rep || "", phone: repDraft.phone || "", email: repDraft.email || "", notes: repDraft.notes || "" };
+        next.vendorContacts[repDraft.vid] = { rep: repDraft.rep || "", phone: repDraft.phone || "", email: repDraft.email || "", notes: repDraft.notes || "" };
         persist(next);
         setRepDraft(null);
     };
 
-    const pill = (active) => ({ fontFamily: "Inter", fontWeight: 600, border: "1px solid " + (active ? COLORS.cream : "#3A3A44"), background: active ? COLORS.cream : "transparent", color: active ? COLORS.crust : "#B8BDC2" });
     const darkBtn = { background: "rgba(255,255,255,0.08)", color: "#FFFFFF", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 10, fontFamily: "Inter", fontSize: 13, fontWeight: 600, minHeight: 36, padding: "0 12px" };
     const FIELD = { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#FAFAF8", borderRadius: 8, minHeight: 38 };
+    const pillStyle = (active) => ({ fontFamily: "Inter", fontWeight: 600, border: "1px solid " + (active ? COLORS.cream : "#3A3A44"), background: active ? COLORS.cream : "transparent", color: active ? COLORS.crust : "#B8BDC2" });
 
     const priceLine = (i) => {
         const bits = [];
@@ -9492,13 +9528,26 @@ function FoodOrderTab({ data, persist, drinks }) {
             const p = vendorPriceOf(i, v.key);
             if (p) bits.push((v.short[0]) + " $" + p.amt.toFixed(2) + "/" + (p.unit || "ea"));
         });
-        return bits.length ? bits.join("  \u00b7  ") : "no price on file";
+        return bits.length ? bits.join("  ·  ") : "no price on file";
+    };
+    // The vendor chip row. One carrier → a single fixed chip (a Pepsi can is a
+    // Pepsi can). Two or three → tap to pick; the active one is the vendor this
+    // line is on (or will go on).
+    const vendorChips = (i) => {
+        const cs = carriers(i);
+        if (!cs.length) return React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A9096" } }, "no vendor linked");
+        const cur = vidOf(i);
+        return React.createElement("div", { className: "flex items-center gap-1 flex-wrap" }, cs.map((v) => {
+            const on = v.id === cur;
+            return React.createElement("button", { key: v.id, onClick: () => chooseVendor(i, v.id), disabled: cs.length === 1, className: "text-xs px-2.5 py-1 rounded-full",
+                style: { fontFamily: "Inter", fontWeight: 700, border: "1px solid " + (on ? COLORS.crust : COLORS.line), background: on ? COLORS.crust : "transparent", color: on ? COLORS.cream : COLORS.crust, opacity: cs.length === 1 ? 0.85 : 1 } }, v.short);
+        }));
     };
     const moveBtn = (i) => {
         const ce = cheaperElsewhere(i);
-        if (!ce) return null;
+        if (!ce || !onVid(i)) return null;
         // A confirmed gap is green and reads as a decision. An unconfirmed one is
-        // amber and reads as a question, because that's what it is \u2014 the button
+        // amber and reads as a question, because that's what it is — the button
         // still moves the item, it just stops pretending to know the number.
         const tone = ce.trusted
             ? { background: "#E4F1E6", color: "#1F6B34", border: "1px solid #BFDCC5" }
@@ -9506,137 +9555,202 @@ function FoodOrderTab({ data, persist, drinks }) {
         return React.createElement("button", { onClick: () => moveTo(i.id, ce.vid), className: "text-xs px-2.5 py-1.5 rounded-full mt-2 flex items-center gap-1",
             style: Object.assign({ fontFamily: "Inter", fontWeight: 600 }, tone) },
             ce.trusted
-                ? VENDOR_SHORT[ce.vid] + " is $" + ce.diff.toFixed(2) + "/" + ce.base + " cheaper \u2014 put it on the " + VENDOR_SHORT[ce.vid] + " order \u2192"
-                : VENDOR_SHORT[ce.vid] + " looks $" + ce.diff.toFixed(2) + "/" + ce.base + " cheaper \u2014 check the sizes match, then move it \u2192");
+                ? VENDOR_SHORT[ce.vid] + " is $" + ce.diff.toFixed(2) + "/" + ce.base + " cheaper — put it on the " + VENDOR_SHORT[ce.vid] + " order →"
+                : VENDOR_SHORT[ce.vid] + " looks $" + ce.diff.toFixed(2) + "/" + ce.base + " cheaper — check the sizes match, then move it →");
     };
 
-    // ---- the working order for this vendor ----
+    // ---- the working order: everything that's on, whoever it's going to ----
     const orderView = () => {
         if (onList.length === 0) {
             return React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#8A9096" } },
-                "Nothing on the " + V.short + " order yet \u2014 go through \u201cSet Up List\u201d and mark what you need" + (usualAvail ? ", or fill the usual order in one tap." : "."));
+                "Nothing on the order yet — go through “Set Up List” and mark what you need" + (usualAvail ? ", or fill the usual order in one tap." : "."));
         }
         const cats = groupByStation(onList);
         return React.createElement("div", null,
-            V.kind === "food" ? React.createElement(OrderSavingsCard, { inv: inv, vid: vendor, onMoveAll: moveAllTo, scope: drinks ? "drinks" : "food" }) : null,
+            React.createElement(FoodOrderSavings, { inv: inv, onMoveAll: moveAll }),
             React.createElement("div", { className: "space-y-1.5" }, cats.flatMap((g) => g.items).map((i) => {
-            const o = orderOf(i, vendor);
-            return React.createElement("div", { key: i.id, className: "px-3 py-3 rounded", style: { background: COLORS.card, border: "1px solid " + COLORS.line, borderLeft: "5px solid " + COLORS.ink } },
-                React.createElement("div", { className: "flex items-center gap-3" },
-                    React.createElement("button", { onClick: () => toggleOpen(i.id), className: "flex-1 min-w-0 text-left" },
-                        React.createElement("div", { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } }, i.item),
-                        o.note ? React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", fontWeight: 500, color: "#8A6116" } }, o.note) : null,
-                        React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#5F676E" } },
-                            (numbersOn && vendorSku(i, vendor) ? "#" + vendorSku(i, vendor) + "  \u00b7  " : "") + priceLine(i),
-                            React.createElement("span", { style: { color: COLORS.steel } }, openId === i.id ? "  \u25b4" : "  \u25be"))),
-                    React.createElement("span", { className: "text-lg px-2.5 py-0.5 rounded-full flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.cream, background: COLORS.ink } }, "\u00d7" + o.need),
-                    React.createElement("button", { onClick: () => clearNeed(i.id), className: "px-2 py-2 flex-shrink-0", style: { border: "none", background: "transparent" } },
-                        React.createElement(Trash2, { size: 15, color: "#8A9096" }))),
-                moveBtn(i),
-                openId === i.id ? React.createElement(PriceDetail, { i: i, vendorOf: () => vendor, patch: patch }) : null);
-        })));
+                const vid = onVid(i);
+                const o = orderOf(i, vid);
+                return React.createElement("div", { key: i.id, className: "px-3 py-3 rounded", style: { background: COLORS.card, border: "1px solid " + COLORS.line, borderLeft: "5px solid " + COLORS.ink } },
+                    React.createElement("div", { className: "flex items-center gap-3" },
+                        React.createElement("button", { onClick: () => toggleOpen(i.id), className: "flex-1 min-w-0 text-left" },
+                            React.createElement("div", { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } }, i.item),
+                            o.note ? React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", fontWeight: 500, color: "#8A6116" } }, o.note) : null,
+                            React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#5F676E" } },
+                                (numbersOn && vendorSku(i, vid) ? "#" + vendorSku(i, vid) + "  ·  " : "") + priceLine(i),
+                                React.createElement("span", { style: { color: COLORS.steel } }, openId === i.id ? "  ▴" : "  ▾"))),
+                        React.createElement("span", { className: "text-lg px-2.5 py-0.5 rounded-full flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.cream, background: COLORS.ink } }, "×" + o.need),
+                        React.createElement("button", { onClick: () => clearNeed(i.id), className: "px-2 py-2 flex-shrink-0", style: { border: "none", background: "transparent" } },
+                            React.createElement(Trash2, { size: 15, color: "#8A9096" }))),
+                    React.createElement("div", { className: "mt-2" }, vendorChips(i)),
+                    moveBtn(i),
+                    openId === i.id ? React.createElement(PriceDetail, { i: i, vendorOf: () => vid, patch: patch }) : null);
+            })));
     };
 
-    // ---- go down this vendor's items and say what you need ----
+    // ---- go down the row and say what you need ----
     const setupView = () => {
         const packMode = view === "packs";
         const shown = (packMode ? inv.filter(needsCompare) : carried).filter(match);
         const cats = groupByStation(shown);
         if (!shown.length) {
             return React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#8A9096" } },
-                packMode ? "Every price on file lines up with how you count it \u2014 nothing left to fill in." : (carried.length ? "No items match." : "Nothing is linked to " + V.label + " yet \u2014 add an item number or a price on the Inventory tab."));
+                packMode ? "Every price on file lines up with how you count it — nothing left to fill in." : (carried.length ? "No items match." : "Nothing is linked to a vendor yet — add an item number or a price on the Inventory tab."));
         }
         return React.createElement("div", null, cats.map((g) => React.createElement("div", { key: g.name, className: "mb-4" },
             React.createElement(StationHeader, { g: g }),
             React.createElement("div", { className: "space-y-1.5" }, g.items.map((i) => {
-                const need = orderNeedOf(i, vendor);
+                const vid = vidOf(i);
+                const need = orderNeedOf(i, vid);
                 const isSet = need === 0;
                 const on = Number(need) > 0;
-                const usual = usualOf(i, vendor);
+                const usual = usualOf(i, vid);
                 const edge = on ? COLORS.ink : isSet ? COLORS.basil : COLORS.line;
-                const o = orderOf(i, vendor);
+                const o = orderOf(i, vid);
                 return React.createElement("div", { key: i.id, className: "px-3 py-2.5 rounded", style: { background: COLORS.card, border: "1px solid " + edge, borderLeft: "5px solid " + edge } },
                     React.createElement("div", { className: "flex items-start justify-between gap-2 mb-2" },
                         React.createElement("button", { onClick: () => toggleOpen(i.id), className: "min-w-0 text-left flex-1" },
                             React.createElement("div", { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } }, i.item),
                             React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#5F676E" } },
-                                "on hand " + (i.qty != null ? i.qty : "?") + " " + (i.unit || "") + "  \u00b7  " + priceLine(i) + (vendorPack(i, vendor) ? "  \u00b7  " + vendorPack(i, vendor) : ""),
-                                React.createElement("span", { style: { color: COLORS.steel } }, openId === i.id ? "  \u25b4" : "  \u25be"))),
+                                "on hand " + (i.qty != null ? i.qty : "?") + " " + (i.unit || "") + "  ·  " + priceLine(i) + (vendorPack(i, vid) ? "  ·  " + vendorPack(i, vid) : ""),
+                                React.createElement("span", { style: { color: COLORS.steel } }, openId === i.id ? "  ▴" : "  ▾"))),
                         on ? React.createElement("span", { className: "text-sm flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.ink } }, "need " + need)
                            : isSet ? React.createElement("span", { className: "text-xs flex-shrink-0", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.basil } }, "all set")
                            : usual ? React.createElement("span", { className: "text-xs flex-shrink-0", style: { fontFamily: "Inter", color: "#8A9096" } }, "usually " + usual) : null),
                     React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap" },
-                        React.createElement("button", { onClick: () => (isSet ? clearNeed(i.id) : setNeed(i.id, vendor, 0, "")), className: "text-sm px-3 py-2 rounded-full",
+                        React.createElement("button", { onClick: () => (isSet ? clearNeed(i.id) : setNeed(i.id, vid, 0, "")), className: "text-sm px-3 py-2 rounded-full",
                             style: { fontFamily: "Inter", border: "1px solid " + (isSet ? COLORS.basil : COLORS.line), background: isSet ? COLORS.basil : "transparent", color: isSet ? COLORS.cream : COLORS.crust } }, "All set"),
-                        [1, 2, 3, 4].map((n) => React.createElement("button", { key: n, onClick: () => (need === n ? clearNeed(i.id) : setNeed(i.id, vendor, n)), className: "text-base px-3.5 py-2 rounded-full",
+                        [1, 2, 3, 4].map((n) => React.createElement("button", { key: n, onClick: () => (need === n ? clearNeed(i.id) : setNeed(i.id, vid, n)), className: "text-base px-3.5 py-2 rounded-full",
                             style: { fontFamily: "JetBrains Mono", fontWeight: 700,
                                 // The usual quantity gets a ring so the right tap is obvious.
                                 border: (need === n ? "1px solid " + COLORS.ink : usual === n ? "2px solid " + COLORS.ink : "1px solid " + COLORS.line),
                                 background: need === n ? COLORS.ink : "transparent", color: need === n ? COLORS.cream : COLORS.crust } }, n)),
-                        React.createElement("button", { onClick: () => setNeed(i.id, vendor, (Number(need) || 0) + 1), className: "px-3 py-2 rounded-full flex items-center", style: { border: "1px solid " + COLORS.line, background: "transparent" } },
-                            React.createElement(Plus, { size: 16, color: COLORS.crust }))),
-                    on ? React.createElement("input", { placeholder: "Note \u2014 e.g. half a case, one piece only", value: (o && o.note) || "", onChange: (e) => setNote(i.id, e.target.value),
+                        React.createElement("button", { onClick: () => setNeed(i.id, vid, (Number(need) || 0) + 1), className: "px-3 py-2 rounded-full flex items-center", style: { border: "1px solid " + COLORS.line, background: "transparent" } },
+                            React.createElement(Plus, { size: 16, color: COLORS.crust })),
+                        React.createElement("span", { className: "ml-auto" }, vendorChips(i))),
+                    on ? React.createElement("input", { placeholder: "Note — e.g. half a case, one piece only", value: (o && o.note) || "", onChange: (e) => setNote(i.id, e.target.value),
                         className: "w-full mt-2 px-3 py-2 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#FAFAF8" } }) : null,
                     on ? moveBtn(i) : null,
-                    (packMode || openId === i.id) ? React.createElement(PriceDetail, { i: i, vendorOf: () => vendor, patch: patch }) : null);
+                    (packMode || openId === i.id) ? React.createElement(PriceDetail, { i: i, vendorOf: () => vid, patch: patch }) : null);
             })))),
             !packMode && unlinked > 0 ? React.createElement("div", { className: "text-xs px-1 py-3 text-center", style: { fontFamily: "Inter", color: "#8A9096" } },
-                unlinked + (unlinked === 1 ? " item isn't" : " items aren't") + " linked to any vendor yet, so they don't show on any order. Add an item number or price on the Inventory tab.") : null);
+                unlinked + (unlinked === 1 ? " item isn't" : " items aren't") + " linked to any vendor yet, so it can't go on an order. Add an item number or price on the Inventory tab.") : null);
+    };
+
+    // ---- send: one block per vendor with anything on it ----
+    const sendView = () => {
+        const vendorsOn = VENDORS.filter((v) => countFor(v.id) > 0);
+        if (!vendorsOn.length) {
+            return React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#8A9096" } }, "Nothing to send yet.");
+        }
+        return React.createElement("div", { className: "space-y-3" },
+            React.createElement("div", { className: "flex items-center justify-end" },
+                React.createElement("button", { onClick: () => setNumbersOn(!numbersOn), className: "text-xs px-2.5 py-1.5 rounded-full", style: { fontFamily: "Inter", fontWeight: 600, border: "1px solid " + (numbersOn ? COLORS.crust : COLORS.line), background: numbersOn ? COLORS.crust : "transparent", color: numbersOn ? COLORS.cream : COLORS.crust } }, numbersOn ? "item #s on" : "item #s off")),
+            vendorsOn.map((V) => {
+                const vid = V.id;
+                const contacts = contactsOf(vid);
+                const list = listFor(vid);
+                const repLine = [contacts.rep, contacts.phone].filter(Boolean).join(" · ");
+                const open = repOpen === vid;
+                const editing = repDraft && repDraft.vid === vid;
+                return React.createElement("div", { key: vid, className: "px-3 pt-3 pb-3 rounded", style: { background: COLORS.crust } },
+                    React.createElement("div", { className: "flex items-start justify-between gap-2" },
+                        React.createElement("div", { className: "min-w-0" },
+                            React.createElement("div", { className: "text-2xl", style: { fontFamily: "Archivo Narrow", color: COLORS.cream, lineHeight: 1.1 } }, list.length + (list.length === 1 ? " item" : " items") + " for " + V.short),
+                            React.createElement("button", { onClick: () => { setRepOpen(open ? "" : vid); setRepDraft(null); }, className: "text-xs mt-1 text-left", style: { background: "transparent", border: "none", padding: 0, fontFamily: "Inter", color: "#B8BDC2" } },
+                                (repLine || "No rep on file") + (contacts.notes ? " · " + contacts.notes : "") + (open ? "  ▴" : "  ▾"))),
+                        React.createElement("button", { onClick: () => clearVendor(vid), className: "text-xs flex-shrink-0", style: { background: "transparent", border: "none", fontFamily: "Inter", color: "#8A9096", textDecoration: "underline", textUnderlineOffset: 3, padding: "4px 0" } }, "Clear " + V.short)),
+                    React.createElement("div", { className: "text-xs mt-2", style: { fontFamily: "JetBrains Mono", color: "#B8BDC2", whiteSpace: "pre-wrap" } }, list.map((i) => "• " + i.item + " × " + orderOf(i, vid).need).join("\n")),
+                    React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap mt-3" },
+                        React.createElement("button", { onClick: () => send(vid, "copy"), className: "flex items-center gap-1.5", style: Object.assign({}, darkBtn, { background: COLORS.basil, border: "none" }) }, React.createElement(Copy, { size: 14 }), copied === vid ? "Copied" : "Copy order"),
+                        contacts.phone ? React.createElement("button", { onClick: () => send(vid, "text"), style: darkBtn }, "Text " + (contacts.rep ? contacts.rep.split(" ")[0] : "rep")) : null,
+                        contacts.email ? React.createElement("button", { onClick: () => send(vid, "email"), style: darkBtn }, "Email") : null),
+                    open ? React.createElement("div", { className: "mt-3 pt-3", style: { borderTop: "1px solid #3A3A44" } },
+                        editing
+                            ? React.createElement("div", { className: "space-y-1.5" },
+                                React.createElement("input", { placeholder: "Rep name", value: repDraft.rep, onChange: (e) => setRepDraft({ ...repDraft, rep: e.target.value }), className: "w-full px-3 outline-none", style: FIELD }),
+                                React.createElement("input", { placeholder: "Phone", inputMode: "tel", value: repDraft.phone, onChange: (e) => setRepDraft({ ...repDraft, phone: e.target.value }), className: "w-full px-3 outline-none", style: FIELD }),
+                                React.createElement("input", { placeholder: "Email", inputMode: "email", value: repDraft.email, onChange: (e) => setRepDraft({ ...repDraft, email: e.target.value }), className: "w-full px-3 outline-none", style: FIELD }),
+                                React.createElement("input", { placeholder: "Notes — cutoff, delivery day, account number", value: repDraft.notes, onChange: (e) => setRepDraft({ ...repDraft, notes: e.target.value }), className: "w-full px-3 outline-none", style: FIELD }),
+                                React.createElement("div", { className: "flex gap-1.5" },
+                                    React.createElement("button", { onClick: saveRep, style: Object.assign({}, darkBtn, { background: COLORS.basil, border: "none" }) }, "Save"),
+                                    React.createElement("button", { onClick: () => setRepDraft(null), style: darkBtn }, "Cancel")))
+                            : React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap" },
+                                contacts.phone ? React.createElement("a", { href: "tel:" + digits(contacts.phone), style: Object.assign({}, darkBtn, { display: "inline-flex", alignItems: "center", textDecoration: "none" }) }, "Call") : null,
+                                contacts.phone ? React.createElement("a", { href: "sms:" + digits(contacts.phone), style: Object.assign({}, darkBtn, { display: "inline-flex", alignItems: "center", textDecoration: "none" }) }, "Text") : null,
+                                contacts.email ? React.createElement("a", { href: "mailto:" + contacts.email, style: Object.assign({}, darkBtn, { display: "inline-flex", alignItems: "center", textDecoration: "none" }) }, "Email") : null,
+                                React.createElement("button", { onClick: () => setRepDraft({ vid, rep: contacts.rep || "", phone: contacts.phone || "", email: contacts.email || "", notes: contacts.notes || "" }), style: darkBtn }, repLine ? "Edit rep" : "Add rep"))) : null);
+            }));
     };
 
     const views = [
         { id: "order", label: "Order", n: onList.length },
         { id: "setup", label: "Set Up List", n: carried.length },
+        { id: "send", label: "Send", n: VENDORS.filter((v) => countFor(v.id) > 0).length },
         { id: "packs", label: "Pack sizes", n: packTodo },
         { id: "quote", label: "Quote", n: (data.vendorQuotes || []).length }
     ];
-    const repLine = [contacts.rep, contacts.phone].filter(Boolean).join(" \u00b7 ");
+    const perVendor = VENDORS.filter((v) => countFor(v.id) > 0).map((v) => v.short + " " + countFor(v.id)).join("  ·  ");
 
     return React.createElement("div", null,
-        // ---- vendor header: pick the order you're building, and who it goes to ----
+        // ---- header: the one order, and how it splits ----
         React.createElement("div", { className: "px-3 pt-3 pb-3 rounded mb-3", style: { background: COLORS.crust } },
-            React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap mb-3" },
-                VLIST.map((v) => React.createElement("button", { key: v.id, onClick: () => { setVendor(v.id); setOpenId(""); setRepDraft(null); }, className: "text-sm px-3 py-1.5 rounded-full flex items-center gap-1.5", style: pill(vendor === v.id) },
-                    v.short,
-                    countFor(v.id) > 0 ? React.createElement("span", { className: "text-xs px-1.5 rounded-full", style: { fontFamily: "JetBrains Mono", fontWeight: 700, background: vendor === v.id ? COLORS.crust : COLORS.cream, color: vendor === v.id ? COLORS.cream : COLORS.crust, minWidth: 18, textAlign: "center" } }, countFor(v.id)) : null))),
             React.createElement("div", { className: "flex items-start justify-between gap-2" },
                 React.createElement("div", { className: "min-w-0" },
                     React.createElement("div", { className: "text-2xl", style: { fontFamily: "Archivo Narrow", color: COLORS.cream, lineHeight: 1.1 } },
-                        onList.length === 0 ? "Nothing on the " + V.short + " order" : onList.length + (onList.length === 1 ? " item" : " items") + " for " + V.short),
-                    React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8A9096" } }, allSet + " marked all set \u00b7 " + untouched + " not looked at"),
-                    React.createElement("button", { onClick: () => { setRepOpen(!repOpen); setRepDraft(null); }, className: "text-xs mt-2 text-left", style: { background: "transparent", border: "none", padding: 0, fontFamily: "Inter", color: "#B8BDC2" } },
-                        (repLine || "No rep on file") + (contacts.notes ? " \u00b7 " + contacts.notes : "") + (repOpen ? "  \u25b4" : "  \u25be"))),
-                onList.length > 0 ? React.createElement("button", { onClick: reset, className: "text-xs flex-shrink-0", style: { background: "transparent", border: "none", fontFamily: "Inter", color: "#8A9096", textDecoration: "underline", textUnderlineOffset: 3, padding: "4px 0" } }, "Clear " + V.short) : null),
-            // ---- send it ----
-            onList.length > 0 ? React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap mt-3" },
-                React.createElement("button", { onClick: () => send("copy"), className: "flex items-center gap-1.5", style: Object.assign({}, darkBtn, { background: COLORS.basil, border: "none" }) }, React.createElement(Copy, { size: 14 }), copied === "order" ? "Copied" : "Copy order"),
-                contacts.phone ? React.createElement("button", { onClick: () => send("text"), style: darkBtn }, "Text " + (contacts.rep ? contacts.rep.split(" ")[0] : "rep")) : null,
-                contacts.email ? React.createElement("button", { onClick: () => send("email"), style: darkBtn }, "Email") : null,
-                React.createElement("button", { onClick: () => setNumbersOn(!numbersOn), className: "text-xs px-2.5 py-1.5 rounded-full ml-auto", style: pill(numbersOn) }, numbersOn ? "item #s on" : "item #s off")) : null,
-            // ---- rep details, editable ----
-            repOpen ? React.createElement("div", { className: "mt-3 pt-3", style: { borderTop: "1px solid #3A3A44" } },
-                repDraft
-                    ? React.createElement("div", { className: "space-y-1.5" },
-                        React.createElement("input", { placeholder: "Rep name", value: repDraft.rep, onChange: (e) => setRepDraft({ ...repDraft, rep: e.target.value }), className: "w-full px-3 outline-none", style: FIELD }),
-                        React.createElement("input", { placeholder: "Phone", inputMode: "tel", value: repDraft.phone, onChange: (e) => setRepDraft({ ...repDraft, phone: e.target.value }), className: "w-full px-3 outline-none", style: FIELD }),
-                        React.createElement("input", { placeholder: "Email", inputMode: "email", value: repDraft.email, onChange: (e) => setRepDraft({ ...repDraft, email: e.target.value }), className: "w-full px-3 outline-none", style: FIELD }),
-                        React.createElement("input", { placeholder: "Notes \u2014 cutoff, delivery day, account number", value: repDraft.notes, onChange: (e) => setRepDraft({ ...repDraft, notes: e.target.value }), className: "w-full px-3 outline-none", style: FIELD }),
-                        React.createElement("div", { className: "flex gap-1.5" },
-                            React.createElement("button", { onClick: saveRep, style: Object.assign({}, darkBtn, { background: COLORS.basil, border: "none" }) }, "Save"),
-                            React.createElement("button", { onClick: () => setRepDraft(null), style: darkBtn }, "Cancel")))
-                    : React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap" },
-                        contacts.phone ? React.createElement("a", { href: "tel:" + digits(contacts.phone), style: Object.assign({}, darkBtn, { display: "inline-flex", alignItems: "center", textDecoration: "none" }) }, "Call") : null,
-                        contacts.phone ? React.createElement("a", { href: "sms:" + digits(contacts.phone), style: Object.assign({}, darkBtn, { display: "inline-flex", alignItems: "center", textDecoration: "none" }) }, "Text") : null,
-                        contacts.email ? React.createElement("a", { href: "mailto:" + contacts.email, style: Object.assign({}, darkBtn, { display: "inline-flex", alignItems: "center", textDecoration: "none" }) }, "Email") : null,
-                        React.createElement("button", { onClick: () => setRepDraft({ rep: contacts.rep || "", phone: contacts.phone || "", email: contacts.email || "", notes: contacts.notes || "" }), style: darkBtn }, repLine ? "Edit rep" : "Add rep"))) : null),
+                        onList.length === 0 ? "Nothing on the order" : onList.length + (onList.length === 1 ? " item" : " items") + " on the order"),
+                    React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#B8BDC2" } }, perVendor || "Every line picks its own vendor — tap the chip to change one."),
+                    React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8A9096" } }, allSet + " marked all set · " + untouched + " not looked at")),
+                onList.length > 0 ? React.createElement("button", { onClick: clearAll, className: "text-xs flex-shrink-0", style: { background: "transparent", border: "none", fontFamily: "Inter", color: "#8A9096", textDecoration: "underline", textUnderlineOffset: 3, padding: "4px 0" } }, "Clear all") : null)),
         // ---- view switch + search ----
         React.createElement("div", { className: "flex items-center gap-1.5 mb-3 flex-wrap" },
             views.map((vw) => React.createElement("button", { key: vw.id, onClick: () => setView(vw.id), className: "text-sm px-3 py-2 rounded-full flex items-center gap-1.5",
                 style: { fontFamily: "Inter", fontWeight: 600, border: "1px solid " + (view === vw.id ? COLORS.crust : COLORS.line), background: view === vw.id ? COLORS.crust : "transparent", color: view === vw.id ? COLORS.cream : COLORS.crust } },
                 vw.label, vw.n > 0 ? React.createElement("span", { className: "text-xs px-1.5 rounded-full", style: { fontFamily: "JetBrains Mono", background: view === vw.id ? COLORS.cream : "#F2F2EF", color: COLORS.crust, minWidth: 18, textAlign: "center" } }, vw.n) : null)),
             view === "setup" && usualAvail > 0 ? React.createElement("button", { onClick: fillUsual, className: "text-sm px-3 py-2 rounded-full ml-auto", style: { fontFamily: "Inter", fontWeight: 600, background: COLORS.lamp, color: COLORS.ink, border: "none" } }, "Fill the usual (" + usualAvail + ")") : null),
-        view !== "order" && view !== "quote" ? React.createElement("input", { placeholder: "Search " + V.short + " items\u2026", value: q, onChange: (e) => setQ(e.target.value), className: "w-full px-3 py-2.5 mb-3 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 15, background: "#FAFAF8" } }) : null,
-        view === "order" ? orderView() : view === "quote" ? React.createElement(PriceQuotePanel, { data, persist }) : setupView());
+        view === "setup" || view === "packs" ? React.createElement("input", { placeholder: "Search items…", value: q, onChange: (e) => setQ(e.target.value), className: "w-full px-3 py-2.5 mb-3 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 15, background: "#FAFAF8" } }) : null,
+        view === "order" ? orderView() : view === "send" ? sendView() : view === "quote" ? React.createElement(PriceQuotePanel, { data, persist }) : setupView());
+}
+
+// The savings card for the whole order — both food vendors at once. "Saving
+// $X on N items already on the cheaper side · move M more and save $Y." It's
+// the sell, and it's information: the move-all button is there, and nothing
+// moves until it's tapped. Built on orderSavings from each vendor's side.
+function FoodOrderSavings({ inv, onMoveAll }) {
+    const sides = [["QFC", "Thomsen"], ["Thomsen", "QFC"]].map(([vid, other]) => ({ vid, other, s: orderSavings(inv, vid) }));
+    const linesN = sides.reduce((n, x) => n + (x.s.linesN || 0), 0);
+    if (!linesN) return null;
+    const saved = sides.reduce((n, x) => n + (x.s.saved || 0), 0);
+    const savedN = sides.reduce((n, x) => n + (x.s.savedN || 0), 0);
+    const movable = sides.reduce((n, x) => n + (x.s.movable || 0), 0);
+    const movableN = sides.reduce((n, x) => n + (x.s.movableN || 0), 0);
+    const moves = sides.flatMap((x) => (x.s.movableIds || []).map((id) => ({ id, toVid: x.other })));
+    const checkN = sides.reduce((n, x) => n + (x.s.checkN || 0), 0);
+    const checkMove = sides.reduce((n, x) => n + (x.s.checkMove || 0), 0);
+    const unknownN = sides.reduce((n, x) => n + (x.s.unknownN || 0), 0);
+    const checkNames = sides.flatMap((x) => x.s.checkIds || []).map((id) => { const it = inv.find((r) => r.id === id); return it ? it.item : ""; }).filter(Boolean);
+    const checkList = checkNames.slice(0, 3).join(", ") + (checkNames.length > 3 ? " and " + (checkNames.length - 3) + " more" : "");
+    const money = (n) => "$" + n.toFixed(2);
+    const tone = movableN ? { bg: "#FFF6E0", fg: "#8A5A00", line: "#F0DDA6" }
+        : (checkN && !savedN) ? { bg: "#FBF7EE", fg: "#8A5A00", line: "#E8DFC9" }
+        : { bg: "#E4F1E6", fg: "#1F6B34", line: "#BFDCC5" };
+    return React.createElement("div", { className: "px-3 py-2.5 rounded mb-2", style: { background: tone.bg, border: "1px solid " + tone.line } },
+        savedN > 0 ? React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: "#1F6B34" } },
+            "Saving " + money(saved) + " on " + savedN + (savedN === 1 ? " item" : " items") + " already on the cheaper vendor") : null,
+        movableN > 0 ? React.createElement("div", { className: "flex items-center gap-2 flex-wrap", style: { marginTop: savedN ? 4 : 0 } },
+            React.createElement("div", { className: "text-sm flex-1", style: { fontFamily: "Inter", fontWeight: 600, color: tone.fg, minWidth: 160 } },
+                "Move " + movableN + (movableN === 1 ? " item" : " items") + " to the cheaper vendor → save " + money(movable) + " more"),
+            React.createElement("button", { onClick: () => onMoveAll(moves), className: "text-xs px-3 py-1.5 rounded-full flex-shrink-0",
+                style: { fontFamily: "Inter", fontWeight: 700, background: "#1F6B34", color: "#FFFFFF", border: "none" } }, "Move all " + movableN)) : null,
+        !savedN && !movableN && !checkN ? React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: "#1F6B34" } },
+            unknownN === linesN ? "Nothing on this order can be compared yet." : "Every priced item is already on the cheaper side.") : null,
+        checkN > 0 ? React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", color: tone.fg, marginTop: (savedN || movableN) ? 6 : 0, paddingTop: (savedN || movableN) ? 6 : 0, borderTop: (savedN || movableN) ? "1px solid " + tone.line : "none" } },
+            React.createElement("span", { style: { fontWeight: 700 } }, "Worth a check · " + checkN + (checkN === 1 ? " item " : " items ")),
+            checkMove > 0 ? "look about " + money(checkMove) + " cheaper elsewhere, but we're comparing a box to a case." : "can't be compared size for size yet.",
+            React.createElement("div", { className: "text-xs mt-0.5", style: { color: "#8A9096" } }, "Open " + checkList + " and either put the weight in or mark both sizes the same.")) : null,
+        unknownN ? React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: "#8A9096" } }, unknownN + " not compared — one price only, or a pack size to fill in") : null,
+        React.createElement("div", { className: "text-xs mt-1.5 pt-1.5", style: { fontFamily: "Inter", color: "#8A9096", borderTop: "1px solid " + tone.line } },
+            "Last price on file each side, per pound where we have a weight. Double-check the pack before you switch a vendor on price alone."));
 }
 // ===================== PREP / ORDER LIST =====================
 const PREP_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -11312,11 +11426,10 @@ function CrewTab({ data, persist, isAdmin, offSoon, initialSub, onSub }) {
 // Inventory (incl. Storage Map) + Food Order + Drinks + Belmont Order + 86
 // Board + Need. The orders are open to the crew — the register crew does the
 // drinks and a few of them place the food order — so nothing here is gated.
-function InventoryOrdersTab({ data, persist, isAdmin, lowStockCount, foodOrderNeed, drinksNeed, belmontNeed, boardFlags, initialSub, onSub }) {
+function InventoryOrdersTab({ data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub, onSub }) {
     const items = [
         { id: "inventory", label: "Inventory", icon: Package, badge: lowStockCount },
         { id: "foodorder", label: "Food Order", icon: ShoppingCart, badge: foodOrderNeed },
-        { id: "drinks", label: "Drinks", icon: ShoppingCart, badge: drinksNeed },
         { id: "belmont", label: "Belmont", icon: ShoppingCart, badge: belmontNeed },
         { id: "board86", label: "86 Board", icon: AlertTriangle, badge: boardFlags },
         { id: "needlist", label: "Need", icon: NotePad, badge: openNeedCount(data) }
@@ -11330,7 +11443,6 @@ function InventoryOrdersTab({ data, persist, isAdmin, lowStockCount, foodOrderNe
         React.createElement(SubNav, { items, active, setActive: setSub }),
         active === "inventory" && React.createElement(InventoryTab, { data, persist }),
         active === "foodorder" && React.createElement(FoodOrderTab, { key: "food", data, persist }),
-        active === "drinks" && React.createElement(FoodOrderTab, { key: "drinks", data, persist, drinks: true }),
         active === "belmont" && React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }),
         active === "board86" && React.createElement(PrepParTab, { data, persist }),
         active === "needlist" && React.createElement(NeedListTab, { data, persist })
