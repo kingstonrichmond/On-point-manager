@@ -99,8 +99,61 @@ const money = (c) => (c == null ? '?' : '$' + (c / 100).toFixed(2));
 const uniq = (a) => [...new Set(a)];
 const take = (a, n) => a.slice(0, n);
 
+// ---------- phase 1b: the two things the owner asked to see next ----------
+
+/**
+ * Every price that isn't on a 5-cent boundary — items AND modifiers. A
+ * percentage was once applied across the board for a cash-discount change and
+ * it didn't round; "XL Cheese Pizza $30.59" is one survivor. The owner fixes
+ * these by hand in Clover. NOTHING IN THE APP ROUNDS: if the app rounded and
+ * Clover didn't, the phone would quote one number and the register charge
+ * another, which is the bug this whole project exists to fix.
+ */
+export function oddPrices(cat) {
+  const odd = (c) => c != null && Number.isFinite(c) && c % 5 !== 0;
+  const items = cat.items || [];
+  const rows = [];
+  items.forEach((it) => {
+    if (odd(it.price)) rows.push({ category: it.categories[0] || '(no category)', item: it.name, price: it.price, group: '', modifier: '', usedBy: '' });
+  });
+  (cat.modifierGroups || []).forEach((g) => {
+    const carriers = items.filter((it) => it.modifierGroups.some((x) => x.id === g.id));
+    g.modifiers.forEach((m) => {
+      if (!odd(m.price)) return;
+      rows.push({
+        category: carriers[0]?.categories[0] || '(modifier group)',
+        item: carriers.length ? carriers[0].name + (carriers.length > 1 ? ` +${carriers.length - 1} more` : '') : '(not on any item)',
+        price: m.price, group: g.name, modifier: m.name,
+        usedBy: carriers.map((c) => c.name).join(', '),
+      });
+    });
+  });
+  // by category, so a fixing session goes in the order the Clover UI is laid out
+  return rows.sort((a, b) => a.category.localeCompare(b.category) || a.item.localeCompare(b.item) || a.modifier.localeCompare(b.modifier));
+}
+
+/**
+ * Large Cheese Pizza's modifier groups (toppings live there), beside what the
+ * app's data.menu.toppingTiers says. The owner says the STRUCTURE matches the
+ * app's tiers on every size and the PRICES have drifted — so a mismatch is the
+ * expected finding, not a failure. Reports the real numbers; decides nothing.
+ */
+export function cheesePizzaToppings(cat, appMenu) {
+  const items = cat.items || [];
+  const cheese = items.filter((it) => /cheese pizza/i.test(it.name) && !/slice/i.test(it.name));
+  const large = cheese.find((it) => /large/i.test(it.name)) || cheese[0] || null;
+  const groupsOf = (it) => (it?.modifierGroups || []).map((g) => ({ id: g.id, name: g.name, required: g.required, min: g.minRequired, max: g.maxAllowed, modifiers: g.modifiers.map((m) => ({ name: m.name, price: m.price })) }));
+  const sig = (it) => (it?.modifierGroups || []).map((g) => g.id).sort().join('|');
+  const sameStructure = large ? cheese.filter((it) => it !== large).map((it) => ({ name: it.name, sameGroups: sig(it) === sig(large) })) : [];
+  const app = appMenu && typeof appMenu === 'object' ? {
+    sizes: Array.isArray(appMenu.pizzaSizes) ? appMenu.pizzaSizes.map(String) : [],
+    tiers: Array.isArray(appMenu.toppingTiers) ? appMenu.toppingTiers.map((t) => ({ tier: String(t.tier || ''), prices: (t.prices || []).map(String), items: String(t.items || '') })) : [],
+  } : null;
+  return { item: large ? { name: large.name, price: large.price } : null, groups: groupsOf(large), otherSizes: sameStructure, app };
+}
+
 /** Everything the report needs, as data the app can also render. */
-export function catalogSummary(cat) {
+export function catalogSummary(cat, appMenu = null) {
   const items = cat.items || [];
   const byCategory = {};
   items.forEach((it) => { const k = it.categories[0] || '(no category)'; byCategory[k] = (byCategory[k] || 0) + 1; });
@@ -150,6 +203,8 @@ export function catalogSummary(cat) {
     tags: { names: Object.keys(tagCounts).sort(), counts: tagCounts, pizzaSample, frontSample },
     nameStyle: { shorthandCount: shorthand.length, share: items.length ? Math.round((shorthand.length / items.length) * 100) : 0, examples: take(shorthand.map((it) => it.name), 8), plainExamples: take(items.filter((it) => !shorthand.includes(it)).map((it) => it.name), 8) },
     frontItems: { count: frontItems.length, examples: take(frontItems.map((it) => `${it.name} (${it.categories[0] || 'no category'})`), 8) },
+    oddPrices: oddPrices(cat),
+    cheesePizza: cheesePizzaToppings(cat, appMenu),
   };
 }
 
@@ -182,5 +237,19 @@ export function reportText(sum) {
   L.push('   Plain examples: ' + list(sum.nameStyle.plainExamples));
   L.push('');
   L.push(`6. Slices, knots and drinks in this same catalog: ${sum.frontItems.count}${sum.frontItems.examples.length ? ' — ' + sum.frontItems.examples.join('; ') : ''}.`);
+  L.push('');
+  const odd = sum.oddPrices || [];
+  L.push(`7. Prices not on a 5-cent boundary (fix in Clover by hand, nearest 5¢ — the app rounds nothing): ${odd.length}`);
+  odd.forEach((r) => L.push(`   - [${r.category}] ${r.group ? `${r.group} → ${r.modifier} ${money(r.price)} (on ${r.item})` : `${r.item} ${money(r.price)}`}`));
+  L.push('');
+  const cp = sum.cheesePizza || {};
+  L.push(`8. ${cp.item ? `${cp.item.name} ${money(cp.item.price)}` : 'Large Cheese Pizza: NOT FOUND'} — modifier groups on the register:`);
+  (cp.groups || []).forEach((g) => L.push(`   - ${g.name} (${g.required ? 'required' : 'optional'}, ${g.min}–${g.max == null ? '∞' : g.max}): ${g.modifiers.length ? g.modifiers.map((m) => `${m.name} ${money(m.price)}`).join(' / ') : 'no modifiers'}`));
+  if (!(cp.groups || []).length && cp.item) L.push('   (none — toppings are not modifier groups on this item)');
+  if ((cp.otherSizes || []).length) L.push('   Other cheese sizes carry the same groups: ' + cp.otherSizes.map((o) => `${o.name} ${o.sameGroups ? 'yes' : 'NO'}`).join('; '));
+  if (cp.app) {
+    L.push(`   App says (data.menu) — sizes: ${cp.app.sizes.join(' / ') || 'none'}`);
+    (cp.app.tiers || []).forEach((t) => L.push(`   App tier "${t.tier}": ${t.prices.map((p, i) => `${cp.app.sizes[i] || 'size ' + (i + 1)} $${p}`).join(' / ')}`));
+  } else L.push('   App menu not available for comparison.');
   return L.join('\n');
 }
