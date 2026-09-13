@@ -9771,6 +9771,12 @@ function FoodOrderTab({ data, persist }) {
     const [repOpen, setRepOpen] = useState("");     // vendor id whose rep panel is open
     const [repDraft, setRepDraft] = useState(null); // { vid, rep, phone, email, notes }
     const [pick, setPick] = useState({});           // item id → vendor chosen before a quantity is set
+    // Whose list you're standing in. "all" is every food item however it splits;
+    // a vendor puts you on THAT vendor's shelf, and a quantity you set there
+    // goes to them — the list you picked decides, not what the item did last
+    // time. Pepsi is its own shelf again: a syrup box has no business in the
+    // middle of the cheese order.
+    const [lens, setLens] = useState("all");
     const contactsOf = (vid) => (data.vendorContacts && data.vendorContacts[vid]) || { rep: "", phone: "", email: "", notes: "" };
 
     const carriers = (i) => VENDORS.filter((v) => carriedBy(i, v.id));
@@ -9874,6 +9880,15 @@ function FoodOrderTab({ data, persist }) {
             if (Number(need) > 0) { r.usual = r.usual || {}; r.usual[vid] = Number(need); r.vendor = vid; }
         });
     };
+
+    const FOOD = VENDORS.filter((v) => v.kind === "food");
+    const lensVid = lens !== "all" && VENDOR_BY_ID[lens] ? lens : "";
+    const inLens = (i) => (lensVid ? carriedBy(i, lensVid) : FOOD.some((v) => carriedBy(i, v.id)));
+    // The other food house's shelf. You get to the end of the Thomsen list and
+    // there they are — the things only Quality has — so you can throw a couple
+    // on without leaving the list you're working. They land on Quality's order.
+    const otherFoodVid = lensVid && (VENDOR_BY_ID[lensVid] || {}).kind === "food"
+        ? ((FOOD.find((v) => v.id !== lensVid) || {}).id || "") : "";
 
     const carried = inv.filter((i) => carriers(i).length > 0);
     const onList = inv.filter(onAnyOrder);
@@ -10019,50 +10034,85 @@ function FoodOrderTab({ data, persist }) {
     };
 
     // ---- go down the row and say what you need ----
+    // One row, used twice: on the list you're in, and again under it for the
+    // things only the other house carries.
+    const setupRow = (i, forceVid, dim) => {
+        const packMode = view === "packs";
+        // In a vendor's list the taps land on that vendor. An item already on
+        // someone's order keeps showing where it really is, so you can see it
+        // and move it rather than have two answers on one screen.
+        const vid = forceVid || onVid(i) || (lensVid && carriedBy(i, lensVid) ? lensVid : vidOf(i));
+        const need = orderNeedOf(i, vid);
+        const isSet = need === 0;
+        const on = Number(need) > 0;
+        const usual = usualOf(i, vid);
+        const edge = on ? COLORS.ink : isSet ? COLORS.basil : COLORS.line;
+        const o = orderOf(i, vid);
+        return React.createElement("div", { key: i.id, className: "px-3 py-2.5 rounded", style: { background: dim ? "#FBFBF9" : COLORS.card, border: "1px solid " + edge, borderLeft: "5px solid " + edge } },
+            React.createElement("div", { className: "flex items-start justify-between gap-2 mb-2" },
+                React.createElement("button", { onClick: () => toggleOpen(i.id), className: "min-w-0 text-left flex-1" },
+                    React.createElement("div", { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } }, i.item),
+                    React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#5F676E" } },
+                        "on hand " + (i.qty != null ? i.qty : "?") + " " + (i.unit || "") + "  ·  " + priceLine(i) + (vendorPack(i, vid) ? "  ·  " + vendorPack(i, vid) : ""),
+                        React.createElement("span", { style: { color: COLORS.steel } }, openId === i.id ? "  ▴" : "  ▾"))),
+                on ? React.createElement("span", { className: "text-sm flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.ink } }, "need " + need)
+                   : isSet ? React.createElement("span", { className: "text-xs flex-shrink-0", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.basil } }, "all set")
+                   : usual ? React.createElement("span", { className: "text-xs flex-shrink-0", style: { fontFamily: "Inter", color: "#8A9096" } }, "usually " + usual) : null),
+            React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap" },
+                React.createElement("button", { onClick: () => (isSet ? clearNeed(i.id) : setNeed(i.id, vid, 0, "")), className: "text-sm px-3 py-2 rounded-full",
+                    style: { fontFamily: "Inter", border: "1px solid " + (isSet ? COLORS.basil : COLORS.line), background: isSet ? COLORS.basil : "transparent", color: isSet ? COLORS.cream : COLORS.crust } }, "All set"),
+                [1, 2, 3, 4].map((n) => React.createElement("button", { key: n, onClick: () => (need === n ? clearNeed(i.id) : setNeed(i.id, vid, n)), className: "text-base px-3.5 py-2 rounded-full",
+                    style: { fontFamily: "JetBrains Mono", fontWeight: 700,
+                        // The usual quantity gets a ring so the right tap is obvious.
+                        border: (need === n ? "1px solid " + COLORS.ink : usual === n ? "2px solid " + COLORS.ink : "1px solid " + COLORS.line),
+                        background: need === n ? COLORS.ink : "transparent", color: need === n ? COLORS.cream : COLORS.crust } }, n)),
+                React.createElement("button", { onClick: () => setNeed(i.id, vid, (Number(need) || 0) + 1), className: "px-3 py-2 rounded-full flex items-center", style: { border: "1px solid " + COLORS.line, background: "transparent" } },
+                    React.createElement(Plus, { size: 16, color: COLORS.crust })),
+                React.createElement("span", { className: "ml-auto" }, vendorChips(i))),
+            on ? React.createElement("input", { placeholder: "Note — e.g. half a case, one piece only", value: (o && o.note) || "", onChange: (e) => setNote(i.id, e.target.value),
+                className: "w-full mt-2 px-3 py-2 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#FAFAF8" } }) : null,
+            on ? moveBtn(i) : null,
+            (packMode || openId === i.id) ? React.createElement(PriceDetail, { i: i, vendorOf: () => vid, patch: patch }) : null);
+
+    };
+    const lensChips = () => {
+        const chip = (id, label, n, on) => React.createElement("button", { key: id, onClick: () => setLens(id), className: "text-sm px-3 py-2 rounded-full flex items-center gap-1.5",
+            style: { fontFamily: "Inter", fontWeight: 600, border: "1px solid " + (on ? COLORS.crust : COLORS.line), background: on ? COLORS.crust : "transparent", color: on ? COLORS.cream : COLORS.crust } },
+            label, n > 0 ? React.createElement("span", { className: "text-xs px-1.5 rounded-full", style: { fontFamily: "JetBrains Mono", background: on ? COLORS.cream : "#F2F2EF", color: COLORS.crust, minWidth: 18, textAlign: "center" } }, n) : null);
+        return React.createElement("div", { className: "flex items-center gap-1.5 mb-3 flex-wrap" },
+            chip("all", "All food", VENDORS.filter((v) => v.kind === "food").reduce((n, v) => n + countFor(v.id), 0), lens === "all"),
+            VENDORS.map((v) => chip(v.id, v.short, countFor(v.id), lens === v.id)));
+    };
+
     const setupView = () => {
         const packMode = view === "packs";
-        const shown = (packMode ? inv.filter(needsCompare) : carried).filter(match);
+        const base = packMode ? inv.filter(needsCompare) : carried.filter(inLens);
+        const shown = base.filter(match);
+        const extras = otherFoodVid && !packMode
+            ? carried.filter((i) => carriedBy(i, otherFoodVid) && !carriedBy(i, lensVid)).filter(match) : [];
         const cats = groupByStation(shown);
-        if (!shown.length) {
-            return React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#8A9096" } },
-                packMode ? "Every price on file lines up with how you count it — nothing left to fill in." : (carried.length ? "No items match." : "Nothing is linked to a vendor yet — add an item number or a price on the Inventory tab."));
+        const otherShort = otherFoodVid ? VENDOR_SHORT[otherFoodVid] : "";
+        const hereShort = lensVid ? VENDOR_SHORT[lensVid] : "";
+        if (!shown.length && !extras.length) {
+            return React.createElement("div", null,
+                !packMode ? lensChips() : null,
+                React.createElement("div", { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#8A9096" } },
+                    packMode ? "Every price on file lines up with how you count it \u2014 nothing left to fill in."
+                        : (carried.length ? (lensVid ? "Nothing is linked to " + hereShort + " yet." : "No items match.") : "Nothing is linked to a vendor yet \u2014 add an item number or a price on the Inventory tab.")));
         }
-        return React.createElement("div", null, cats.map((g) => React.createElement("div", { key: g.name, className: "mb-4" },
-            React.createElement(StationHeader, { g: g }),
-            React.createElement("div", { className: "space-y-1.5" }, g.items.map((i) => {
-                const vid = vidOf(i);
-                const need = orderNeedOf(i, vid);
-                const isSet = need === 0;
-                const on = Number(need) > 0;
-                const usual = usualOf(i, vid);
-                const edge = on ? COLORS.ink : isSet ? COLORS.basil : COLORS.line;
-                const o = orderOf(i, vid);
-                return React.createElement("div", { key: i.id, className: "px-3 py-2.5 rounded", style: { background: COLORS.card, border: "1px solid " + edge, borderLeft: "5px solid " + edge } },
-                    React.createElement("div", { className: "flex items-start justify-between gap-2 mb-2" },
-                        React.createElement("button", { onClick: () => toggleOpen(i.id), className: "min-w-0 text-left flex-1" },
-                            React.createElement("div", { className: "text-base", style: { fontFamily: "Inter", color: COLORS.crust } }, i.item),
-                            React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: "#5F676E" } },
-                                "on hand " + (i.qty != null ? i.qty : "?") + " " + (i.unit || "") + "  ·  " + priceLine(i) + (vendorPack(i, vid) ? "  ·  " + vendorPack(i, vid) : ""),
-                                React.createElement("span", { style: { color: COLORS.steel } }, openId === i.id ? "  ▴" : "  ▾"))),
-                        on ? React.createElement("span", { className: "text-sm flex-shrink-0", style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.ink } }, "need " + need)
-                           : isSet ? React.createElement("span", { className: "text-xs flex-shrink-0", style: { fontFamily: "Inter", fontWeight: 600, color: COLORS.basil } }, "all set")
-                           : usual ? React.createElement("span", { className: "text-xs flex-shrink-0", style: { fontFamily: "Inter", color: "#8A9096" } }, "usually " + usual) : null),
-                    React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap" },
-                        React.createElement("button", { onClick: () => (isSet ? clearNeed(i.id) : setNeed(i.id, vid, 0, "")), className: "text-sm px-3 py-2 rounded-full",
-                            style: { fontFamily: "Inter", border: "1px solid " + (isSet ? COLORS.basil : COLORS.line), background: isSet ? COLORS.basil : "transparent", color: isSet ? COLORS.cream : COLORS.crust } }, "All set"),
-                        [1, 2, 3, 4].map((n) => React.createElement("button", { key: n, onClick: () => (need === n ? clearNeed(i.id) : setNeed(i.id, vid, n)), className: "text-base px-3.5 py-2 rounded-full",
-                            style: { fontFamily: "JetBrains Mono", fontWeight: 700,
-                                // The usual quantity gets a ring so the right tap is obvious.
-                                border: (need === n ? "1px solid " + COLORS.ink : usual === n ? "2px solid " + COLORS.ink : "1px solid " + COLORS.line),
-                                background: need === n ? COLORS.ink : "transparent", color: need === n ? COLORS.cream : COLORS.crust } }, n)),
-                        React.createElement("button", { onClick: () => setNeed(i.id, vid, (Number(need) || 0) + 1), className: "px-3 py-2 rounded-full flex items-center", style: { border: "1px solid " + COLORS.line, background: "transparent" } },
-                            React.createElement(Plus, { size: 16, color: COLORS.crust })),
-                        React.createElement("span", { className: "ml-auto" }, vendorChips(i))),
-                    on ? React.createElement("input", { placeholder: "Note — e.g. half a case, one piece only", value: (o && o.note) || "", onChange: (e) => setNote(i.id, e.target.value),
-                        className: "w-full mt-2 px-3 py-2 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#FAFAF8" } }) : null,
-                    on ? moveBtn(i) : null,
-                    (packMode || openId === i.id) ? React.createElement(PriceDetail, { i: i, vendorOf: () => vid, patch: patch }) : null);
-            })))),
+        return React.createElement("div", null,
+            !packMode ? lensChips() : null,
+            !packMode && onList.length ? React.createElement(FoodOrderSavings, { inv: inv, onMoveAll: moveAll }) : null,
+            cats.map((g) => React.createElement("div", { key: g.name, className: "mb-4" },
+                React.createElement(StationHeader, { g: g }),
+                React.createElement("div", { className: "space-y-1.5" }, g.items.map((i) => setupRow(i))))),
+            extras.length ? React.createElement("div", { className: "mb-4" },
+                React.createElement("div", { className: "px-1 pt-2 pb-2", style: { borderTop: "2px solid " + COLORS.line } },
+                    React.createElement("div", { className: "text-sm", style: { fontFamily: "Archivo Narrow", fontSize: 17, color: COLORS.crust } },
+                        otherShort + " has these, " + hereShort + " doesn't"),
+                    React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8A9096" } },
+                        "Put a number on one and it goes on the " + otherShort + " order.")),
+                React.createElement("div", { className: "space-y-1.5" }, groupByStation(extras).flatMap((g) => g.items).map((i) => setupRow(i, otherFoodVid, true)))) : null,
             !packMode && unlinked > 0 ? React.createElement("div", { className: "text-xs px-1 py-3 text-center", style: { fontFamily: "Inter", color: "#8A9096" } },
                 unlinked + (unlinked === 1 ? " item isn't" : " items aren't") + " linked to any vendor yet, so it can't go on an order. Add an item number or price on the Inventory tab.") : null);
     };
@@ -10117,8 +10167,7 @@ function FoodOrderTab({ data, persist }) {
         { id: "order", label: "Order", n: onList.length },
         { id: "setup", label: "Set Up List", n: carried.length },
         { id: "send", label: "Send", n: VENDORS.filter((v) => countFor(v.id) > 0).length },
-        { id: "packs", label: "Pack sizes", n: packTodo },
-        { id: "quote", label: "Quote", n: (data.vendorQuotes || []).length }
+        { id: "packs", label: "Pack sizes", n: packTodo }
     ];
     const perVendor = VENDORS.filter((v) => countFor(v.id) > 0).map((v) => v.short + " " + countFor(v.id)).join("  ·  ");
 
@@ -10139,7 +10188,7 @@ function FoodOrderTab({ data, persist }) {
                 vw.label, vw.n > 0 ? React.createElement("span", { className: "text-xs px-1.5 rounded-full", style: { fontFamily: "JetBrains Mono", background: view === vw.id ? COLORS.cream : "#F2F2EF", color: COLORS.crust, minWidth: 18, textAlign: "center" } }, vw.n) : null)),
             view === "setup" && usualAvail > 0 ? React.createElement("button", { onClick: fillUsual, className: "text-sm px-3 py-2 rounded-full ml-auto", style: { fontFamily: "Inter", fontWeight: 600, background: COLORS.lamp, color: COLORS.ink, border: "none" } }, "Fill the usual (" + usualAvail + ")") : null),
         view === "setup" || view === "packs" ? React.createElement("input", { placeholder: "Search items…", value: q, onChange: (e) => setQ(e.target.value), className: "w-full px-3 py-2.5 mb-3 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 15, background: "#FAFAF8" } }) : null,
-        view === "order" ? orderView() : view === "send" ? sendView() : view === "quote" ? React.createElement(PriceQuotePanel, { data, persist }) : setupView());
+        view === "order" ? orderView() : view === "send" ? sendView() : setupView());
 }
 
 // The savings card for the whole order — both food vendors at once. "Saving
@@ -11976,6 +12025,10 @@ function InventoryOrdersTab({ data, persist, isAdmin, lowStockCount, foodOrderNe
     const items = [
         { id: "inventory", label: "Inventory", icon: Package, badge: lowStockCount },
         { id: "foodorder", label: "Food Order", icon: ShoppingCart, badge: foodOrderNeed },
+        // A price list lands every week or two and is the only way prices get
+        // onto the shelf. It was three taps deep inside the food order, under
+        // the word "Quote", which is what it did before it could do this.
+        { id: "pricelists", label: "Price lists", icon: DollarSign, badge: (data.vendorQuotes || []).length },
         { id: "belmont", label: "Belmont", icon: ShoppingCart, badge: belmontNeed },
         { id: "board86", label: "86 Board", icon: AlertTriangle, badge: boardFlags },
         { id: "needlist", label: "Need", icon: NotePad, badge: openNeedCount(data) }
@@ -11989,6 +12042,7 @@ function InventoryOrdersTab({ data, persist, isAdmin, lowStockCount, foodOrderNe
         React.createElement(SubNav, { items, active, setActive: setSub }),
         active === "inventory" && React.createElement(InventoryTab, { data, persist }),
         active === "foodorder" && React.createElement(FoodOrderTab, { key: "food", data, persist }),
+        active === "pricelists" && React.createElement(PriceQuotePanel, { data, persist }),
         active === "belmont" && React.createElement(PrepListTab, { data, persist, listKey: "produce", mode: "order" }),
         active === "board86" && React.createElement(PrepParTab, { data, persist }),
         active === "needlist" && React.createElement(NeedListTab, { data, persist })
