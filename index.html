@@ -7784,14 +7784,26 @@ function nameTokens(s) {
   return normName(s).split(" ").filter((w) => w.length > 2 && NOISE.indexOf(w) === -1);
 }
 // Score a parsed invoice line against an inventory item.
-function scoreMatch(line, item) {
-  if (line.code && item.thomsenSku && String(line.code).trim() === String(item.thomsenSku).trim()) return 99;
+// An item number is only meaningful against the vendor who issued it: a Thomsen
+// guide line carries Thomsen's number, a Quality invoice carries Quality's.
+// Checking one hardcoded column meant every other vendor's number fell through
+// to fuzzy name matching even when the number on the page was an exact hit.
+// Someone else's number can still settle a match, but only when the name agrees
+// too — two vendors' numbering ranges overlap, and a bare collision is a wrong
+// price on the wrong item.
+function scoreMatch(line, item, vid) {
   const a = nameTokens(line.desc), b = nameTokens(item.item);
-  if (!a.length || !b.length) return 0;
   let hits = 0;
   a.forEach((t) => {
     if (b.some((u) => u === t || (t.length > 4 && u.indexOf(t) === 0) || (u.length > 4 && t.indexOf(u) === 0))) hits++;
   });
+  if (line.code) {
+    const code = String(line.code).trim();
+    const hit = (k) => item[k + "Sku"] && String(item[k + "Sku"]).trim() === code;
+    if (vid && hit(vendorKey(vid))) return 99;
+    if ((!vid || hits > 0) && VENDORS.some((v) => hit(v.key))) return 99;
+  }
+  if (!a.length || !b.length) return 0;
   return hits;
 }
 
@@ -7846,7 +7858,7 @@ function InvoiceScanner({ data, persist, onClose }) {
       : { type: "image", source: { type: "base64", media_type: "image/jpeg", data: pg } });
     content.push({
       type: "text",
-      text: 'These photos are ' + (total > 1 ? "pages " + (index * 2 + 1) + " onward of" : "") + ' one food-distributor invoice for a pizza shop. Read every line item on THESE pages only. Respond with ONLY raw JSON, no prose and no markdown fences, in exactly this shape:\n{"vendor":"QFC" or "Thomsen" or the vendor name you see,"invoice_date":"YYYY-MM-DD","lines":[{"desc":"item description as printed","code":"item/product number if shown else empty string","unit":"the unit the PRICE is per - lb, case, box, ea, bag, bundle, pail","price":0.00}]}\nRules: "price" must be the UNIT price (price per lb, per case, etc), NOT the extended line total. If a line shows both a unit price and a total, use the unit price. Skip any line you cannot read a price for. If the vendor or invoice date is not visible on these pages, use an empty string. Return an empty lines array if these pages have no priced items.'
+      text: 'These photos are ' + (total > 1 ? "pages " + (index * 2 + 1) + " onward of" : "") + ' one food-distributor invoice for a pizza shop. Read every line item on THESE pages only. Respond with ONLY raw JSON, no prose and no markdown fences, in exactly this shape:\n{"vendor":"QFC" or "Thomsen" or the vendor name you see,"invoice_date":"YYYY-MM-DD","lines":[{"desc":"item description as printed","code":"item/product number if shown else empty string","unit":"the unit the PRICE is per - lb, case, box, ea, bag, bundle, pail","price":0.00,"pack":"pack size exactly as printed, e.g. 6 LB AVG X 8, 8/6#, 1 GAL X 4, 100 CT X 10, or empty","catchweight":true only if the line says catchweight / random weight / priced by the pound}]}\nRules: "price" must be the UNIT price (price per lb, per case, etc), NOT the extended line total. If a line shows both a unit price and a total, use the unit price. Copy "pack" and "catchweight" straight off the page - do not infer catchweight from the pack or from a small price, and do not do any arithmetic on the price yourself. Skip any line you cannot read a price for. If the vendor or invoice date is not visible on these pages, use an empty string. Return an empty lines array if these pages have no priced items.'
     });
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 24e3);
@@ -7914,10 +7926,23 @@ function InvoiceScanner({ data, persist, onClose }) {
       setParsed({ vendor: out.vendor || "", date: out.invoice_date || "" });
 
       const inv = data.inventory || [];
-      setRows(lines.map((l) => {
+      // Same treatment as a pasted price list: a catchweight line is priced by
+      // the pound however the unit column reads, so multiply it out by the pack
+      // — and when the pack can't be read, hold the line back rather than write
+      // a per-pound number in as a case price.
+      const prepped = dedupeQuoteLines(lines.map((l) => finishQuoteLine({
+        code: String(l.code || ""),
+        desc: String(l.desc),
+        price: Number(l.price),
+        unit: String(l.unit || "ea").toLowerCase(),
+        pack: String(l.pack || ""),
+        pk: parsePackSize(l.pack) || parsePackSize(l.desc),
+        catchweight: l.catchweight === true || isCatchweight(String(l.pack || "") + " " + String(l.desc || ""))
+      })));
+      setRows(prepped.map((l) => {
         let best = null, bs = 0;
         inv.forEach((it) => {
-          const s = scoreMatch(l, it);
+          const s = scoreMatch(l, it, vendorKey(vendor));
           if (s > bs) { bs = s; best = it; }
         });
         return {
@@ -7926,9 +7951,14 @@ function InvoiceScanner({ data, persist, onClose }) {
           code: l.code || "",
           unit: l.unit || "ea",
           price: Number(l.price),
-          matchId: bs >= 2 ? best.id : "",
+          listed: l.listed != null ? l.listed : null,
+          packLb: l.packLb || null,
+          pk: l.pk || null,
+          catchweight: !!l.catchweight,
+          held: !!l.held,
+          matchId: l.held ? "" : (bs >= 2 ? best.id : ""),
           newName: cleanItemName(l.desc),
-          include: bs >= 2
+          include: !l.held && bs >= 2
         };
       }));
     } catch (e) {
@@ -7939,8 +7969,10 @@ function InvoiceScanner({ data, persist, onClose }) {
     setBusy(false);
   };
 
-  const vendorKey = () => {
-    const v = normName(parsed && parsed.vendor);
+  // Takes the name when we have it in hand (the read hasn't set state yet) and
+  // falls back to what was parsed.
+  const vendorKey = (name) => {
+    const v = normName(name != null ? name : (parsed && parsed.vendor));
     if (v.indexOf("thomsen") !== -1) return "thomsen";
     return "qfc";
   };
@@ -7951,7 +7983,7 @@ function InvoiceScanner({ data, persist, onClose }) {
     const next = JSON.parse(JSON.stringify(data));
     let n = 0, added = 0;
     rows.forEach((r) => {
-      if (!r.include || !r.matchId) return;
+      if (!r.include || !r.matchId || r.held) return;
       // No date on the invoice? Use today — an undated price loses to the next seed migration.
       const price = { amt: Number(r.price), unit: r.unit || "ea", date: date || todayISO() };
       if (r.matchId === "__new__") {
@@ -7976,6 +8008,14 @@ function InvoiceScanner({ data, persist, onClose }) {
       if (!it) return;
       if (!it.prices) it.prices = { qfc: null, thomsen: null };
       it.prices[vk] = price;
+      // A case price on a pound item compares against nothing until we know how
+      // big their case is. The invoice printed it; take it, but never over a
+      // number someone typed in themselves.
+      const per = packBaseUnits(r.pk, it.unit);
+      if (per > 0 && normUnit(r.unit) !== normUnit(it.unit) && !(it.pack && Number(it.pack[vk]) > 0)) {
+        it.pack = Object.assign({}, it.pack || {});
+        it.pack[vk] = per;
+      }
       n++;
     });
     persist(next);
@@ -8088,7 +8128,11 @@ function InvoiceScanner({ data, persist, onClose }) {
                   "div",
                   { className: "flex-1" },
                   /* @__PURE__ */ React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, r.desc),
-                  /* @__PURE__ */ React.createElement("div", { className: "text-sm mt-0.5", style: { fontFamily: "JetBrains Mono", color: COLORS.ink, fontWeight: 700 } }, "$" + Number(r.price).toFixed(2) + "/" + r.unit + (r.code ? "  #" + r.code : ""))
+                  /* @__PURE__ */ React.createElement("div", { className: "text-sm mt-0.5", style: { fontFamily: "JetBrains Mono", color: r.held ? "#8A5A00" : COLORS.ink, fontWeight: 700 } }, "$" + Number(r.held ? r.listed : r.price).toFixed(2) + "/" + (r.held ? "lb listed" : r.unit) + (r.code ? "  #" + r.code : "")),
+                  r.catchweight && r.packLb > 0 ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: COLORS.basil } },
+                    "$" + Number(r.listed).toFixed(2) + "/lb \u00d7 " + r.packLb + " lb \u2192 $" + Number(r.price).toFixed(2) + " / " + r.unit) : null,
+                  r.held ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8A5A00" } },
+                    "Priced by the pound and the pack size didn't read \u2014 left out. Add it by hand, or check a price list instead.") : null
                 )
               ),
               /* @__PURE__ */ React.createElement(
@@ -9095,6 +9139,72 @@ function OrderSavingsCard({ inv, vid, onMoveAll, scope }) {
 }
 
 
+// ---- Catchweight ------------------------------------------------------------
+// Broadline distributors price meat and cheese BY THE POUND while the UOM
+// column still says CASE, because nobody knows what a case weighs until it is
+// on the truck. Thomsen's guide prints $1.99 · CASE against a 48 lb box of
+// mozzarella. Taken at face value the app believes a case of mozz costs two
+// dollars and sends the whole cheese order to the wrong truck — silently, on
+// the most expensive lines in the kitchen. Sysco, US Foods, PFG and the
+// regional houses all print it this way, so this is every shop's first import,
+// not ours.
+//
+// The stated phrase is the ONLY thing we trust. Not the pack — "10 LB X 1"
+// breaded eggplant is a genuine $35.23 case, while "1 LB X 36" butter IS
+// catchweight, and neither LB nor AVG tells them apart. Not a suspiciously
+// small price either: that is the same guess pointed the other way, and wrong
+// in that direction costs just as much.
+const CATCHWEIGHT_RE = /catch\s*-?\s*weight|random\s*weight|priced?\s+by\s+the\s+(?:pound|lb)\b|price\s+per\s+lb\b|sold\s+by\s+(?:the\s+)?weight/i;
+function isCatchweight(text) { return CATCHWEIGHT_RE.test(String(text || "")); }
+// Money that came out of a multiplication. 1.99 × 48 is 95.52000000000001 in
+// binary; this drops the dust, and only the dust — no price is ever rounded to
+// a nicer number, because the invoice won't be.
+const exactCents = (n) => Math.round(n * 100) / 100;
+
+const LB_PER = { LB: 1, LBS: 1, "#": 1, OZ: 1 / 16, KG: 2.2046226218, G: 0.0022046226 };
+// "6 LB AVG X 8" → eight 6 lb loaves = 48 lb. Also "50# X 1", "2.50 LB X 4",
+// "100 CT X 10", the count-first "4 X 10 LB" some houses print, and a bare
+// "10#" with no multiplier. Anything else returns null and the line waits for
+// a human rather than guessing.
+function parsePackSize(text) {
+    const t = String(text || "").toUpperCase().replace(/\u00a0/g, " ");
+    const at = t.indexOf("PACK SIZE");
+    let src = at !== -1 ? t.slice(at + 9).replace(/^[\s:]+/, "") : t;
+    src = src.split("|")[0];
+    // "24/12 OZ X 1" means 24 twelve-ounce cans, not one — a slash pack is a
+    // second multiplier we can't safely fold in, so don't try.
+    if (/\d\s*\/\s*\d/.test(src)) return null;
+    const U = "(LBS|LB|#|OZ|KG|G|CT|CTS|COUNT|GAL|GALLON)";
+    let m, each, unit, count;
+    if ((m = src.match(new RegExp("(\\d+(?:\\.\\d+)?)\\s*" + U + "\\s*(?:AVG\\s*)?X\\s*(\\d+)\\b")))) { each = Number(m[1]); unit = m[2]; count = Number(m[3]); }
+    else if ((m = src.match(new RegExp("(\\d+)\\s*X\\s*(\\d+(?:\\.\\d+)?)\\s*" + U + "\\b")))) { each = Number(m[2]); unit = m[3]; count = Number(m[1]); }
+    else if ((m = src.match(new RegExp("^\\s*(\\d+(?:\\.\\d+)?)\\s*" + U + "\\s*$")))) { each = Number(m[1]); unit = m[2]; count = 1; }
+    else return null;
+    if (!(each > 0) || !(count > 0)) return null;
+    const u = unit === "LBS" ? "LB" : unit === "GALLON" ? "GAL" : unit === "CTS" || unit === "COUNT" ? "CT" : unit;
+    const lbEach = LB_PER[u];
+    return {
+        text: (m[0] || "").replace(/\s+/g, " ").trim(),
+        each: each, unit: u, count: count,
+        lb: lbEach ? Math.round(each * count * lbEach * 1e4) / 1e4 : null,
+        ct: u === "CT" ? each * count : count,
+        gal: u === "GAL" ? each * count : null
+    };
+}
+// How many of OUR count unit are in one of THEIR priced units. A case is a case;
+// pounds only come from a weight pack; "each" counts the containers in the box.
+function packBaseUnits(pk, baseUnit) {
+    if (!pk) return null;
+    const base = normUnit(baseUnit);
+    // Their bag and our box are not knowably the same object — that's what the
+    // same-unit check upstream is for. Anything else stays unknown.
+    if (base === "case") return null;
+    if (base === "lb") return pk.lb || null;
+    if (base === "ea") return pk.ct || null;
+    if (base === "gal") return pk.gal || null;
+    return null;
+}
+
 // ---- Vendor quotes ----------------------------------------------------------
 const QUOTE_UNITS = ["lb", "lbs", "case", "cs", "cse", "bx", "box", "ea", "each", "ct", "gal", "gallon", "bag", "doz", "pk", "pack", "bdl", "bundle"];
 // One line of pasted text or CSV → { code, desc, price, unit, pack }. Tolerant:
@@ -9127,18 +9237,103 @@ function parseQuoteLine(raw) {
     if (pack) desc = desc.replace(packM[1], " ");
     desc = desc.replace(new RegExp("\\b(" + QUOTE_UNITS.join("|") + ")\\b\\.?", "ig"), " ").replace(/\bper\b/ig, " ").replace(/[|;]+/g, " ").replace(/(^|\s)\/+(\s|$)/g, " ").replace(/\s{2,}/g, " ").trim().replace(/^[-–•*\s]+/, "").replace(/[\s,]+$/, "");
     if (!desc) return null;
-    return { code, desc: desc.slice(0, 80), price, unit: unit || (pack ? "case" : ""), pack };
+    return finishQuoteLine({ code, desc: desc.slice(0, 80), price, unit: unit || (pack ? "case" : ""), pack, pk: parsePackSize(text), catchweight: isCatchweight(text) });
+}
+// The last step for every line, however it was read. A catchweight price is
+// per pound, so it becomes the price of one of their units — but only when the
+// pack says how much that unit holds. When it doesn't, the line is HELD: not
+// imported, not compared, not guessed at. An unimported line is an annoyance;
+// a wrong one is a purchasing decision.
+function finishQuoteLine(l) {
+    if (!l || !l.catchweight) return l;
+    const lb = l.pk && l.pk.lb;
+    l.listed = l.price;
+    if (lb > 0) { l.packLb = lb; l.price = exactCents(l.price * lb); }
+    else l.held = true;
+    return l;
+}
+// Same line twice is the same line. Thomsen's export prints every item under
+// its real group AND under "Default"; two rows that differ in pack or unit are
+// two real products (a 9 lb turkey breast and a 2-pack of them) and both stay.
+function dedupeQuoteLines(lines) {
+    const seen = {}, out = [];
+    lines.forEach((l) => {
+        const key = [String(l.code || l.desc).toLowerCase().trim(), l.pk ? l.pk.text : (l.pack || ""), normUnit(l.unit), l.price].join("|");
+        if (seen[key]) return;
+        seen[key] = 1;
+        out.push(l);
+    });
+    return out;
+}
+// One CSV row → cells, honoring "quoted, ""escaped"" fields".
+function splitCsv(line) {
+    const out = []; let cur = "", q = false;
+    for (let k = 0; k < line.length; k++) {
+        const c = line[k];
+        if (q) { if (c === '"') { if (line[k + 1] === '"') { cur += '"'; k++; } else q = false; } else cur += c; }
+        else if (c === '"') q = true;
+        else if (c === ",") { out.push(cur); cur = ""; }
+        else cur += c;
+    }
+    out.push(cur);
+    return out.map((c) => c.trim());
+}
+// A guide exported as CSV states what each column is. Reading it by column is
+// how the UOM stays the unit (and not the word "Pack" out of "Pack Size"), how
+// a whole-dollar price survives, and how the pack and the catchweight note stay
+// out of the product name.
+function headerMap(cells) {
+    const map = { code: -1, name: -1, unit: -1, price: -1, notes: [] };
+    cells.forEach((c, k) => {
+        const h = String(c || "").trim().toLowerCase().replace(/[_.]+/g, " ").replace(/\s+/g, " ");
+        if (!h) return;
+        if (map.price < 0 && /(^|\s)(price|cost)(\s|$)/.test(h)) { map.price = k; return; }
+        if (map.unit < 0 && /^(uom|u\/m|um|unit|unit of measure)$/.test(h)) { map.unit = k; return; }
+        if (map.code < 0 && /(item code|item number|item no|item #|sku|product code|product number|^code$)/.test(h)) { map.code = k; return; }
+        if (map.name < 0 && /^(item name|item description|description|product|product name|name|item)$/.test(h)) { map.name = k; return; }
+        if (/(description|pack|brand|size|note)/.test(h)) map.notes.push(k);
+    });
+    return map.price >= 0 && map.name >= 0 ? map : null;
+}
+function quoteLineFromRow(cells, map) {
+    if (!cells || !cells.length) return null;
+    const cell = (k) => (k >= 0 && k < cells.length ? String(cells[k] || "").trim() : "");
+    const price = Number(cell(map.price).replace(/[^0-9.]/g, ""));
+    if (!(price > 0)) return null; // a blank price is a special-order line, not a quote
+    const desc = cell(map.name).replace(/\s{2,}/g, " ").trim();
+    if (!desc) return null;
+    const notes = map.notes.map(cell).join(" | ");
+    const unitCell = cell(map.unit).toLowerCase().replace(/[^a-z/]/g, "");
+    const pk = parsePackSize(notes) || parsePackSize(desc);
+    // Quality writes its pack the old way ("8/6#", "4/1GAL"), which parsePackSize
+    // deliberately refuses as a double multiplier — but parseCatalogPack has read
+    // that shape for years, so keep the raw string when there's no parsed pack.
+    const legacy = (notes.match(/\d+\/(?:\d+(?:\.\d+)?)?(?:#|LB|LBS|GAL|CT|OZ|Z|L)\b|\d+\/#10/i) || [""])[0].replace(/\s+/g, "").toUpperCase();
+    return finishQuoteLine({
+        code: cell(map.code).replace(/[^0-9A-Za-z-]/g, ""),
+        desc: desc.slice(0, 80),
+        price: price,
+        unit: unitCell || (pk ? "case" : ""),
+        pack: pk ? pk.text : legacy,
+        pk: pk,
+        catchweight: isCatchweight(notes + " " + desc)
+    });
 }
 function parseQuoteText(txt) {
-    return String(txt || "").split(/\r?\n/).map(parseQuoteLine).filter(Boolean);
+    const rows = String(txt || "").split(/\r?\n/).filter((r) => r.trim());
+    for (let k = 0; k < rows.length && k < 5; k++) {
+        const map = headerMap(splitCsv(rows[k]));
+        if (map) return dedupeQuoteLines(rows.slice(k + 1).map((r) => quoteLineFromRow(splitCsv(r), map)).filter(Boolean));
+    }
+    return dedupeQuoteLines(rows.map(parseQuoteLine).filter(Boolean));
 }
-// Best inventory match for a quote line. Item numbers on OUR side belong to
-// other vendors, so a code only counts if the vendor happens to share it.
-function matchQuoteLine(line, inv) {
+// Best inventory match for a quote line, scored against the vendor whose list
+// it is (see scoreMatch). "Sure" still needs a clear winner — one fuzzy hit
+// that two items share is left for the owner to tap.
+function matchQuoteLine(line, inv, vid) {
     let best = null, bestScore = 0, second = 0;
     inv.forEach((i) => {
-        let sc = scoreMatch({ code: line.code, desc: line.desc }, i);
-        if (line.code && i.qfcSku && String(i.qfcSku).trim() === String(line.code).trim()) sc = 99;
+        let sc = scoreMatch({ code: line.code, desc: line.desc }, i, vid);
         (i.names ? Object.keys(i.names) : []).forEach((k) => { if (i.names[k]) sc = Math.max(sc, scoreMatch({ desc: line.desc }, { item: i.names[k] })); });
         if (sc > bestScore) { second = bestScore; bestScore = sc; best = i; }
         else if (sc > second) second = sc;
@@ -9159,9 +9354,24 @@ function bestCurrentPerBase(i) {
 // Their price per OUR count unit: same unit → as is; otherwise a pack size
 // from the line ("8/6#"), from a tap, or nothing — never a guess.
 function quotePerBase(line, i, packOverride) {
+    // A held catchweight line has no case price yet — it is a per-pound number
+    // wearing a case label. Nothing to compare until someone says how big the
+    // case is, and a typed pack is exactly that.
+    const typed = Number(packOverride) > 0 ? Number(packOverride) : null;
+    if (line.held) {
+        // The typed number is the one thing the guide didn't say: how many
+        // pounds are in one of their units. That's all it takes to finish it.
+        if (!typed) return null;
+        const price = exactCents(line.listed * typed);
+        const via = typed + " lb per " + (line.unit || "case") + ", typed in";
+        if (normUnit(line.unit || "") === normUnit(i.unit)) return { perBase: price, via: via };
+        const n = packBaseUnits({ lb: typed, ct: null, gal: null }, i.unit);
+        if (!n) return null;
+        return { perBase: price / n, via: via };
+    }
     const bu = normUnit(i.unit), qu = normUnit(line.unit || "");
     if (qu && qu === bu) return { perBase: line.price, via: "same unit" };
-    const n = Number(packOverride) > 0 ? Number(packOverride) : (line.pack ? parseCatalogPack(line.pack, i.unit) : null);
+    const n = typed || packBaseUnits(line.pk, i.unit) || (line.pack ? parseCatalogPack(line.pack, i.unit) : null);
     if (n) return { perBase: line.price / n, via: n + " " + (i.unit || "ea") + " per " + (line.unit || "case") };
     return null;
 }
@@ -9220,6 +9430,7 @@ function PriceQuotePanel({ data, persist }) {
     const [err, setErr] = useState("");
     const [lines, setLines] = useState(null); // [{code,desc,price,unit,pack,itemId,packN,sure}]
     const [openSaved, setOpenSaved] = useState("");
+    const [applied, setApplied] = useState(0);
     const quotes = data.vendorQuotes || [];
     const FIELD = { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#FAFAF8", borderRadius: 8, minHeight: 38 };
     const hdr = (t) => React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#5F676E", marginBottom: 8 } }, t);
@@ -9233,9 +9444,30 @@ function PriceQuotePanel({ data, persist }) {
     const shopName = (data.shopProfile && data.shopProfile.name) || "";
 
     // ---- their list ----
+    // Which of our vendors this list belongs to, if the name matches one. It
+    // decides which SKU column an item number is checked against, and which
+    // vendor's pack size the guide is allowed to fill in. A list from someone
+    // new stays vendor-less and just gets compared.
+    const vidOfName = (name) => {
+        const n = String(name || "").toLowerCase().replace(/[^a-z]/g, "");
+        if (!n) return "";
+        const v = VENDORS.find((x) => [x.id, x.label, x.short].some((t) => { const s = String(t).toLowerCase().replace(/[^a-z]/g, ""); return s && (s === n || n.indexOf(s) !== -1 || s.indexOf(n) !== -1); }));
+        return v ? v.id : "";
+    };
+    const quoteVid = vidOfName(vendorName);
+
     const finish = (parsed, vendorHint) => {
         if (!parsed.length) { setErr("No priced lines found. Each line needs a description and a price."); return; }
-        const rows = parsed.map((l, k) => { const m = matchQuoteLine(l, inv); return Object.assign({}, l, { key: "q" + k + "-" + Date.now(), itemId: m.item ? m.item.id : "", guessId: m.guess ? m.guess.id : "", sure: !!m.item, packN: null }); });
+        const vid = vidOfName(vendorName || vendorHint);
+        const rows = parsed.map((l, k) => { const m = matchQuoteLine(l, inv, vid); return Object.assign({}, l, { key: "q" + k + "-" + Date.now(), itemId: m.item ? m.item.id : "", guessId: m.guess ? m.guess.id : "", sure: !!m.item, score: m.score, packN: null }); });
+        // One item, one line. A vendor who sells both part-skim and whole-milk
+        // mozzarella matches our single "Mozzarella" twice by name, and the
+        // second one to land would quietly overwrite the first — with the wrong
+        // cheese's price. The strongest match (an item number beats a name) keeps
+        // the item; the others come back as a question for the owner.
+        const bestFor = {};
+        rows.forEach((r) => { if (!r.itemId) return; const b = bestFor[r.itemId]; if (!b || r.score > b.score) bestFor[r.itemId] = r; });
+        rows.forEach((r) => { if (r.itemId && bestFor[r.itemId] !== r) { r.guessId = r.itemId; r.itemId = ""; r.sure = false; r.clash = true; } });
         setLines(rows);
         if (vendorHint && !vendorName) setVendorName(vendorHint);
         setErr("");
@@ -9309,11 +9541,85 @@ function PriceQuotePanel({ data, persist }) {
     };
     const setLine = (key, patch) => setLines((ls) => ls.map((l) => (l.key === key ? Object.assign({}, l, patch) : l)));
     const result = lines ? compareQuote(lines, inv) : null;
+
+    // What one priced unit holds is worth as much as the price. packOf() reads
+    // i.pack[vk] to turn a case price into a per-pound one, and without it a
+    // case price on a pound item produces no comparison at all — which is why
+    // every Thomsen case price on file today is inert. The guide states the
+    // pack on every line, so fill in what's missing; where it disagrees with a
+    // number a person typed, ask rather than overwrite.
+    const packOffers = (() => {
+        if (!result || !quoteVid) return [];
+        const vk = vendorKey(quoteVid), seen = {}, out = [];
+        result.rows.forEach((r) => {
+            const l = r.line, i = r.item;
+            if (!i || seen[i.id]) return;
+            if (normUnit(l.unit) === normUnit(i.unit)) return; // same unit, nothing to hold
+            const n = packBaseUnits(l.pk, i.unit);
+            if (!(n > 0)) return;
+            const cur = i.pack && Number(i.pack[vk]) > 0 ? Number(i.pack[vk]) : null;
+            if (cur != null && Math.abs(cur - n) < 0.005) return;
+            seen[i.id] = 1;
+            out.push({ id: i.id, item: i.item, unit: i.unit || "ea", n: n, cur: cur, vk: vk, from: l.pk.text, theirUnit: l.unit || "case" });
+        });
+        return out;
+    })();
+    const packNew = packOffers.filter((p) => p.cur == null);
+    const packDiff = packOffers.filter((p) => p.cur != null);
+    // Applying the list. The compare panel used to be read-only, which meant a
+    // new price sheet was something you looked at and then retyped by hand.
+    // Only lines matched to an item go in — never a held catchweight line, and
+    // never a line the owner left unmatched.
+    const applyable = (() => {
+        if (!result) return [];
+        const taken = {}, out = [];
+        result.rows.forEach((r) => {
+            if (!r.item || r.line.held || !(r.line.price > 0) || taken[r.item.id]) return;
+            taken[r.item.id] = 1;
+            out.push(r);
+        });
+        return out;
+    })();
+    const applyPrices = () => {
+        if (!quoteVid || !applyable.length) return;
+        const vk = vendorKey(quoteVid);
+        const next = JSON.parse(JSON.stringify(data));
+        let n = 0;
+        applyable.forEach((r) => {
+            const it = next.inventory.find((x) => x.id === r.item.id);
+            if (!it) return;
+            it.prices = Object.assign({}, it.prices || {});
+            it.prices[vk] = { amt: r.line.price, unit: r.line.unit || "case", date: todayISO() };
+            const per = packBaseUnits(r.line.pk, it.unit);
+            if (per > 0 && normUnit(r.line.unit) !== normUnit(it.unit) && !(it.pack && Number(it.pack[vk]) > 0)) {
+                it.pack = Object.assign({}, it.pack || {});
+                it.pack[vk] = per;
+            }
+            // Their item number, so the next list off the same vendor matches on
+            // the number instead of guessing from the name.
+            if (r.line.code && !it[vk + "Sku"]) it[vk + "Sku"] = String(r.line.code);
+            n++;
+        });
+        persist(next);
+        setApplied(n);
+    };
+
+    const savePacks = (rows) => {
+        if (!rows.length) return;
+        const next = JSON.parse(JSON.stringify(data));
+        rows.forEach((p) => {
+            const it = next.inventory.find((x) => x.id === p.id);
+            if (!it) return;
+            it.pack = Object.assign({}, it.pack || {});
+            it.pack[p.vk] = p.n;
+        });
+        persist(next);
+    };
     const saveQuote = () => {
         if (!lines || !lines.length) return;
         const next = JSON.parse(JSON.stringify(data));
         next.vendorQuotes = (next.vendorQuotes || []).filter((q) => q.id !== openSaved);
-        const q = { id: openSaved || uid(), vendor: vendorName.trim() || "Vendor", date: todayISO(), lines: lines.map((l) => ({ code: l.code, desc: l.desc, price: l.price, unit: l.unit, pack: l.pack, itemId: l.itemId || "", packN: l.packN || null })) };
+        const q = { id: openSaved || uid(), vendor: vendorName.trim() || "Vendor", date: todayISO(), lines: lines.map((l) => ({ code: l.code, desc: l.desc, price: l.price, unit: l.unit, pack: l.pack, pk: l.pk || null, catchweight: !!l.catchweight, listed: l.listed != null ? l.listed : null, packLb: l.packLb || null, held: !!l.held, itemId: l.itemId || "", packN: l.packN || null })) };
         next.vendorQuotes.unshift(q);
         next.vendorQuotes = next.vendorQuotes.slice(0, 12);
         persist(next);
@@ -9324,7 +9630,7 @@ function PriceQuotePanel({ data, persist }) {
         setLines(q.lines.map((l, k) => Object.assign({}, l, { key: "s" + k + "-" + q.id, sure: !!l.itemId, guessId: l.itemId || "" })));
     };
     const deleteQuote = (id) => { const next = JSON.parse(JSON.stringify(data)); next.vendorQuotes = (next.vendorQuotes || []).filter((q) => q.id !== id); persist(next); if (openSaved === id) { setOpenSaved(""); setLines(null); } };
-    const clearCheck = () => { setLines(null); setPages([]); setPasted(""); setOpenSaved(""); setErr(""); };
+    const clearCheck = () => { setLines(null); setPages([]); setPasted(""); setOpenSaved(""); setErr(""); setApplied(0); };
 
     const sendView = () => React.createElement("div", { className: "p-4 opp-card mb-3", style: { background: COLORS.card } },
         hdr("Send our list to a vendor"),
@@ -9343,24 +9649,34 @@ function PriceQuotePanel({ data, persist }) {
     const rowView = (r) => {
         const l = r.line;
         const i = r.item;
-        const verdict = !i ? null : !r.ours ? { t: "no current price on file to compare", c: "#8A9096" }
+        // Nobody should have to trust a number that got multiplied by 48 behind
+        // their back. When it's wrong — and on some guide it will be — this line
+        // is how anyone finds out.
+        const work = l.catchweight && l.packLb > 0 && l.listed != null
+            ? "$" + l.listed.toFixed(2) + "/lb \u00d7 " + l.packLb + " lb \u2192 $" + l.price.toFixed(2) + " / " + (l.unit || "case") : "";
+        const verdict = l.held ? { t: "catchweight \u2014 how many lb in their " + (l.unit || "case") + "?", c: "#8A5A00" }
+            : !i && l.clash ? { t: "another line already matched " + ((inv.find((x) => x.id === l.guessId) || {}).item || "this one") + " \u2014 pick one", c: "#8A5A00" }
+            : !i ? null : !r.ours ? { t: "no current price on file to compare", c: "#8A9096" }
             : !r.theirs ? { t: "how many " + (i.unit || "ea") + " in their " + (l.unit || "unit") + "?", c: "#8A5A00" }
             : r.cmp.diff < -0.005 ? { t: money(-r.cmp.diff) + "/" + (i.unit || "ea") + " cheaper than " + r.ours.vendor + " (" + Math.round(-r.cmp.pct * 100) + "%)", c: "#1F6B34" }
             : r.cmp.diff > 0.005 ? { t: money(r.cmp.diff) + "/" + (i.unit || "ea") + " more than " + r.ours.vendor + " (+" + Math.round(r.cmp.pct * 100) + "%)", c: COLORS.alertDark }
             : { t: "same as " + r.ours.vendor, c: "#5F676E" };
-        const needsPackN = i && r.ours && !r.theirs;
+        const needsPackN = l.held || (i && r.ours && !r.theirs);
         return React.createElement("div", { key: l.key, className: "px-3 py-2.5", style: { borderBottom: "1px solid " + COLORS.line, borderLeft: "4px solid " + (verdict ? verdict.c : COLORS.line) } },
             React.createElement("div", { className: "flex items-baseline justify-between gap-2" },
                 React.createElement("div", { className: "min-w-0 flex-1" },
                     React.createElement("div", { className: "text-sm truncate", style: { fontFamily: "Inter", color: COLORS.crust, fontWeight: 600 } }, l.desc, l.code ? React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 400, color: "#8A9096", marginLeft: 6, fontSize: 12 } }, "#" + l.code) : null)),
-                React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: 15, fontWeight: 700, color: COLORS.crust, flexShrink: 0 } }, "$" + l.price.toFixed(2), React.createElement("span", { style: { fontWeight: 400, fontSize: 12, color: "#5F676E" } }, " /" + (l.unit || "?") + (l.pack ? " " + l.pack : "")))),
+                React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: 15, fontWeight: 700, color: l.held ? "#8A5A00" : COLORS.crust, flexShrink: 0 } },
+                    "$" + (l.held ? l.listed : l.price).toFixed(2),
+                    React.createElement("span", { style: { fontWeight: 400, fontSize: 12, color: "#5F676E" } }, l.held ? " /lb listed" : " /" + (l.unit || "?") + (l.pack ? " " + l.pack : "")))),
+            work ? React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "JetBrains Mono", color: COLORS.basil } }, work) : null,
             React.createElement("div", { className: "flex items-center gap-2 mt-1 flex-wrap" },
                 React.createElement("select", { value: l.itemId || "", onChange: (e) => setLine(l.key, { itemId: e.target.value, sure: true }), className: "px-2 outline-none", style: Object.assign({}, FIELD, { minHeight: 32, fontSize: 13, maxWidth: 240, borderColor: l.itemId ? COLORS.line : "#F0DDA6", background: l.itemId ? "#FAFAF8" : "#FFF6E0" }) },
                     React.createElement("option", { value: "" }, l.guessId && !l.itemId ? "Not sure — is it " + (inv.find((x) => x.id === l.guessId) || {}).item + "?" : "Not one of ours / skip"),
                     inv.map((x) => React.createElement("option", { key: x.id, value: x.id }, x.item))),
                 !l.itemId && l.guessId ? React.createElement("button", { onClick: () => setLine(l.key, { itemId: l.guessId, sure: true }), className: "text-xs px-2.5 py-1.5 rounded-full", style: { fontFamily: "Inter", fontWeight: 700, background: "#1F6B34", color: "#FFFFFF", border: "none" } }, "Yes") : null,
                 verdict ? React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", fontWeight: 600, color: verdict.c } }, verdict.t) : null,
-                needsPackN ? React.createElement("input", { inputMode: "decimal", placeholder: "?", value: l.packN || "", onChange: (e) => setLine(l.key, { packN: e.target.value.replace(/[^0-9.]/g, "") }), className: "px-2 outline-none", style: Object.assign({}, FIELD, { minHeight: 32, width: 64, fontFamily: "JetBrains Mono", fontSize: 13 }) }) : null,
+                needsPackN ? React.createElement("input", { inputMode: "decimal", placeholder: l.held ? "lb" : "?", value: l.packN || "", onChange: (e) => setLine(l.key, { packN: e.target.value.replace(/[^0-9.]/g, "") }), className: "px-2 outline-none", style: Object.assign({}, FIELD, { minHeight: 32, width: 64, fontFamily: "JetBrains Mono", fontSize: 13, borderColor: l.held ? "#F0DDA6" : COLORS.line, background: l.held ? "#FFF6E0" : "#FAFAF8" }) }) : null,
                 r.theirs && r.theirs.via !== "same unit" ? React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A9096" } }, "(" + r.theirs.via + ")") : null,
                 r.perOrder != null && Math.abs(r.perOrder) >= 0.5 ? React.createElement("span", { className: "text-xs ml-auto", style: { fontFamily: "JetBrains Mono", color: r.perOrder < 0 ? "#1F6B34" : COLORS.alertDark } }, (r.perOrder < 0 ? "saves " : "costs ") + money(Math.abs(r.perOrder)) + "/order") : null));
     };
@@ -9392,6 +9708,32 @@ function PriceQuotePanel({ data, persist }) {
                     React.createElement("input", { placeholder: "Vendor", value: vendorName, onChange: (e) => setVendorName(e.target.value), className: "px-3 outline-none", style: Object.assign({}, FIELD, { width: 150 }) }),
                     React.createElement(TicketButton, { color: COLORS.basil, onClick: saveQuote }, openSaved ? "Save changes" : "Save this quote"),
                     React.createElement(TicketButton, { color: COLORS.line, style: { color: COLORS.crust }, onClick: clearCheck }, "Start over")),
+                // Putting the list on the shelf. One button, counted, and it
+                // says whose side it lands on — a price is written against a
+                // vendor, so an unrecognised name is a question, not a guess.
+                React.createElement("div", { className: "px-3 py-2.5 rounded mb-2", style: { background: applied ? "#E4F1E6" : "#FAFAF8", border: "1px solid " + COLORS.line },
+                    },
+                    applied ? React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 700, color: "#1F6B34" } },
+                        applied + (applied === 1 ? " price is" : " prices are") + " now on the " + (VENDOR_BY_ID[quoteVid] ? VENDOR_BY_ID[quoteVid].short : "vendor") + " side, dated today.")
+                    : React.createElement("div", null,
+                        React.createElement("div", { className: "flex items-center gap-2 flex-wrap" },
+                            React.createElement(TicketButton, { color: quoteVid && applyable.length ? COLORS.crust : COLORS.line, style: quoteVid && applyable.length ? null : { color: "#8A9096" }, onClick: applyPrices },
+                                quoteVid && applyable.length ? "Put these " + applyable.length + " prices on the " + (VENDOR_BY_ID[quoteVid] ? VENDOR_BY_ID[quoteVid].short : "") + " side" : "Put these prices on file"),
+                            !quoteVid ? React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A5A00" } }, "Name the vendor first \u2014 " + VENDORS.map((v) => v.short).join(", ")) : null),
+                        React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: "#5F676E" } },
+                            "Only matched lines. " + (result.rows.filter((r) => r.line.held).length ? result.rows.filter((r) => r.line.held).length + " catchweight line(s) waiting on a pack size, and " : "") +
+                            result.unmatched + " unmatched, are left alone."))),
+                packOffers.length ? React.createElement("div", { className: "px-3 py-2.5 rounded mb-2", style: { background: "#FAFAF8", border: "1px solid " + COLORS.line } },
+                    React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 700, color: COLORS.crust } }, "Pack sizes this list can fill in"),
+                    React.createElement("div", { className: "text-xs mt-0.5 mb-1.5", style: { fontFamily: "Inter", color: "#5F676E" } },
+                        "How much is in one of their " + (VENDOR_BY_ID[quoteVid] ? VENDOR_BY_ID[quoteVid].short : "") + " units. Without it a case price can't be compared against a per-pound one at all."),
+                    packNew.length ? React.createElement("div", { className: "flex items-center gap-2 flex-wrap mb-1" },
+                        React.createElement(TicketButton, { color: COLORS.basil, onClick: () => savePacks(packNew) }, "Fill in " + packNew.length + (packNew.length === 1 ? " pack size" : " pack sizes")),
+                        React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A9096" } }, packNew.slice(0, 4).map((p) => p.item + " " + p.n + " " + p.unit).join(" \u00b7 ") + (packNew.length > 4 ? " \u2026" : ""))) : null,
+                    packDiff.map((p) => React.createElement("div", { key: p.id, className: "flex items-center gap-2 flex-wrap", style: { paddingTop: 4 } },
+                        React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A5A00" } },
+                            p.item + ": on file as " + p.cur + " " + p.unit + " per " + p.theirUnit + ", the guide says " + p.n + " (" + p.from + ")"),
+                        React.createElement("button", { onClick: () => savePacks([p]), className: "text-xs px-2.5 py-1 rounded-full", style: { fontFamily: "Inter", fontWeight: 700, background: COLORS.crust, color: COLORS.cream, border: "none" } }, "Use " + p.n)))) : null,
                 React.createElement("div", { className: "rounded", style: { border: "1px solid " + COLORS.line, overflow: "hidden" } },
                     result.rows.slice().sort((a, b) => (a.cmp ? a.cmp.diff : 9e9) - (b.cmp ? b.cmp.diff : 9e9)).map(rowView)))),
         quotes.length ? React.createElement("div", { className: "p-4 opp-card mb-3", style: { background: COLORS.card } },
