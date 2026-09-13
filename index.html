@@ -7188,13 +7188,22 @@ function primeAudio() {
 // hood tablet needs to cut through a running fryer, the prep tablet doesn't.
 const SOUND_KEY = "opp:timerSound";
 const VOLUME_KEY = "opp:timerVolume";
-// Each pattern is a list of [startOffset, durationSeconds, frequency].
+// A note is [startOffset, seconds, hz, glideToHz?, wave?, level?]. Everything
+// past the third is optional, so the old three-number beeps still read the same.
+//
 // Square waves carry over kitchen noise far better than sine; the higher
-// harmonics survive when the fundamental gets swamped by the hood.
+// harmonics survive when the fundamental gets swamped by the hood. That is the
+// right answer for "the wings are burning" and the wrong one for everything
+// else — a fryer basket does not need to sound like a heart monitor. So the
+// list runs from cut-through-anything, through sounds a kitchen might actually
+// like, to a few that are just funny. `decay: true` swaps the flat hold for a
+// struck-and-ringing envelope, which is what makes a bell sound like a bell
+// instead of a beep.
 const ALARM_SOUNDS = [
     {
         id: "hood",
         label: "Hood",
+        group: "Cuts through the noise",
         note: "5 fast beeps, pause, repeat \u2014 loudest",
         wave: "square",
         gain: 1,
@@ -7205,6 +7214,7 @@ const ALARM_SOUNDS = [
     {
         id: "siren",
         label: "Siren",
+        group: "Cuts through the noise",
         note: "two-tone warble, hard to ignore",
         wave: "square",
         gain: 1,
@@ -7215,6 +7225,7 @@ const ALARM_SOUNDS = [
     {
         id: "kitchen",
         label: "Kitchen",
+        group: "Cuts through the noise",
         note: "3 firm beeps \u2014 the standard",
         wave: "square",
         gain: 0.8,
@@ -7225,6 +7236,7 @@ const ALARM_SOUNDS = [
     {
         id: "prep",
         label: "Prep",
+        group: "Easier on the ear",
         note: "softer double chime",
         wave: "triangle",
         gain: 0.55,
@@ -7235,6 +7247,7 @@ const ALARM_SOUNDS = [
     {
         id: "gentle",
         label: "Gentle",
+        group: "Easier on the ear",
         note: "one soft rising note \u2014 quiet areas",
         wave: "sine",
         gain: 0.45,
@@ -7242,9 +7255,114 @@ const ALARM_SOUNDS = [
         loopGap: 0,
         beeps: [[0, 0.5, 659], [0.3, 0.6, 880]]
     },
+    // ---- sounds a kitchen might actually like ----
+    {
+        id: "bell",
+        label: "Dinner bell",
+        group: "Kitchen",
+        note: "two strikes, rings out",
+        wave: "sine",
+        gain: 0.9,
+        decay: true,
+        loops: 2,
+        loopGap: 0.5,
+        // A bell is a fundamental plus partials that aren't whole multiples of
+        // it — that inharmonic shimmer is the whole difference between a bell
+        // and a beep. 2.76x and 5.4x are roughly where a real one sits.
+        beeps: [
+            [0, 1.6, 784, 0, "sine", 1], [0, 1.2, 2164, 0, "sine", 0.35], [0, 0.8, 4234, 0, "sine", 0.14],
+            [0.42, 1.6, 784, 0, "sine", 0.85], [0.42, 1.2, 2164, 0, "sine", 0.3], [0.42, 0.8, 4234, 0, "sine", 0.12]
+        ]
+    },
+    {
+        id: "marimba",
+        label: "Wood block",
+        group: "Kitchen",
+        note: "three warm notes up",
+        wave: "triangle",
+        gain: 0.85,
+        decay: true,
+        loops: 2,
+        loopGap: 0.45,
+        beeps: [
+            [0, 0.5, 523, 0, "triangle", 1], [0, 0.3, 1568, 0, "sine", 0.18],
+            [0.16, 0.5, 659, 0, "triangle", 1], [0.16, 0.3, 1976, 0, "sine", 0.18],
+            [0.32, 0.7, 784, 0, "triangle", 1], [0.32, 0.4, 2350, 0, "sine", 0.18]
+        ]
+    },
+    {
+        id: "orderup",
+        label: "Order up",
+        group: "Kitchen",
+        note: "counter bell, ding ding",
+        wave: "sine",
+        gain: 0.9,
+        decay: true,
+        loops: 2,
+        loopGap: 0.6,
+        beeps: [
+            [0, 1.1, 1319, 0, "sine", 1], [0, 0.7, 3640, 0, "sine", 0.3],
+            [0.26, 1.3, 1760, 0, "sine", 1], [0.26, 0.8, 4858, 0, "sine", 0.3]
+        ]
+    },
+    // ---- and a few that are just funny ----
+    {
+        id: "airhorn",
+        label: "Air horn",
+        group: "Quirky",
+        note: "two blasts \u2014 you asked for it",
+        wave: "sawtooth",
+        gain: 0.9,
+        loops: 2,
+        loopGap: 0.5,
+        beeps: [
+            [0, 0.45, 233, 0, "sawtooth", 1], [0, 0.45, 349, 0, "sawtooth", 0.8], [0, 0.45, 466, 0, "square", 0.35],
+            [0.6, 0.7, 233, 0, "sawtooth", 1], [0.6, 0.7, 349, 0, "sawtooth", 0.8], [0.6, 0.7, 466, 0, "square", 0.35]
+        ]
+    },
+    {
+        id: "whistle",
+        label: "Slide whistle",
+        group: "Quirky",
+        note: "up, then all the way down",
+        wave: "sine",
+        gain: 0.8,
+        loops: 2,
+        loopGap: 0.5,
+        beeps: [[0, 0.45, 600, 1900, "sine", 1], [0.5, 0.6, 1900, 420, "sine", 1]]
+    },
+    {
+        id: "boing",
+        label: "Boing",
+        group: "Quirky",
+        note: "three goofy twangs",
+        wave: "sawtooth",
+        gain: 0.8,
+        decay: true,
+        loops: 2,
+        loopGap: 0.5,
+        beeps: [[0, 0.3, 500, 120, "sawtooth", 1], [0.3, 0.3, 620, 150, "sawtooth", 0.9], [0.6, 0.45, 760, 180, "sawtooth", 0.85]]
+    },
+    {
+        id: "trombone",
+        label: "Sad trombone",
+        group: "Quirky",
+        note: "wah wah wah waaah",
+        wave: "sawtooth",
+        gain: 0.8,
+        loops: 1,
+        loopGap: 0.6,
+        beeps: [
+            [0, 0.34, 349, 330, "sawtooth", 1],
+            [0.36, 0.34, 330, 311, "sawtooth", 1],
+            [0.72, 0.34, 311, 294, "sawtooth", 1],
+            [1.08, 0.85, 294, 220, "sawtooth", 1]
+        ]
+    },
     {
         id: "silent",
         label: "Silent",
+        group: "Easier on the ear",
         note: "vibrate and flash only",
         wave: "sine",
         gain: 0,
@@ -7253,6 +7371,8 @@ const ALARM_SOUNDS = [
         beeps: []
     }
 ];
+// Headings for the picker, in the order the sounds are declared.
+const ALARM_GROUPS = ALARM_SOUNDS.map((s) => s.group || "").filter((g, k, all) => g && all.indexOf(g) === k);
 function getSoundId() {
     try {
         return localStorage.getItem(SOUND_KEY) || "kitchen";
@@ -7298,24 +7418,34 @@ function playAlarm(soundId, volume) {
     if (!_timerAudio || vol <= 0 || !snd.beeps.length)
         return;
     const base = _timerAudio.currentTime + 0.02;
-    const loopLen = snd.beeps[snd.beeps.length - 1][0] +
-        snd.beeps[snd.beeps.length - 1][1] + snd.loopGap;
+    const loopLen = snd.beeps.reduce((m, b) => Math.max(m, b[0] + b[1]), 0) + snd.loopGap;
     for (let L = 0; L < Math.max(1, snd.loops); L++) {
         snd.beeps.forEach((b) => {
             try {
                 const t0 = base + L * loopLen + b[0];
+                const dur = b[1], hz = b[2], glide = b[3], wave = b[4] || snd.wave, level = b[5] == null ? 1 : b[5];
                 const o = _timerAudio.createOscillator();
                 const g = _timerAudio.createGain();
                 o.connect(g);
                 g.connect(_timerAudio.destination);
-                o.type = snd.wave;
-                o.frequency.setValueAtTime(b[2], t0);
+                o.type = wave;
+                o.frequency.setValueAtTime(hz, t0);
+                // A slide whistle and a sad trombone are both just a note that
+                // moves while it sounds.
+                if (glide > 0) o.frequency.exponentialRampToValueAtTime(Math.max(20, glide), t0 + dur);
+                const peak = Math.max(0.0002, vol * 0.3 * level);
                 g.gain.setValueAtTime(0.0001, t0);
-                g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * 0.3), t0 + 0.015);
-                g.gain.setValueAtTime(Math.max(0.0002, vol * 0.3), t0 + b[1] - 0.02);
-                g.gain.exponentialRampToValueAtTime(0.0001, t0 + b[1]);
+                if (snd.decay) {
+                    // struck, then ringing out — a bell, a block, a plucked string
+                    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.006);
+                    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+                } else {
+                    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.015);
+                    g.gain.setValueAtTime(peak, t0 + Math.max(0.03, dur - 0.02));
+                    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+                }
                 o.start(t0);
-                o.stop(t0 + b[1] + 0.02);
+                o.stop(t0 + dur + 0.02);
             }
             catch (e) { }
         });
@@ -7331,9 +7461,81 @@ function startTimer(setTimers, label, seconds) {
     };
     setTimers((prev) => (prev || []).concat([t]));
 }
+// Where this tablet keeps its timer cards. Device-local, like the timers and
+// the alarm: the hood tablet wants them out of the way of the ticket board, the
+// prep tablet doesn't care.
+const TIMER_POS_KEY = "opp:timerPos";
+function loadTimerPos() {
+    try {
+        const raw = localStorage.getItem(TIMER_POS_KEY);
+        const p = raw ? JSON.parse(raw) : null;
+        return p && Number.isFinite(p.x) && Number.isFinite(p.y) ? p : null;
+    } catch (e) { return null; }
+}
+function saveTimerPos(p) {
+    try {
+        if (p) localStorage.setItem(TIMER_POS_KEY, JSON.stringify(p));
+        else localStorage.removeItem(TIMER_POS_KEY);
+    } catch (e) { }
+}
+// Keep the stack on the glass. A tablet that gets turned sideways, or a card
+// dropped near an edge and then more timers started, must not put the dismiss
+// button somewhere you can't reach it.
+function clampTimerPos(p, w, h) {
+    const vw = window.innerWidth || 1024, vh = window.innerHeight || 768;
+    return { x: Math.max(6, Math.min(p.x, vw - (w || 200) - 6)), y: Math.max(6, Math.min(p.y, vh - (h || 80) - 6)) };
+}
 function TimerOverlay({ timers, setTimers, now }) {
     const rungRef = useRef({});
     const list = timers || [];
+    // Drag the whole stack by pressing anywhere on it that isn't a button. It
+    // only becomes a drag after the finger has actually travelled, so a tap on
+    // "+1m" is still a tap.
+    const boxRef = useRef(null);
+    const dragRef = useRef(null);
+    const [pos, setPos] = useState(loadTimerPos);
+    const [dragging, setDragging] = useState(false);
+    useEffect(() => {
+        const onResize = () => setPos((p) => {
+            if (!p) return p;
+            const el = boxRef.current;
+            return clampTimerPos(p, el ? el.offsetWidth : 0, el ? el.offsetHeight : 0);
+        });
+        const onReset = () => setPos(null);
+        window.addEventListener("resize", onResize);
+        window.addEventListener("orientationchange", onResize);
+        window.addEventListener("opp:timerpos", onReset);
+        return () => {
+            window.removeEventListener("resize", onResize);
+            window.removeEventListener("orientationchange", onResize);
+            window.removeEventListener("opp:timerpos", onReset);
+        };
+    }, []);
+    useEffect(() => { if (!dragging && pos) saveTimerPos(pos); }, [pos, dragging]);
+    const onDown = (e) => {
+        if (e.target && typeof e.target.closest === "function" && e.target.closest("button")) return;
+        const el = boxRef.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        dragRef.current = { dx: e.clientX - r.left, dy: e.clientY - r.top, x0: e.clientX, y0: e.clientY, moved: false, w: r.width, h: r.height };
+    };
+    const onMove = (e) => {
+        const d = dragRef.current;
+        if (!d) return;
+        // A few pixels of travel before it counts, so a tap on "+1m" stays a tap
+        // and a hand brushing past doesn't fling the stack across the screen.
+        if (!d.moved) {
+            if (Math.abs(e.clientX - d.x0) + Math.abs(e.clientY - d.y0) < 6) return;
+            d.moved = true;
+            setDragging(true);
+        }
+        if (e.cancelable) e.preventDefault();
+        setPos(clampTimerPos({ x: e.clientX - d.dx, y: e.clientY - d.dy }, d.w, d.h));
+    };
+    const onUp = () => {
+        dragRef.current = null;
+        setDragging(false);
+    };
     useEffect(() => {
         list.forEach((t) => {
             const left = t.endsAt - Date.now();
@@ -7356,16 +7558,23 @@ function TimerOverlay({ timers, setTimers, now }) {
     const addMinute = (id) => {
         setTimers((prev) => (prev || []).map((t) => t.id === id ? Object.assign({}, t, { endsAt: Math.max(Date.now(), t.endsAt) + 60000 }) : t));
     };
-    return (React.createElement("div", { className: "opp-timer-overlay", style: {
-            position: "fixed", right: 10, bottom: 10, zIndex: 9999,
+    const place = pos
+        ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" }
+        : { right: 10, bottom: 10 };
+    return (React.createElement("div", { className: "opp-timer-overlay", ref: boxRef,
+        onPointerDown: onDown, onPointerMove: onMove, onPointerUp: onUp, onPointerCancel: onUp,
+        style: Object.assign({
+            position: "fixed", zIndex: 9999,
             display: "flex", flexDirection: "column", gap: 8,
-            maxWidth: "min(340px, calc(100vw - 20px))", pointerEvents: "none"
-        } }, list.slice().sort((a, b) => a.endsAt - b.endsAt).map((t) => {
+            maxWidth: "min(340px, calc(100vw - 20px))", pointerEvents: "none",
+            touchAction: "none", cursor: dragging ? "grabbing" : "grab"
+        }, place) }, list.slice().sort((a, b) => a.endsAt - b.endsAt).map((t) => {
         const left = t.endsAt - now;
         const done = left <= 0;
         const frac = Math.max(0, Math.min(1, left / (t.seconds * 1000)));
         return (React.createElement("div", { key: t.id, style: {
                 pointerEvents: "auto",
+                touchAction: "none",
                 background: done ? COLORS.alert : COLORS.crust,
                 color: COLORS.cream,
                 borderRadius: 10,
@@ -7464,23 +7673,30 @@ function TimersTab({ data, persist, timers, setTimers, now }) {
         React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("div", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#5F676E" } }, "ALARM ON THIS TABLET"),
             React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: "#5F676E" } }, "Set per tablet \u2014 the one by the hood can be loud without the prep area being loud."),
-            React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-2" }, ALARM_SOUNDS.map((sn) => {
-                const on = sound === sn.id;
-                return (React.createElement("button", { key: sn.id, onClick: () => { setSound(sn.id); setSoundId(sn.id); playAlarm(sn.id, vol); }, className: "px-3 py-2.5 rounded text-left", style: {
-                        background: on ? COLORS.crust : COLORS.cream,
-                        border: "1px solid " + (on ? COLORS.crust : COLORS.line)
-                    } },
-                    React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: on ? COLORS.cream : COLORS.crust } },
-                        sn.label,
-                        on ? " \u2713" : ""),
-                    React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: on ? "#8A9096" : COLORS.muted } }, sn.note)));
-            })),
+            ALARM_GROUPS.map((gName) => React.createElement("div", { key: gName, className: "mb-2" },
+                React.createElement("div", { className: "text-xs mb-1", style: { fontFamily: "Inter", fontWeight: 700, color: "#8A9096" } }, gName),
+                React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-2" }, ALARM_SOUNDS.filter((sn) => (sn.group || "") === gName).map((sn) => {
+                    const on = sound === sn.id;
+                    return (React.createElement("button", { key: sn.id, onClick: () => { setSound(sn.id); setSoundId(sn.id); playAlarm(sn.id, vol); }, className: "px-3 py-2.5 rounded text-left", style: {
+                            background: on ? COLORS.crust : COLORS.cream,
+                            border: "1px solid " + (on ? COLORS.crust : COLORS.line)
+                        } },
+                        React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: on ? COLORS.cream : COLORS.crust } },
+                            sn.label,
+                            on ? " \u2713" : ""),
+                        React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: on ? "#8A9096" : COLORS.muted } }, sn.note)));
+                })))),
             React.createElement("div", { className: "flex items-center gap-2 mt-3" },
                 React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#5F676E" } }, "Volume"),
                 React.createElement("input", { type: "range", min: "10", max: "100", step: "5", value: Math.round(vol * 100), onChange: (e) => { const v = Number(e.target.value) / 100; setVol(v); setVolume(v); }, style: { flex: 1, accentColor: COLORS.lamp } }),
                 React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13, color: COLORS.crust, minWidth: 38, textAlign: "right" } }, Math.round(vol * 100) + "%"),
                 React.createElement(TicketButton, { color: COLORS.basil, onClick: () => playAlarm(sound, vol) }, "Test")),
-            React.createElement("div", { className: "text-xs mt-2", style: { fontFamily: "Inter", color: COLORS.muted } }, "Tablet volume still has the final say \u2014 turn it up on the device too.")),
+            React.createElement("div", { className: "text-xs mt-2", style: { fontFamily: "Inter", color: COLORS.muted } }, "Tablet volume still has the final say \u2014 turn it up on the device too."),
+            React.createElement("div", { className: "flex items-center gap-2 mt-3 flex-wrap", style: { borderTop: "1px solid " + COLORS.line, paddingTop: 10 } },
+                React.createElement("span", { className: "text-xs flex-1", style: { fontFamily: "Inter", color: "#5F676E", minWidth: 180 } },
+                    "A running timer card can be dragged anywhere on the screen \u2014 press it and slide. It stays where you put it on this tablet."),
+                React.createElement("button", { onClick: () => { saveTimerPos(null); try { window.dispatchEvent(new Event("opp:timerpos")); } catch (e) { } }, className: "text-xs px-3 py-2 rounded-full",
+                    style: { fontFamily: "Inter", fontWeight: 600, border: "1px solid " + COLORS.line, background: "transparent", color: COLORS.crust } }, "Put them back in the corner"))),
         React.createElement("div", { className: "p-4 opp-card", style: { background: COLORS.card } },
             React.createElement("button", { onClick: () => setEditing(!editing), className: "w-full flex items-center justify-between" },
                 React.createElement("span", { className: "mb-2", style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#5F676E" } }, "EDIT THE PRESET TIMES"),
