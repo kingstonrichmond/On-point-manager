@@ -9305,12 +9305,16 @@ function quoteLineFromRow(cells, map) {
     const notes = map.notes.map(cell).join(" | ");
     const unitCell = cell(map.unit).toLowerCase().replace(/[^a-z/]/g, "");
     const pk = parsePackSize(notes) || parsePackSize(desc);
+    // Quality writes its pack the old way ("8/6#", "4/1GAL"), which parsePackSize
+    // deliberately refuses as a double multiplier — but parseCatalogPack has read
+    // that shape for years, so keep the raw string when there's no parsed pack.
+    const legacy = (notes.match(/\d+\/(?:\d+(?:\.\d+)?)?(?:#|LB|LBS|GAL|CT|OZ|Z|L)\b|\d+\/#10/i) || [""])[0].replace(/\s+/g, "").toUpperCase();
     return finishQuoteLine({
         code: cell(map.code).replace(/[^0-9A-Za-z-]/g, ""),
         desc: desc.slice(0, 80),
         price: price,
         unit: unitCell || (pk ? "case" : ""),
-        pack: pk ? pk.text : "",
+        pack: pk ? pk.text : legacy,
         pk: pk,
         catchweight: isCatchweight(notes + " " + desc)
     });
@@ -9426,6 +9430,7 @@ function PriceQuotePanel({ data, persist }) {
     const [err, setErr] = useState("");
     const [lines, setLines] = useState(null); // [{code,desc,price,unit,pack,itemId,packN,sure}]
     const [openSaved, setOpenSaved] = useState("");
+    const [applied, setApplied] = useState(0);
     const quotes = data.vendorQuotes || [];
     const FIELD = { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 14, background: "#FAFAF8", borderRadius: 8, minHeight: 38 };
     const hdr = (t) => React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#5F676E", marginBottom: 8 } }, t);
@@ -9454,7 +9459,15 @@ function PriceQuotePanel({ data, persist }) {
     const finish = (parsed, vendorHint) => {
         if (!parsed.length) { setErr("No priced lines found. Each line needs a description and a price."); return; }
         const vid = vidOfName(vendorName || vendorHint);
-        const rows = parsed.map((l, k) => { const m = matchQuoteLine(l, inv, vid); return Object.assign({}, l, { key: "q" + k + "-" + Date.now(), itemId: m.item ? m.item.id : "", guessId: m.guess ? m.guess.id : "", sure: !!m.item, packN: null }); });
+        const rows = parsed.map((l, k) => { const m = matchQuoteLine(l, inv, vid); return Object.assign({}, l, { key: "q" + k + "-" + Date.now(), itemId: m.item ? m.item.id : "", guessId: m.guess ? m.guess.id : "", sure: !!m.item, score: m.score, packN: null }); });
+        // One item, one line. A vendor who sells both part-skim and whole-milk
+        // mozzarella matches our single "Mozzarella" twice by name, and the
+        // second one to land would quietly overwrite the first — with the wrong
+        // cheese's price. The strongest match (an item number beats a name) keeps
+        // the item; the others come back as a question for the owner.
+        const bestFor = {};
+        rows.forEach((r) => { if (!r.itemId) return; const b = bestFor[r.itemId]; if (!b || r.score > b.score) bestFor[r.itemId] = r; });
+        rows.forEach((r) => { if (r.itemId && bestFor[r.itemId] !== r) { r.guessId = r.itemId; r.itemId = ""; r.sure = false; r.clash = true; } });
         setLines(rows);
         if (vendorHint && !vendorName) setVendorName(vendorHint);
         setErr("");
@@ -9553,6 +9566,44 @@ function PriceQuotePanel({ data, persist }) {
     })();
     const packNew = packOffers.filter((p) => p.cur == null);
     const packDiff = packOffers.filter((p) => p.cur != null);
+    // Applying the list. The compare panel used to be read-only, which meant a
+    // new price sheet was something you looked at and then retyped by hand.
+    // Only lines matched to an item go in — never a held catchweight line, and
+    // never a line the owner left unmatched.
+    const applyable = (() => {
+        if (!result) return [];
+        const taken = {}, out = [];
+        result.rows.forEach((r) => {
+            if (!r.item || r.line.held || !(r.line.price > 0) || taken[r.item.id]) return;
+            taken[r.item.id] = 1;
+            out.push(r);
+        });
+        return out;
+    })();
+    const applyPrices = () => {
+        if (!quoteVid || !applyable.length) return;
+        const vk = vendorKey(quoteVid);
+        const next = JSON.parse(JSON.stringify(data));
+        let n = 0;
+        applyable.forEach((r) => {
+            const it = next.inventory.find((x) => x.id === r.item.id);
+            if (!it) return;
+            it.prices = Object.assign({}, it.prices || {});
+            it.prices[vk] = { amt: r.line.price, unit: r.line.unit || "case", date: todayISO() };
+            const per = packBaseUnits(r.line.pk, it.unit);
+            if (per > 0 && normUnit(r.line.unit) !== normUnit(it.unit) && !(it.pack && Number(it.pack[vk]) > 0)) {
+                it.pack = Object.assign({}, it.pack || {});
+                it.pack[vk] = per;
+            }
+            // Their item number, so the next list off the same vendor matches on
+            // the number instead of guessing from the name.
+            if (r.line.code && !it[vk + "Sku"]) it[vk + "Sku"] = String(r.line.code);
+            n++;
+        });
+        persist(next);
+        setApplied(n);
+    };
+
     const savePacks = (rows) => {
         if (!rows.length) return;
         const next = JSON.parse(JSON.stringify(data));
@@ -9579,7 +9630,7 @@ function PriceQuotePanel({ data, persist }) {
         setLines(q.lines.map((l, k) => Object.assign({}, l, { key: "s" + k + "-" + q.id, sure: !!l.itemId, guessId: l.itemId || "" })));
     };
     const deleteQuote = (id) => { const next = JSON.parse(JSON.stringify(data)); next.vendorQuotes = (next.vendorQuotes || []).filter((q) => q.id !== id); persist(next); if (openSaved === id) { setOpenSaved(""); setLines(null); } };
-    const clearCheck = () => { setLines(null); setPages([]); setPasted(""); setOpenSaved(""); setErr(""); };
+    const clearCheck = () => { setLines(null); setPages([]); setPasted(""); setOpenSaved(""); setErr(""); setApplied(0); };
 
     const sendView = () => React.createElement("div", { className: "p-4 opp-card mb-3", style: { background: COLORS.card } },
         hdr("Send our list to a vendor"),
@@ -9604,6 +9655,7 @@ function PriceQuotePanel({ data, persist }) {
         const work = l.catchweight && l.packLb > 0 && l.listed != null
             ? "$" + l.listed.toFixed(2) + "/lb \u00d7 " + l.packLb + " lb \u2192 $" + l.price.toFixed(2) + " / " + (l.unit || "case") : "";
         const verdict = l.held ? { t: "catchweight \u2014 how many lb in their " + (l.unit || "case") + "?", c: "#8A5A00" }
+            : !i && l.clash ? { t: "another line already matched " + ((inv.find((x) => x.id === l.guessId) || {}).item || "this one") + " \u2014 pick one", c: "#8A5A00" }
             : !i ? null : !r.ours ? { t: "no current price on file to compare", c: "#8A9096" }
             : !r.theirs ? { t: "how many " + (i.unit || "ea") + " in their " + (l.unit || "unit") + "?", c: "#8A5A00" }
             : r.cmp.diff < -0.005 ? { t: money(-r.cmp.diff) + "/" + (i.unit || "ea") + " cheaper than " + r.ours.vendor + " (" + Math.round(-r.cmp.pct * 100) + "%)", c: "#1F6B34" }
@@ -9656,6 +9708,21 @@ function PriceQuotePanel({ data, persist }) {
                     React.createElement("input", { placeholder: "Vendor", value: vendorName, onChange: (e) => setVendorName(e.target.value), className: "px-3 outline-none", style: Object.assign({}, FIELD, { width: 150 }) }),
                     React.createElement(TicketButton, { color: COLORS.basil, onClick: saveQuote }, openSaved ? "Save changes" : "Save this quote"),
                     React.createElement(TicketButton, { color: COLORS.line, style: { color: COLORS.crust }, onClick: clearCheck }, "Start over")),
+                // Putting the list on the shelf. One button, counted, and it
+                // says whose side it lands on — a price is written against a
+                // vendor, so an unrecognised name is a question, not a guess.
+                React.createElement("div", { className: "px-3 py-2.5 rounded mb-2", style: { background: applied ? "#E4F1E6" : "#FAFAF8", border: "1px solid " + COLORS.line },
+                    },
+                    applied ? React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 700, color: "#1F6B34" } },
+                        applied + (applied === 1 ? " price is" : " prices are") + " now on the " + (VENDOR_BY_ID[quoteVid] ? VENDOR_BY_ID[quoteVid].short : "vendor") + " side, dated today.")
+                    : React.createElement("div", null,
+                        React.createElement("div", { className: "flex items-center gap-2 flex-wrap" },
+                            React.createElement(TicketButton, { color: quoteVid && applyable.length ? COLORS.crust : COLORS.line, style: quoteVid && applyable.length ? null : { color: "#8A9096" }, onClick: applyPrices },
+                                quoteVid && applyable.length ? "Put these " + applyable.length + " prices on the " + (VENDOR_BY_ID[quoteVid] ? VENDOR_BY_ID[quoteVid].short : "") + " side" : "Put these prices on file"),
+                            !quoteVid ? React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A5A00" } }, "Name the vendor first \u2014 " + VENDORS.map((v) => v.short).join(", ")) : null),
+                        React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: "#5F676E" } },
+                            "Only matched lines. " + (result.rows.filter((r) => r.line.held).length ? result.rows.filter((r) => r.line.held).length + " catchweight line(s) waiting on a pack size, and " : "") +
+                            result.unmatched + " unmatched, are left alone."))),
                 packOffers.length ? React.createElement("div", { className: "px-3 py-2.5 rounded mb-2", style: { background: "#FAFAF8", border: "1px solid " + COLORS.line } },
                     React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 700, color: COLORS.crust } }, "Pack sizes this list can fill in"),
                     React.createElement("div", { className: "text-xs mt-0.5 mb-1.5", style: { fontFamily: "Inter", color: "#5F676E" } },
