@@ -14,7 +14,7 @@
 // message and the hand-entered Order Queue below it is untouched.
 
 import { checkAuth, authHeaders, denied } from './_auth.mjs';
-import { loadShopData, normalizeShop, openStore } from './lib/shop-data.mjs';
+import { loadShopData, normalizeShop, openStore, nowInShop } from './lib/shop-data.mjs';
 import { loadTickets, ordersConfigured, fetchInventory, kitchenFilter } from './lib/clover-orders.mjs';
 import { estimateWait, kitchenConfig, basisLine } from './lib/wait-estimate.mjs';
 
@@ -102,13 +102,17 @@ export default async (req) => {
       wipMinutes: cfg.wipMinutes,
       kitchen,
     });
-    const estimate = estimateWait(tickets, cfg);
+    // The kitchen runs faster on a Friday night than a Tuesday lunch, so the
+    // rate is picked from the shop's own clock, not the server's.
+    const when = shop ? nowInShop(shop) : null;
+    const estimate = estimateWait(tickets, cfg, when);
     payload = {
       enabled: true,
       tickets,
       estimate: { ...estimate, line: basisLine(estimate) },
       kitchen: cfg,
       currentWait: shop?.wait ?? null,
+      when,
       diagnostics: {
         ...diagnostics,
         kitchenFilter: { mode: kitchen.mode, tag: kitchen.tag, tagMissing: kitchen.tagMissing, categories: kitchen.categories },

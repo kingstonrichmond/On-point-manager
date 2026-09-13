@@ -33,7 +33,14 @@
 // estimate to absurdity. Deleted, not softened.
 
 export const DEFAULT_KITCHEN = {
-  pizzasPerHour: 20,     // A GUESS until measured. The single number worth tuning first.
+  // 36/hr is the owner's own count: twelve pizzas or calzones out the door in a
+  // twenty-minute stretch before the quote has to go up. It replaced a 20/hr
+  // guess that was nearly doubling every estimate.
+  pizzasPerHour: 36,
+  // Thursday, Friday and Saturday nights the line runs about twice that — 24 in
+  // the same twenty minutes. Days are 0=Sun..6=Sat and the hour is the shop's
+  // own clock, so this is a per-shop pattern, not On Point's baked in.
+  rush: { days: [4, 5, 6], fromHour: 16, pizzasPerHour: 72 },
   otherWeight: 0.3,      // how much a non-pizza kitchen item counts toward oven/fryer load
   bakeMinutes: 8,        // floor: even an empty shop takes this long to hand it over
   minWait: 15,
@@ -44,10 +51,37 @@ export const DEFAULT_KITCHEN = {
   countCategories: null, // Clover categories that count as kitchen work; null = everything
 };
 
+// A shift that runs past midnight still belongs to the night it started on: at
+// 00:30 on Sunday a Saturday-night shop is still working Saturday. Anything
+// before this hour counts as the previous day.
+const NIGHT_ROLLOVER_HOUR = 4;
+
+/**
+ * Which throughput applies at a given moment in the shop's own clock.
+ * @param when {{dow:number, hour:number}|null}  null → the everyday rate
+ */
+export function rateAt(cfg, when) {
+  const base = { pizzasPerHour: cfg.pizzasPerHour, rush: false };
+  const r = cfg.rush;
+  if (!when || !r || !(r.pizzasPerHour > 0) || !Array.isArray(r.days) || !r.days.length) return base;
+  let { dow, hour } = when;
+  if (!Number.isFinite(dow) || !Number.isFinite(hour)) return base;
+  if (hour < NIGHT_ROLLOVER_HOUR) { dow = (dow + 6) % 7; hour += 24; }
+  const on = r.days.indexOf(dow) !== -1 && hour >= (Number(r.fromHour) || 0);
+  return on ? { pizzasPerHour: r.pizzasPerHour, rush: true } : base;
+}
+
 export function kitchenConfig(data) {
   const c = { ...DEFAULT_KITCHEN, ...(data?.kitchen ?? {}) };
   const wip = Number(c.wipMinutes);
   c.wipMinutes = Number.isFinite(wip) && wip > 0 ? wip : DEFAULT_KITCHEN.wipMinutes;
+  const rate = Number(c.pizzasPerHour);
+  c.pizzasPerHour = Number.isFinite(rate) && rate > 0 ? rate : DEFAULT_KITCHEN.pizzasPerHour;
+  const r = c.rush && typeof c.rush === 'object' ? c.rush : null;
+  const rr = r ? Number(r.pizzasPerHour) : NaN;
+  c.rush = r && Number.isFinite(rr) && rr > 0 && Array.isArray(r.days)
+    ? { days: r.days.map(Number).filter((d) => d >= 0 && d <= 6), fromHour: Number.isFinite(Number(r.fromHour)) ? Number(r.fromHour) : 16, pizzasPerHour: rr }
+    : null;
   c.kitchenTag = String(c.kitchenTag || '').trim();
   c.countCategories = Array.isArray(c.countCategories) && c.countCategories.length ? c.countCategories.map(String) : null;
   return c;
@@ -60,9 +94,14 @@ const round = (n, to) => Math.max(to, Math.round(n / to) * to);
  *                 count kitchen lines only)
  * @returns {{minutes:number|null, basis:object, confidence:'low'|'ok', notes:string[]}}
  */
-export function estimateWait(tickets, config = DEFAULT_KITCHEN) {
+export function estimateWait(tickets, config = DEFAULT_KITCHEN, when = null) {
   const c = { ...DEFAULT_KITCHEN, ...config };
-  const basis = { tickets: tickets.length, pizzas: 0, otherItems: 0, load: 0, pizzasPerHour: c.pizzasPerHour, bakeMinutes: c.bakeMinutes, wipMinutes: c.wipMinutes };
+  // The rate depends on when it is — see rateAt. Everything downstream uses the
+  // resolved number, and the basis carries it so the line a person reads names
+  // the rate that was actually used.
+  const { pizzasPerHour, rush } = rateAt(c, when);
+  c.pizzasPerHour = pizzasPerHour;
+  const basis = { tickets: tickets.length, pizzas: 0, otherItems: 0, load: 0, pizzasPerHour, rush, bakeMinutes: c.bakeMinutes, wipMinutes: c.wipMinutes };
 
   // Nothing rang in inside the window: say so. A number here would be invented.
   if (!tickets.length) {
@@ -101,5 +140,5 @@ export function basisLine(est) {
   if (!b.tickets) return 'nothing in the queue';
   const bits = [`${b.tickets} ticket${b.tickets === 1 ? '' : 's'}`, `${b.pizzas} pizza${b.pizzas === 1 ? '' : 's'}`];
   if (b.otherItems) bits.push(`${b.otherItems} other`);
-  return `${bits.join(' · ')} at ${b.pizzasPerHour}/hr · last ${b.wipMinutes} min`;
+  return `${bits.join(' · ')} at ${b.pizzasPerHour}/hr${b.rush ? ' (busy night)' : ''} · last ${b.wipMinutes} min`;
 }

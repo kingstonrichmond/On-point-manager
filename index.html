@@ -5471,7 +5471,7 @@ function TicketBoard({ data, persist }) {
                 items.length > 6 ? React.createElement("div", { style: { color: "#8A9096" } }, "+" + (items.length - 6) + " more") : null));
           })),
 
-    React.createElement(KitchenWorkCard, { data, persist, diag: d, filterLine }),
+    React.createElement(KitchenWorkCard, { data, persist, diag: d, filterLine, est: est }),
 
     // diagnostics — this is how "does the register even show a ticket at
     // ring-in" and "is there a kitchen-printer tag" get answered from real
@@ -5504,10 +5504,21 @@ function TicketBoard({ data, persist }) {
 // estimate. If tags don't come through (or aren't clean), tick the categories
 // that count instead. Nothing ticked means everything counts — conservative,
 // never broken. All of it lives in data.kitchen next to pizzasPerHour.
-function KitchenWorkCard({ data, persist, diag, filterLine }) {
+function KitchenWorkCard({ data, persist, diag, filterLine, est }) {
   const [open, setOpen] = useState(false);
   const k = (data && data.kitchen) || {};
   const wip = Number(k.wipMinutes) > 0 ? Number(k.wipMinutes) : 45;
+  // He counts in "twelve out in twenty minutes", the model works in per-hour, so
+  // the card talks his way and stores the model's. One tap on a stepper is one
+  // more pizza per twenty minutes, which is three an hour.
+  const PER = 20 / 60;
+  const rate = Number(k.pizzasPerHour) > 0 ? Number(k.pizzasPerHour) : 36;
+  const rush = k.rush && typeof k.rush === "object" ? k.rush : null;
+  const rushRate = rush && Number(rush.pizzasPerHour) > 0 ? Number(rush.pizzasPerHour) : 72;
+  const rushDays = rush && Array.isArray(rush.days) ? rush.days.map(Number) : [4, 5, 6];
+  const rushFrom = rush && Number.isFinite(Number(rush.fromHour)) ? Number(rush.fromHour) : 16;
+  const per20 = (perHour) => Math.round(perHour * PER);
+  const rushOnNow = !!(est && est.basis && est.basis.rush);
   const tag = String(k.kitchenTag || "").trim();
   const tagsSeen = (diag && diag.tagsSeen) || [];
   const catsSeen = (diag && diag.categoriesSeen) || [];
@@ -5538,6 +5549,27 @@ function KitchenWorkCard({ data, persist, diag, filterLine }) {
       React.createElement("span", { style: { color: COLORS.steel, fontFamily: "Inter" } }, open ? "▴" : "▾")),
     React.createElement("div", { style: Object.assign({ marginTop: 2 }, muted) }, "Last " + wip + " min · " + filterLine),
     open ? React.createElement("div", { className: "mt-3" },
+      // ---- how fast the kitchen actually goes ----
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: COLORS.crust, marginBottom: 6 } }, "Pizzas and calzones out of the kitchen"),
+      [["Normal", rate, (v) => set({ pizzasPerHour: v }), !rushOnNow],
+       ["Busy nights", rushRate, (v) => set({ rush: { days: rushDays, fromHour: rushFrom, pizzasPerHour: v } }), rushOnNow]
+      ].map(([label, perHour, write, live]) => React.createElement("div", { key: label, className: "flex items-center gap-2 mb-1.5" },
+        React.createElement("span", { style: { fontFamily: "Inter", fontSize: 13.5, color: live ? COLORS.crust : "#8A9096", fontWeight: live ? 700 : 400, flex: 1 } },
+          label, live ? React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, color: "#1F6B34", marginLeft: 6 } }, "· in effect now") : null),
+        React.createElement("button", { onClick: () => write(Math.max(3, perHour - 3)), style: { width: 34, height: 34, borderRadius: 10, border: "1px solid " + COLORS.line, background: COLORS.card, fontFamily: "Inter", fontSize: 17, fontWeight: 700, color: COLORS.crust } }, "−"),
+        React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 14, fontWeight: 700, minWidth: 118, textAlign: "center", color: COLORS.crust } }, per20(perHour) + " per 20 min"),
+        React.createElement("button", { onClick: () => write(Math.min(120, perHour + 3)), style: { width: 34, height: 34, borderRadius: 10, border: "1px solid " + COLORS.line, background: COLORS.card, fontFamily: "Inter", fontSize: 17, fontWeight: 700, color: COLORS.crust } }, "+"),
+        React.createElement("span", { style: Object.assign({ minWidth: 46, textAlign: "right" }, muted) }, perHour + "/hr"))),
+      React.createElement("div", { className: "flex items-center gap-1 flex-wrap mb-1.5" },
+        React.createElement("span", { style: Object.assign({ marginRight: 2 }, muted) }, "Busy"),
+        ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d, i) => React.createElement("button", { key: d,
+          onClick: () => { const on = rushDays.indexOf(i) !== -1; const next = on ? rushDays.filter((x) => x !== i) : [...rushDays, i].sort(); set({ rush: { days: next, fromHour: rushFrom, pizzasPerHour: rushRate } }); },
+          style: { background: rushDays.indexOf(i) !== -1 ? COLORS.ink : "#F2F2EF", color: rushDays.indexOf(i) !== -1 ? "#FFFFFF" : COLORS.crust, border: "none", borderRadius: 8, minWidth: 34, minHeight: 30, fontFamily: "Inter", fontSize: 12.5, fontWeight: 700 } }, d[0])),
+        React.createElement("span", { style: Object.assign({ marginLeft: 4 }, muted) }, "from"),
+        React.createElement("button", { onClick: () => set({ rush: { days: rushDays, fromHour: Math.max(0, rushFrom - 1), pizzasPerHour: rushRate } }), style: { width: 30, height: 30, borderRadius: 8, border: "1px solid " + COLORS.line, background: COLORS.card, fontFamily: "Inter", fontWeight: 700, color: COLORS.crust } }, "−"),
+        React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13, fontWeight: 700, minWidth: 52, textAlign: "center", color: COLORS.crust } }, hourLabel(rushFrom)),
+        React.createElement("button", { onClick: () => set({ rush: { days: rushDays, fromHour: Math.min(23, rushFrom + 1), pizzasPerHour: rushRate } }), style: { width: 30, height: 30, borderRadius: 8, border: "1px solid " + COLORS.line, background: COLORS.card, fontFamily: "Inter", fontWeight: 700, color: COLORS.crust } }, "+")),
+      React.createElement("div", { style: Object.assign({ marginBottom: 12 }, muted) }, "The suggested wait is the kitchen's backlog divided by this. If the suggestion reads long on a quiet night or short in a rush, this is the number to move."),
       React.createElement("div", { className: "flex items-center gap-2 mb-3" },
         React.createElement("span", { style: { fontFamily: "Inter", fontSize: 14, color: COLORS.crust, flex: 1 } }, "An order older than this is out the door"),
         React.createElement("button", { onClick: () => set({ wipMinutes: Math.max(15, wip - 5) }), style: { width: 36, height: 36, borderRadius: 10, border: "1px solid " + COLORS.line, background: COLORS.card, fontFamily: "Inter", fontSize: 18, fontWeight: 700, color: COLORS.crust } }, "−"),
