@@ -7402,6 +7402,69 @@ function setVolume(v) {
     }
     catch (e) { }
 }
+// ---- The voice that comes after the beeps -----------------------------------
+// A timer that has been screaming for twenty seconds has already failed as a
+// beep. Nobody is coming. So past that point the tablet says what is actually
+// burning, by name — which is the one thing a beep can never do when six timers
+// are running and they all sound alike.
+//
+// Off by default everywhere, and the sharp version is opt-in per tablet: this
+// ships to other people's kitchens too, and an app that swears at the crew is
+// the owner's decision to make, not ours.
+const TIMER_VOICE_KEY = "opp:timerVoice";
+const OVERTIME_SPEAK_SEC = 20;
+const VOICE_MODES = [
+    { id: "off", label: "Beeps only", note: "keeps beeping, never talks" },
+    { id: "plain", label: "Says what's burning", note: "\u201cThe mozzarella sticks are burning\u201d" },
+    { id: "salty", label: "Says it with feeling", note: "same, but it swears at you" }
+];
+const OVERTIME_LINES = {
+    plain: [
+        (it) => "Hey. The " + it + " are burning.",
+        (it) => "The " + it + " are still in. Pull them.",
+        (it) => "Somebody get the " + it + "."
+    ],
+    salty: [
+        (it) => "Hey asshole, you're burning the " + it + ".",
+        (it) => "The " + it + " are on fire, genius.",
+        (it) => "Still burning the " + it + ". Any day now."
+    ]
+};
+// The label is written for a button, not a mouth.
+const SPOKEN_LABEL = [[/\bmozz\b/gi, "mozzarella"], [/\bpepp\b/gi, "pepperoni"], [/\bparm\b/gi, "parmesan"], [/\bveg\b/gi, "vegetable"], [/\bchx\b/gi, "chicken"]];
+function spokenLabel(label) {
+    let t = String(label || "the timer");
+    SPOKEN_LABEL.forEach((r) => { t = t.replace(r[0], r[1]); });
+    return t.toLowerCase();
+}
+function getVoiceMode() {
+    try { return localStorage.getItem(TIMER_VOICE_KEY) || "off"; } catch (e) { return "off"; }
+}
+function setVoiceMode(m) {
+    try { localStorage.setItem(TIMER_VOICE_KEY, m); } catch (e) { }
+}
+function canSpeak() {
+    return typeof window !== "undefined" && !!window.speechSynthesis && typeof window.SpeechSynthesisUtterance === "function";
+}
+// Returns true if it actually said something, so the caller can fall back to
+// beeping on a tablet whose browser has no voice.
+function speakOvertime(label, nth, mode, volume) {
+    const m = mode || getVoiceMode();
+    if (m === "off" || !canSpeak()) return false;
+    const lines = OVERTIME_LINES[m] || OVERTIME_LINES.plain;
+    try {
+        const u = new window.SpeechSynthesisUtterance(lines[Math.abs(nth || 0) % lines.length](spokenLabel(label)));
+        // Same voice the tablet already picked for reading things aloud.
+        const v = resolveVoice();
+        if (v) u.voice = v;
+        u.volume = volume == null ? getVolume() : volume;
+        u.rate = 1.05;
+        u.pitch = 1;
+        window.speechSynthesis.cancel(); // six timers over at once shouldn't queue into a monologue
+        window.speechSynthesis.speak(u);
+        return true;
+    } catch (e) { return false; }
+}
 function soundById(id) {
     return ALARM_SOUNDS.filter((s) => s.id === id)[0] || ALARM_SOUNDS[2];
 }
@@ -7536,6 +7599,7 @@ function TimerOverlay({ timers, setTimers, now }) {
         dragRef.current = null;
         setDragging(false);
     };
+    const nagRef = useRef({});
     useEffect(() => {
         list.forEach((t) => {
             const left = t.endsAt - Date.now();
@@ -7545,7 +7609,13 @@ function TimerOverlay({ timers, setTimers, now }) {
             // burst on the way past zero, then nag every 20s until it's dismissed
             if (Date.now() - last > 20000) {
                 rungRef.current[t.id] = Date.now();
-                playAlarm();
+                const nth = (nagRef.current[t.id] || 0);
+                nagRef.current[t.id] = nth + 1;
+                // The first one is the alarm you chose. After that it has already
+                // failed as a beep, so it says what's actually burning — and falls
+                // back to beeping on a tablet with no voice.
+                const spoke = nth > 0 && (-left) >= OVERTIME_SPEAK_SEC * 1000 && speakOvertime(t.label, nth - 1);
+                if (!spoke) playAlarm();
             }
         });
     }, [now]);
@@ -7553,6 +7623,8 @@ function TimerOverlay({ timers, setTimers, now }) {
         return null;
     const dismiss = (id) => {
         delete rungRef.current[id];
+        delete nagRef.current[id];
+        try { if (canSpeak()) window.speechSynthesis.cancel(); } catch (e) { }
         setTimers((prev) => (prev || []).filter((t) => t.id !== id));
     };
     const addMinute = (id) => {
@@ -7602,6 +7674,7 @@ function TimersTab({ data, persist, timers, setTimers, now }) {
     const [editing, setEditing] = useState(false);
     const [sound, setSound] = useState(getSoundId);
     const [vol, setVol] = useState(getVolume);
+    const [voice, setVoice] = useState(getVoiceMode);
     const [newLabel, setNewLabel] = useState("");
     const [newMins, setNewMins] = useState("");
     const [newSecs, setNewSecs] = useState("");
@@ -7692,6 +7765,19 @@ function TimersTab({ data, persist, timers, setTimers, now }) {
                 React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 13, color: COLORS.crust, minWidth: 38, textAlign: "right" } }, Math.round(vol * 100) + "%"),
                 React.createElement(TicketButton, { color: COLORS.basil, onClick: () => playAlarm(sound, vol) }, "Test")),
             React.createElement("div", { className: "text-xs mt-2", style: { fontFamily: "Inter", color: COLORS.muted } }, "Tablet volume still has the final say \u2014 turn it up on the device too."),
+            React.createElement("div", { className: "mt-3", style: { borderTop: "1px solid " + COLORS.line, paddingTop: 10 } },
+                React.createElement("div", { className: "text-xs mb-1", style: { fontFamily: "Inter", fontWeight: 700, color: "#8A9096" } }, "When it goes 20 seconds over"),
+                React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: "#5F676E" } },
+                    "Twenty seconds of beeping means nobody is coming. Past that the tablet can say what is actually burning \u2014 useful when six timers are running and they all sound the same."),
+                React.createElement("div", { className: "grid grid-cols-3 gap-2" }, VOICE_MODES.map((m) => {
+                    const on = voice === m.id;
+                    return React.createElement("button", { key: m.id, onClick: () => { setVoice(m.id); setVoiceMode(m.id); if (m.id !== "off") speakOvertime("Mozz Sticks", 0, m.id, vol); }, className: "px-3 py-2.5 rounded text-left",
+                        style: { background: on ? COLORS.crust : COLORS.cream, border: "1px solid " + (on ? COLORS.crust : COLORS.line) } },
+                        React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: on ? COLORS.cream : COLORS.crust } }, m.label, on ? " \u2713" : ""),
+                        React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: on ? "#8A9096" : COLORS.muted } }, m.note));
+                })),
+                !canSpeak() ? React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: "#8A5A00" } },
+                    "This tablet's browser can't speak \u2014 it'll keep beeping instead.") : null),
             React.createElement("div", { className: "flex items-center gap-2 mt-3 flex-wrap", style: { borderTop: "1px solid " + COLORS.line, paddingTop: 10 } },
                 React.createElement("span", { className: "text-xs flex-1", style: { fontFamily: "Inter", color: "#5F676E", minWidth: 180 } },
                     "A running timer card can be dragged anywhere on the screen \u2014 press it and slide. It stays where you put it on this tablet."),
