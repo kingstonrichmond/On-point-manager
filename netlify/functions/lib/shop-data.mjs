@@ -215,11 +215,67 @@ const CATEGORY_WORDS = {
   'ice cream': 'Ice Cream', 'drinks': 'Drinks', 'soda': 'Drinks', 'cookies': 'Chips & Cookies', 'chips': 'Chips & Cookies', 'desserts': 'Chips & Cookies',
 };
 
+// An 86'd INGREDIENT takes off everything made with it. Out of eggplant means
+// Moussaka and Mom's Veggie are gone too, and nobody should have to find them.
+// It's a rule, not forty rows: one flag off and the whole lot comes back.
+//
+// Matching is on whole words in the item's name and its ingredient line, and the
+// FORMS are resolved once against the real menu: if the word as typed appears on
+// some item ("olives" on Mom's Veggie), only that exact form counts, so "olives"
+// never catches "olive oil". Only when nothing matches as typed does it try the
+// singular/plural. Anything the shop decides is a false hit lives in
+// data.prep.ingredientExcept and stays excluded next time too.
+// Apostrophes are dropped, not spaced, so "Mom's Veggie" normalizes to
+// "moms veggie" rather than "mom s veggie" — otherwise an exclusion typed by
+// hand never lines up with the one the × button writes.
+const norm86 = (s) => String(s ?? '').toLowerCase().replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+const hay86 = (item) => ' ' + norm86(`${item.name} ${item.description || ''}`) + ' ';
+const hasForm = (h, f) => f.length >= 3 && h.includes(' ' + f + ' ');
+/** Everything a rule could mean, most literal first. */
+function termForms(term) {
+  const t = norm86(term);
+  if (t.length < 3) return [];
+  const out = [t];
+  if (t.length > 4 && t.endsWith('es')) out.push(t.slice(0, -2));
+  if (t.length > 3 && t.endsWith('s')) out.push(t.slice(0, -1));
+  if (!t.endsWith('s')) { out.push(t + 's'); out.push(t + 'es'); }
+  return [...new Set(out)];
+}
+/** The forms actually used, decided by what the menu really says. */
+export function resolveTermForms(term, menu) {
+  const forms = termForms(term);
+  if (!forms.length) return [];
+  const hays = arr(menu).map(hay86);
+  const exact = forms[0];
+  if (hays.some((h) => hasForm(h, exact))) return [exact];
+  // Nothing on the menu says it, in any form: no cascade. The caller then treats
+  // the flag as the plain item it names, which is what it did before ingredient
+  // rules existed — 86ing a word that isn't on the menu must not silently do
+  // nothing.
+  return forms.filter((f) => hays.some((h) => hasForm(h, f)));
+}
+/** Does this ingredient rule take this item off? */
+export function ingredientTakesOff(rule, item) {
+  if (!rule || !Array.isArray(rule.forms) || !rule.forms.length) return false;
+  const n = norm86(item.name);
+  if ((rule.except || []).some((x) => norm86(x) === n)) return false;
+  const h = hay86(item);
+  return rule.forms.some((f) => hasForm(h, f));
+}
+/** The items a rule would take off, for the board's preview. */
+export function ingredientHits(term, menu, except = []) {
+  const rule = { forms: resolveTermForms(term, menu), except };
+  return arr(menu).filter((m) => ingredientTakesOff(rule, m));
+}
+
 function normalizeEightySix(data, menu) {
   const items = new Set();
   const categories = new Set();
   const low = [];
   const notes = [];
+  const ingredients = [];
+  const exceptMap = (data?.prep?.ingredientExcept && typeof data.prep.ingredientExcept === 'object') ? data.prep.ingredientExcept : {};
+  const exceptFor = (term) => arr(exceptMap[norm86(term)]).map(String);
   const flagItem = (name, note) => {
     const key = lc(name);
     const cat = CATEGORY_WORDS[key] || CATEGORY_WORDS[key.replace(/^all\s+/, '')];
@@ -229,8 +285,19 @@ function normalizeEightySix(data, menu) {
   // The real board: data.prep.lowStock — status "86" means out, "low" means running low
   arr(data?.prep?.lowStock).forEach((f) => {
     if (!f || !f.item) return;
-    if (f.status === '86') flagItem(f.item, f.notes);
-    else if (f.status === 'low') low.push(f.item);
+    if (f.status === 'low') { low.push(f.item); return; }
+    if (f.status !== '86') return;
+    // An ingredient rule cascades; anything else is the single item or category
+    // it names, exactly as before.
+    if (f.kind === 'ingredient') {
+      const forms = resolveTermForms(f.item, menu);
+      if (forms.length) {
+        ingredients.push({ term: String(f.item), forms, except: exceptFor(f.item) });
+        if (f.notes) notes.push(`${f.item}: ${f.notes}`);
+        return;
+      }
+    }
+    flagItem(f.item, f.notes);
   });
   // Generic fallbacks (other data shapes)
   const src = firstOf(data, ['eightySix', 'eightysix', 'e86', 'board86', 'outOfStock']);
@@ -246,7 +313,7 @@ function normalizeEightySix(data, menu) {
   if (Array.isArray(src)) src.forEach(push);
   else if (src && typeof src === 'object') { arr(src.items).forEach(push); arr(src.categories).forEach((c) => categories.add(lc(typeof c === 'string' ? c : c?.name))); }
   menu.forEach((m) => { if (m.unavailable) items.add(lc(m.name)); });
-  return { items, categories, low, notes };
+  return { items, categories, low, notes, ingredients };
 }
 
 // The shop's normal quote. Nobody has to set a wait on a quiet day — the phone
@@ -477,6 +544,8 @@ export function hoursText(shop) {
 // ---------- availability ----------
 export function isEightySixed(shop, item) {
   const n = squash(item.name), c = lc(item.category);
+  // Out of an ingredient means out of everything made with it.
+  for (const rule of (shop.eightySix.ingredients || [])) if (ingredientTakesOff(rule, item)) return true;
   for (const x of shop.eightySix.items) {
     const q = squash(x);
     if (!q) continue;
