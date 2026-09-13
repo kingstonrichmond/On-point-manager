@@ -5884,8 +5884,12 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
     style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, background: bg, color: fg, border: bd ? "1px solid " + bd : "none", borderRadius: 999, padding: "6px 13px", minHeight: 34 } }, txt);
 
   // Never fewer than four, so a short phone is no worse than it was; never more
-  // than there are. `reserve` leaves room for the "+N more" line under the list.
-  const [prepRef, prepFits] = useFitCount(D.row + 1, 4, prepLeft.length, 44);
+  // than there are; and never more than a dozen even on a tablet with room to
+  // spare — past about twelve rows the card stops reading as the "what's left"
+  // glance Today is for and starts being the prep tab. The rest stays one tap
+  // away, through "+N more" or "Full list". `reserve` leaves room for that line.
+  const PREP_CAP = 12;
+  const [prepRef, prepFits] = useFitCount(D.row + 1, 4, Math.min(PREP_CAP, prepLeft.length), 44);
   const shownPrep = showAllPrep ? prepLeft : prepLeft.slice(0, prepFits);
 
   return React.createElement(
@@ -5975,7 +5979,8 @@ function TodayTab({ data, persist, goTo, timers, setTimers, now }) {
           row.kind === "focus" ? React.createElement(Trash2, { size: 15, color: INK3 }) : React.createElement("span", { style: { display: "block", width: 12, height: 12, borderRadius: 999, background: COLORS.alert } }))))
     ) : null,
 
-    // prep — as many as the screen has room for, the rest behind "+N more"
+    // prep — as many as the screen has room for, twelve at the most, the rest
+    // behind "+N more"
     React.createElement(
       "div",
       { className: "px-4 py-4 mb-3", style: CARD },
