@@ -65,7 +65,49 @@ export function loadShopDataFromObject(obj) {
 // ---------- helpers ----------
 const lc = (s) => String(s ?? '').trim().toLowerCase();
 /** lowercase + drop punctuation so "dels" finds "Del's" and "mozz sticks" finds "Mozz. Sticks" */
-export const squash = (s) => lc(s).replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+// Said out loud, not read off a screen. The phone reads this menu aloud, and the
+// abbreviations that belong on a 64-pixel price column are wrong in a sentence:
+// "w/ marinara" becomes "w slash marinara", 18" XL becomes "ex el", 3pc becomes
+// "three p c", and an address ending in RI becomes "are eye".
+//
+// Expanded HERE, at the boundary, and not in the shop's own menu text: the screen
+// still wants the short forms, the live document is never rewritten, and anything
+// added later — or imported from the register — is covered without anyone
+// remembering to spell it out. Item names on tickets stay canonical, because
+// priceLine takes them from the menu record rather than from what was spoken.
+const SPOKEN = [
+  [/\bBBQ\b/gi, 'barbecue'],
+  [/\bXL\b/gi, 'extra large'],
+  // Upper case only, so these can't fire inside an ordinary word.
+  [/\bGF\b/g, 'gluten free'],
+  [/\bSM\b/g, 'small'], [/\bMED\b/g, 'medium'], [/\bLG\b/g, 'large'], [/\bREG\b/g, 'regular'],
+  [/\bRI\b/g, 'Rhode Island'],
+  [/\bw\/\s*/gi, 'with '],
+  // No word boundary between a digit and a letter, so these need the digit.
+  [/(\d)\s*"/g, '$1 inch'],
+  [/(\d)\s*oz\b/gi, '$1 ounce'],
+  [/(\d)\s*pc\b/gi, '$1 piece'],
+  [/(\d)\s*ct\b/gi, '$1 count'],
+  [/(\d+)\s*x\s*(\d+)/gi, '$1 by $2'],
+  [/\bmtn\b/gi, 'Mountain'],
+  [/\s*&\s*/g, ' and '],
+  // A dash between numbers or days is a range; an em dash in prose is a pause,
+  // so "herbs — try it with tomatoes" must not become "herbs to try it".
+  // An en dash is a range wherever it sits — "11am–9pm", "Mon–Wed", "1.50–3.00".
+  [/([A-Za-z0-9])\s*–\s*([A-Za-z0-9])/g, '$1 to $2'],
+  [/(\d)\s*—\s*(\d)/g, '$1 to $2'],
+  [/\s*—\s*/g, ', '],
+  [/\s*·\s*/g, ', '],
+];
+export function sayable(text) {
+  let out = String(text ?? '');
+  for (const [re, to] of SPOKEN) out = out.replace(re, to);
+  return out.replace(/\s+/g, ' ').trim();
+}
+// Matching runs through the same expansion, so "barbecue chicken" and "BBQ
+// Chicken" are the same thing to the order taker — which also means a caller who
+// says it the long way now matches, not just the assistant reading it back.
+export const squash = (s) => lc(sayable(s)).replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
 const num = (v, d = null) => (v === undefined || v === null || v === '' || Number.isNaN(Number(v)) ? d : Number(v));
 const arr = (v) => (Array.isArray(v) ? v : v && typeof v === 'object' ? Object.values(v) : []);
 const firstOf = (obj, keys) => keys.map((k) => obj?.[k]).find((v) => v !== undefined && v !== null);
@@ -190,7 +232,7 @@ export function menuNotes(data) {
   if (m.dressings) bits.push('Dressings: ' + m.dressings + '.');
   if (m.iceCreamFlavors) bits.push('Ice cream flavors: ' + m.iceCreamFlavors + '.');
   if (m.sandwiches?.note) bits.push(m.sandwiches.note);
-  return bits.join(' ');
+  return sayable(bits.join(' '));
 }
 
 function normalizeMenu(data) {
@@ -538,7 +580,9 @@ export function hoursText(shop) {
     const last = rows[rows.length - 1];
     if (last && last.label === label) last.end = i; else rows.push({ start: i, end: i, label });
   });
-  return rows.map((r) => `${r.start === r.end ? names[r.start] : names[r.start].slice(0, 3) + '–' + names[r.end].slice(0, 3)} ${r.label}`).join('; ');
+  // Full day names and "to" rather than "Mon–Wed": this line gets read aloud
+  // every time somebody asks what time we close.
+  return sayable(rows.map((r) => `${r.start === r.end ? names[r.start] : names[r.start] + ' to ' + names[r.end]} ${r.label}`).join('; '));
 }
 
 // ---------- availability ----------
@@ -593,10 +637,10 @@ export function menuText(shop, { withPrices = true } = {}) {
     lines.push(`## ${cat}${catOut ? '  — ALL OUT TODAY (86\'d)' : ''}`);
     for (const m of items) {
       const out = isEightySixed(shop, m);
-      const bits = [m.name];
-      if (withPrices) bits.push(`(${priceText(m)})`);
-      if (m.description) bits.push(`— ${m.description}`);
-      if (m.options.length) bits.push(`[add-ons: ${m.options.map((o) => o.name + (o.price ? ` +$${o.price.toFixed(2)}` : '')).join(', ')}]`);
+      const bits = [sayable(m.name)];
+      if (withPrices) bits.push(`(${sayable(priceText(m))})`);
+      if (m.description) bits.push(`— ${sayable(m.description)}`);
+      if (m.options.length) bits.push(`[add-ons: ${m.options.map((o) => sayable(o.name) + (o.price ? ` +$${o.price.toFixed(2)}` : '')).join(', ')}]`);
       lines.push(`- ${out ? '86\'d TODAY: ' : ''}${bits.join(' ')}`);
     }
   }
