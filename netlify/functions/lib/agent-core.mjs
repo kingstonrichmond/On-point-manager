@@ -3,7 +3,7 @@
 // envelope to these calls; a Retell or LiveKit adapter would call the same code.
 
 import {
-  normalizeShop, shopStatus, hoursText, hourLabel, findMenuItems, isEightySixed, priceText, menuText, menuNotes, squash, updateShopData,
+  normalizeShop, shopStatus, hoursText, hourLabel, findMenuItems, isEightySixed, priceText, menuText, menuNotes, squash, updateShopData, sayable,
 } from './shop-data.mjs';
 import { languageName, voiceSupportsMultilingual } from './voices.mjs';
 import { makeSink } from './order-sink.mjs';
@@ -21,7 +21,7 @@ export function buildSystemPrompt(shop, at = new Date()) {
 
   const out86 = [...shop.eightySix.categories].filter(Boolean);
   const catOut = (m) => shop.eightySix.categories.has(lc(m.category)) || [...shop.eightySix.categories].some((c) => c && lc(m.category).includes(c));
-  const outItems = shop.menu.filter((m) => isEightySixed(shop, m) && !catOut(m)).map((m) => m.name);
+  const outItems = shop.menu.filter((m) => isEightySixed(shop, m) && !catOut(m)).map((m) => sayable(m.name));
 
   // Vapi's docs are emphatic: an assistant will not use a second language unless
   // the prompt names it. A multilingual transcriber alone does nothing.
@@ -39,7 +39,8 @@ HOURS: ${hoursText(shop)}.
 CURRENT WAIT: ${wait === null ? 'not set by the kitchen — use get_wait_time before promising any time, and if it is still unknown say you can\'t promise a time tonight' : `${wait} minutes for pickup (set by the kitchen${shop.wait.updatedAt ? ' ' + shop.wait.updatedAt : ''})`}.
 ${out86.length ? `WHOLE CATEGORIES OUT TODAY: ${out86.join(', ')}.\n` : ''}${outItems.length ? `ITEMS OUT TODAY (86'd): ${outItems.join(', ')}.\n` : ''}${shop.clover?.added?.length ? `(the register has ${shop.clover.added.join(', ')} marked out)\n` : ''}${shop.eightySix.low?.length ? `RUNNING LOW (may run out during the call — fine to sell, don't promise): ${shop.eightySix.low.join(', ')}.\n` : ''}DELIVERY: ${a.delivery ? `yes — we deliver. For delivery orders get the street address${a.deliveryNotes ? ' (' + a.deliveryNotes + ')' : ''}.` : 'no in-house delivery — pickup only from the shop.'}
 RULES
-1. Pizza sizes are 12-inch medium, 16-inch large, 18-inch XL, plus Detroit style and a 12-inch gluten-free. If a caller says "small" for a pizza, that's the medium. A "pepperoni pizza" (or any plain topping pizza) is a Cheese Pizza with that topping added — the named specialties are the ones in the Specialty Pizza list. Topping prices depend on the size — the place_order tool prices them; you don't have to.
+0. SAY IT, DON'T SPELL IT. Read every name as words, never as letters or symbols: BBQ is "barbecue", XL is "extra large", w/ is "with", 3pc is "three piece", 20oz is "twenty ounce", 10x14 is "ten by fourteen", RI is "Rhode Island". The menu below is already written out this way — read it as written. BLT is the exception: say the letters.
+1. Pizza sizes are 12-inch medium, 16-inch large, 18-inch extra large, plus Detroit style and a 12-inch gluten-free. If a caller says "small" for a pizza, that's the medium. A "pepperoni pizza" (or any plain topping pizza) is a Cheese Pizza with that topping added — the named specialties are the ones in the Specialty Pizza list. Topping prices depend on the size — the place_order tool prices them; you don't have to.
 1b. Be honest about the wait. Quote the kitchen's current wait exactly, even when it is long (a 75-minute wait on a summer Saturday is normal — say it plainly and offer to place the order anyway). Never shave the number. To-go orders are NOT jumped ahead of the queue; do not offer to rush anything.
 2. ${priceRule}
 3. Anything on the 86 list is out — do not take it. Offer the closest thing we do have. Use check_availability if unsure; the list above is current as of the start of this call.

@@ -10087,9 +10087,96 @@ function NeedListTab({ data, persist }) {
         React.createElement("button", { onClick: clearDone, style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.ink, padding: "6px 2px" } }, "Clear these")),
       React.createElement("div", { style: { borderRadius: 16, overflow: "hidden", boxShadow: CARD_SHADOW } }, done.map((n, i) => row(n, i, i === done.length - 1)))) : null);
 }
+// ---- 86 an ingredient, and everything made with it goes too --------------------
+// Out of eggplant means Moussaka and Mom's Veggie are off, and nobody should have
+// to hunt for them. It's a RULE, not forty rows written onto the board: one flag
+// off and the whole lot comes back on its own.
+//
+// This mirrors resolveTermForms / ingredientTakesOff in lib/shop-data.mjs, which
+// is what the phone actually obeys — the two are tested against each other on the
+// real menu so the preview here can't promise something the phone won't do.
+// Apostrophes dropped, not spaced, so "Mom's Veggie" → "moms veggie".
+const norm86 = (s) => String(s == null ? "" : s).toLowerCase().replace(/['\u2019]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+const hasForm86 = (h, f) => f.length >= 3 && h.indexOf(" " + f + " ") !== -1;
+function termForms86(term) {
+  const t = norm86(term);
+  if (t.length < 3) return [];
+  const out = [t];
+  if (t.length > 4 && /es$/.test(t)) out.push(t.slice(0, -2));
+  if (t.length > 3 && /s$/.test(t)) out.push(t.slice(0, -1));
+  if (!/s$/.test(t)) { out.push(t + "s"); out.push(t + "es"); }
+  return out.filter((x, i) => out.indexOf(x) === i);
+}
+// Every menu item the crew could be talking about, with the words that describe
+// it. Same names the phone's menu uses (a specialty is "<name> Pizza").
+function menuFlat86(data) {
+  const m = (data && data.menu) || {};
+  const out = [];
+  const add = (name, category, description) => { if (name) out.push({ name: String(name), category, description: String(description || "") }); };
+  if ((m.pizzaSizes || []).length) add("Cheese Pizza", "Pizza", "Build your own — pick a size, add toppings");
+  (m.specialty || []).forEach((sp) => add(sp.name + " Pizza", "Specialty Pizza", sp.ingredients));
+  if (m.calzone) {
+    add("Cheese Calzone", "Calzones", (m.calzone.note || "") + (m.calzone.toppingsEach ? " Toppings " + m.calzone.toppingsEach + " each." : ""));
+    add("Specialty Calzone", "Calzones", "Any specialty pizza made as a calzone, with marinara");
+  }
+  (m.appetizers || []).forEach((it) => add(it.name, "Appetizers", it.ingredients));
+  (m.tendersWings || []).forEach((it) => { if (!/^\s*\.\.\./.test(it.name || "")) add(String(it.name || "").replace(/\s*w\/.*$/, ""), "Tenders & Wings", (it.name || "").indexOf("w/") !== -1 ? "comes " + it.name.slice(it.name.indexOf("w/")) : ""); });
+  (m.salads || []).forEach((it) => add(it.name, "Salads", it.ingredients));
+  ((m.sandwiches && m.sandwiches.items) || []).forEach((it) => add(it.name, "Grinders & Wraps", it.ingredients));
+  (m.iceCream || []).forEach((it) => add(it.name, "Ice Cream", ""));
+  (m.chipsCookies || []).forEach((it) => add(it.name, "Chips & Cookies", it.ingredients));
+  (m.drinks || []).forEach((it) => add(it.name, "Drinks", it.ingredients));
+  return out;
+}
+const hay86 = (it) => " " + norm86(it.name + " " + (it.description || "")) + " ";
+// The forms actually used, decided by what the menu really says: if the word as
+// typed is on some item ("olives" on Mom's Veggie) only that counts, so "olives"
+// never catches "olive oil". Only if nothing matches as typed does it try the
+// singular and plural.
+function resolveTermForms86(term, flat) {
+  const forms = termForms86(term);
+  if (!forms.length) return [];
+  const hays = flat.map(hay86);
+  if (hays.some((h) => hasForm86(h, forms[0]))) return [forms[0]];
+  // Nothing on the menu says it: no cascade, so the flag stays the plain item.
+  return forms.filter((f) => hays.some((h) => hasForm86(h, f)));
+}
+function ingredientHits86(term, flat, except) {
+  const forms = resolveTermForms86(term, flat);
+  if (!forms.length) return [];
+  const ex = (except || []).map(norm86);
+  return flat.filter((it) => ex.indexOf(norm86(it.name)) === -1 && forms.some((f) => hasForm86(hay86(it), f)));
+}
+function exceptList86(data, term) {
+  const map = (data && data.prep && data.prep.ingredientExcept) || {};
+  const v = map[norm86(term)];
+  return Array.isArray(v) ? v : [];
+}
 function PrepParTab({ data, persist }) {
   const prep = data.prep || { lowStock: [] };
   const [newFlag, setNewFlag] = useState("");
+  const [openId, setOpenId] = useState("");
+  const flat = menuFlat86(data);
+  const hitsFor = (f) => ingredientHits86(f.item, flat, exceptList86(data, f.item));
+  const setKind = (id, kind) => {
+    const next = JSON.parse(JSON.stringify(data));
+    const row = next.prep.lowStock.find((r) => r.id === id);
+    if (!row) return;
+    if (kind) row.kind = kind; else delete row.kind;
+    persist(next);
+  };
+  // An exclusion is a fact about the menu, not about tonight: keep it where it
+  // survives the flag being cleared and put back next week.
+  const toggleExcept = (term, name) => {
+    const next = JSON.parse(JSON.stringify(data));
+    next.prep.ingredientExcept = next.prep.ingredientExcept || {};
+    const key = norm86(term);
+    const cur = Array.isArray(next.prep.ingredientExcept[key]) ? next.prep.ingredientExcept[key] : [];
+    const on = cur.some((x) => norm86(x) === norm86(name));
+    const list = on ? cur.filter((x) => norm86(x) !== norm86(name)) : [...cur, name];
+    if (list.length) next.prep.ingredientExcept[key] = list; else delete next.prep.ingredientExcept[key];
+    persist(next);
+  };
   const addFlag = () => {
     if (!newFlag.trim()) return;
     const next = JSON.parse(JSON.stringify(data));
@@ -10127,17 +10214,16 @@ function PrepParTab({ data, persist }) {
         { className: "text-sm italic px-1 py-6 text-center", style: { fontFamily: "Inter", color: "#8A9096" } },
         "Nothing flagged right now."
       ),
-      prep.lowStock.map((f) => /* @__PURE__ */ React.createElement(
+      prep.lowStock.map((f) => {
+      const hits = f.status === "86" ? hitsFor(f) : [];
+      const isIng = f.kind === "ingredient";
+      const excepted = exceptList86(data, f.item);
+      const shown = openId === f.id;
+      return /* @__PURE__ */ React.createElement("div", { key: f.id, className: "px-3 py-3 rounded",
+        style: { background: COLORS.card, border: `1px solid ${COLORS.line}`, borderLeft: `5px solid ${statusColor[f.status] || COLORS.line}` } },
+      /* @__PURE__ */ React.createElement(
         "div",
-        {
-          key: f.id,
-          className: "flex items-center justify-between gap-2 px-3 py-3 rounded",
-          style: {
-            background: COLORS.card,
-            border: `1px solid ${COLORS.line}`,
-            borderLeft: `5px solid ${statusColor[f.status] || COLORS.line}`
-          }
-        },
+        { className: "flex items-center justify-between gap-2" },
         /* @__PURE__ */ React.createElement(
           "span",
           { className: "text-base flex-1", style: { fontFamily: "Inter", color: COLORS.crust } },
@@ -10168,7 +10254,37 @@ function PrepParTab({ data, persist }) {
             /* @__PURE__ */ React.createElement(Trash2, { size: 15, color: "#8A9096" })
           )
         )
-      ))
+      ),
+      // The cascade. Offered the moment it would do something, so nobody has to
+      // know the feature exists; once it's on, every item it takes off is listed
+      // with an × — an ingredient rule that quietly empties the menu would be
+      // worse than no rule at all.
+      f.status === "86" && (isIng || hits.length > 0) ? React.createElement("div", { className: "mt-2 pt-2", style: { borderTop: "1px solid " + COLORS.line } },
+        !isIng
+          ? React.createElement("div", { className: "flex items-center gap-2 flex-wrap" },
+              React.createElement("span", { className: "text-xs flex-1", style: { fontFamily: "Inter", color: "#8A5A00", minWidth: 170 } },
+                "“" + f.item + "” is in " + hits.length + (hits.length === 1 ? " menu item" : " menu items") + ". Take " + (hits.length === 1 ? "it" : "them") + " off too?"),
+              React.createElement("button", { onClick: () => { setKind(f.id, "ingredient"); setOpenId(f.id); }, className: "text-xs px-2.5 py-1.5 rounded-full",
+                style: { fontFamily: "Inter", fontWeight: 700, background: COLORS.alert, color: "#FFFFFF", border: "none" } }, "Take them off"),
+              React.createElement("button", { onClick: () => setOpenId(shown ? "" : f.id), className: "text-xs px-2.5 py-1.5 rounded-full",
+                style: { fontFamily: "Inter", fontWeight: 600, background: "transparent", color: COLORS.crust, border: "1px solid " + COLORS.line } }, shown ? "Hide" : "Which?"))
+          : React.createElement("div", null,
+              React.createElement("button", { onClick: () => setOpenId(shown ? "" : f.id), className: "text-xs", style: { background: "transparent", border: "none", padding: 0, fontFamily: "Inter", fontWeight: 600, color: COLORS.alertDark } },
+                hits.length === 0 ? "Nothing else comes off" : "Also off: " + hits.length + (hits.length === 1 ? " item" : " items") + (shown ? "  ▴" : "  ▾")),
+              React.createElement("button", { onClick: () => setKind(f.id, null), className: "text-xs ml-3", style: { background: "transparent", border: "none", padding: 0, fontFamily: "Inter", color: "#8A9096", textDecoration: "underline", textUnderlineOffset: 3 } },
+                "just this item")),
+        shown ? React.createElement("div", { className: "mt-1.5 flex flex-wrap gap-1" },
+          hits.map((it) => React.createElement("span", { key: it.name, className: "text-xs px-2 py-1 rounded-full inline-flex items-center gap-1",
+            style: { fontFamily: "Inter", background: "#FDECEA", color: COLORS.alertDark, border: "1px solid rgba(200,56,47,0.25)" } },
+            it.name,
+            isIng ? React.createElement("button", { onClick: () => toggleExcept(f.item, it.name), title: "Keep this one on",
+              style: { background: "transparent", border: "none", padding: "0 0 0 2px", color: COLORS.alertDark, fontFamily: "Inter", fontWeight: 700, lineHeight: 1 } }, "×") : null)),
+          excepted.map((name) => React.createElement("span", { key: "x" + name, className: "text-xs px-2 py-1 rounded-full inline-flex items-center gap-1",
+            style: { fontFamily: "Inter", background: "#F2F2EF", color: "#5F676E", border: "1px solid " + COLORS.line } },
+            name + " — kept on",
+            React.createElement("button", { onClick: () => toggleExcept(f.item, name),
+              style: { background: "transparent", border: "none", padding: "0 0 0 2px", color: "#5F676E", fontFamily: "Inter", fontWeight: 700, lineHeight: 1 } }, "+")))) : null) : null);
+      })
     ),
     /* @__PURE__ */ React.createElement(
       "div",
