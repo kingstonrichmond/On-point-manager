@@ -11029,6 +11029,123 @@ function PriceInput({ value, onChange }) {
 function SimpleList({ title, rows, onChange }) {
   return /* @__PURE__ */ React.createElement("div", { className: "mb-4" }, /* @__PURE__ */ React.createElement(SectionHeader, null, title), /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, rows.map((r) => /* @__PURE__ */ React.createElement("div", { key: r.id, className: "flex items-center justify-between px-3 py-1.5 rounded", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("span", { className: "text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, r.name), /* @__PURE__ */ React.createElement(PriceInput, { value: r.price, onChange: (v) => onChange(r.id, v) })))));
 }
+// ---- Menu wording ----------------------------------------------------------
+// An 86'd ingredient crosses off everything made with it by matching the word
+// on the menu. That only works if the menu says the word the same way twice:
+// "roma tomato" on the Gorgonzola Special and "roma tomatoes" on the Meatball
+// Parm are the same tomato, and 86ing either one leaves the other on.
+//
+// The matcher can't fix this on its own, and shouldn't try: on this very menu
+// "olive" is olive OIL on eight items while "olives" is actual olives on six.
+// Pluralising by rule would cross off half the pizzas for a can of kalamatas.
+// A person can tell those apart in a glance — so show them the two spellings
+// with the words around them, and let them decide.
+//
+// Only ingredient text gets rewritten, never an item's name: "Dr Pepper" in the
+// soda list and "Onion Rings" on the appetizers are not toppings, and a blind
+// rename would turn them into Dr Peppers and Onions Rings.
+const MENU_TEXT_FIELDS = ["ingredients", "items", "note"];
+function menuTextEach(menu, fn) {
+    const walk = (node) => {
+        if (!node || typeof node !== "object") return;
+        if (Array.isArray(node)) { node.forEach(walk); return; }
+        Object.keys(node).forEach((k) => {
+            const v = node[k];
+            if (typeof v === "string") { if (MENU_TEXT_FIELDS.indexOf(k) !== -1) node[k] = fn(v); }
+            else walk(v);
+        });
+    };
+    walk(menu);
+}
+// The word with the word on either side of it — "black olive", "olive oil" —
+// which is the whole story at a glance. Both sides matter: the modifier usually
+// comes first ("roma tomato", "green peppers") but "olive oil" carries its
+// meaning in the word after, and that one is the difference between a can of
+// kalamatas and half the pizzas on the board.
+function wordPhrases(menu, word) {
+    const counts = {};
+    const bump = (t) => { counts[t] = (counts[t] || 0) + 1; };
+    menuTextEach(JSON.parse(JSON.stringify(menu)), (txt) => {
+        const norm = norm86(txt).split(" ");
+        norm.forEach((w, k) => {
+            if (w !== word) return;
+            if (k + 1 < norm.length) bump(w + " " + norm[k + 1]);
+            else if (k > 0) bump(norm[k - 1] + " " + w);
+            if (k > 0 && k + 1 < norm.length) bump(norm[k - 1] + " " + w);
+        });
+        return txt;
+    });
+    return Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 4).map((t) => ({ text: t, n: counts[t] }));
+}
+// Two spellings of one word, both in use on the menu.
+function menuWordFamilies(data) {
+    const flat = menuFlat86(data);
+    const where = {};
+    flat.forEach((it) => {
+        hay86(it).trim().split(/\s+/).forEach((w) => {
+            if (w.length < 4) return;
+            (where[w] = where[w] || []).push(it.name);
+        });
+    });
+    const seen = {}, out = [];
+    Object.keys(where).sort().forEach((w) => {
+        if (seen[w]) return;
+        const forms = [w, w + "s", w + "es", w.replace(/es$/, ""), w.replace(/s$/, "")]
+            .filter((x, i, a) => x && x.length >= 4 && a.indexOf(x) === i && where[x]);
+        if (forms.length < 2) return;
+        forms.forEach((f) => { seen[f] = 1; });
+        out.push(forms.map((f) => ({
+            word: f,
+            items: where[f].filter((n, i, a) => a.indexOf(n) === i),
+            phrases: wordPhrases((data && data.menu) || {}, f)
+        })).sort((a, b) => b.items.length - a.items.length));
+    });
+    return out;
+}
+// Replace one whole word with another through the ingredient text, keeping the
+// capitalisation that was there: "Roma tomato" → "Roma tomatoes", not "roma".
+function renameMenuWord(data, from, to) {
+    const next = JSON.parse(JSON.stringify(data));
+    const re = new RegExp("\\b" + from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "gi");
+    let n = 0;
+    menuTextEach(next.menu || {}, (txt) => txt.replace(re, (hit) => {
+        n++;
+        return /^[A-Z]/.test(hit) ? to.charAt(0).toUpperCase() + to.slice(1) : to;
+    }));
+    return { data: next, n: n };
+}
+function MenuWordingCard({ data, persist }) {
+    const [open, setOpen] = useState(false);
+    const [done, setDone] = useState("");
+    const fams = menuWordFamilies(data);
+    if (!fams.length) return null;
+    const apply = (from, to) => {
+        const r = renameMenuWord(data, from, to);
+        if (!r.n) return;
+        persist(r.data);
+        setDone(from + " \u2192 " + to + " (" + r.n + (r.n === 1 ? " place)" : " places)"));
+        setTimeout(() => setDone(""), 4000);
+    };
+    return React.createElement("div", { className: "px-3 py-2.5 rounded mb-4", style: { background: "#FBF7EE", border: "1px solid #E8DFC9" } },
+        React.createElement("button", { onClick: () => setOpen(!open), className: "w-full flex items-center justify-between text-left", style: { background: "transparent", border: "none", padding: 0 } },
+            React.createElement("div", null,
+                React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 700, color: COLORS.crust } },
+                    fams.length + (fams.length === 1 ? " word is" : " words are") + " spelled two ways on the menu"),
+                React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#8A5A00" } },
+                    "86ing one spelling leaves the other on. Tidy them and one tap covers everything.")),
+            React.createElement("span", { style: { color: COLORS.steel, fontFamily: "Inter" } }, open ? "\u25b4" : "\u25be")),
+        done ? React.createElement("div", { className: "text-xs mt-2", style: { fontFamily: "Inter", fontWeight: 600, color: "#1F6B34" } }, "Changed " + done) : null,
+        open ? React.createElement("div", { className: "mt-2 space-y-2" }, fams.map((fam) => React.createElement("div", { key: fam.map((f) => f.word).join("-"), className: "px-2.5 py-2 rounded", style: { background: COLORS.card, border: "1px solid " + COLORS.line } },
+            fam.map((f) => React.createElement("div", { key: f.word, className: "text-xs", style: { fontFamily: "Inter", color: "#5F676E", marginBottom: 2 } },
+                React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontWeight: 700, color: COLORS.crust } }, f.word),
+                "  \u00b7  " + f.items.length + (f.items.length === 1 ? " item" : " items") + "  \u00b7  " + f.phrases.map((p) => p.text + (p.n > 1 ? " \u00d7" + p.n : "")).join(", "))),
+            React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap mt-1.5" },
+                fam.map((f) => React.createElement("button", { key: f.word, onClick: () => apply(fam.filter((x) => x !== f)[0].word, f.word), className: "text-xs px-2.5 py-1.5 rounded-full",
+                    style: { fontFamily: "Inter", fontWeight: 700, background: COLORS.crust, color: COLORS.cream, border: "none" } },
+                    "Make them all \u201c" + f.word + "\u201d")),
+                React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A9096" } }, "or leave them if they're different things")))))
+            : null);
+}
 function MenuTab({ data, persist }) {
   const menu = data.menu;
   if (!menu) return null;
@@ -11041,7 +11158,7 @@ function MenuTab({ data, persist }) {
     const row = m[key].find((r) => r.id === id);
     row.price = price;
   });
-  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 rounded mb-4", style: { background: COLORS.crust } }, /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.parm } }, menu.info.phone, " \xB7 ", menu.info.address), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: COLORS.cream } }, menu.info.hours), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: COLORS.parm } }, menu.info.note)), /* @__PURE__ */ React.createElement(SectionHeader, null, "Pizza \u2014 sizes & toppings"), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: "#8A9096" } }, menu.glutenFree), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-x-auto mb-2", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[minmax(96px,1fr)_repeat(4,64px)] px-3 py-1.5 text-xs tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#8A9096", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "SIZE"), menu.pizzaSizes.map((s) => /* @__PURE__ */ React.createElement("span", { key: s, className: "text-right leading-tight" }, String(s).replace(/detroit/i, "Det").replace(/gluten\s*free/i, "GF")))), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[minmax(96px,1fr)_repeat(4,64px)] items-center px-3 py-2 text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, /* @__PURE__ */ React.createElement("span", null, "Base price"), menu.pizzaBasePrices.map((p, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "justify-self-end" }, /* @__PURE__ */ React.createElement(PriceInput, { value: p, onChange: (v) => set((m) => {
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "px-3 py-2.5 rounded mb-4", style: { background: COLORS.crust } }, /* @__PURE__ */ React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.parm } }, menu.info.phone, " \xB7 ", menu.info.address), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: COLORS.cream } }, menu.info.hours), /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: COLORS.parm } }, menu.info.note)), /* @__PURE__ */ React.createElement(MenuWordingCard, { data, persist }), /* @__PURE__ */ React.createElement(SectionHeader, null, "Pizza \u2014 sizes & toppings"), /* @__PURE__ */ React.createElement("div", { className: "text-xs mb-2", style: { fontFamily: "Inter", color: "#8A9096" } }, menu.glutenFree), /* @__PURE__ */ React.createElement("div", { className: "rounded overflow-x-auto mb-2", style: { border: `1px solid ${COLORS.line}`, background: COLORS.card } }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[minmax(96px,1fr)_repeat(4,64px)] px-3 py-1.5 text-xs tracking-widest", style: { fontFamily: "Inter", fontWeight: 600, color: "#8A9096", background: COLORS.cream } }, /* @__PURE__ */ React.createElement("span", null, "SIZE"), menu.pizzaSizes.map((s) => /* @__PURE__ */ React.createElement("span", { key: s, className: "text-right leading-tight" }, String(s).replace(/detroit/i, "Det").replace(/gluten\s*free/i, "GF")))), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-[minmax(96px,1fr)_repeat(4,64px)] items-center px-3 py-2 text-sm", style: { fontFamily: "Inter", color: COLORS.crust } }, /* @__PURE__ */ React.createElement("span", null, "Base price"), menu.pizzaBasePrices.map((p, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "justify-self-end" }, /* @__PURE__ */ React.createElement(PriceInput, { value: p, onChange: (v) => set((m) => {
     m.pizzaBasePrices[i] = v;
   }) }))))), menu.toppingTiers.map((t) => /* @__PURE__ */ React.createElement("div", { key: t.id, className: "rounded px-3 py-2 mb-2", style: { background: COLORS.card, border: `1px solid ${COLORS.line}` } }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between mb-1" }, /* @__PURE__ */ React.createElement("span", { className: "text-sm font-medium", style: { fontFamily: "Inter", color: COLORS.crust } }, t.tier), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1" }, t.prices.map((p, i) => /* @__PURE__ */ React.createElement(PriceInput, { key: i, value: p, onChange: (v) => set((m) => {
     m.toppingTiers.find((x) => x.id === t.id).prices[i] = v;
