@@ -1122,6 +1122,10 @@ function migrateShopProfile(d) {
   if (!d.wontBuySeeded) {
     (d.inventory || []).forEach((i) => {
       if (i.item === "Souffle Lids" && !i.wontBuy) i.wontBuy = { thomsen: true, thomsenWhy: "not Solo" };
+      if (/^Gloves - /.test(i.item || "") && i.notSame === undefined) {
+        i.notSame = true;
+        i.notSameWhy = "Quality's are nitrile, Thomsen's are vinyl \u2014 split them into two items to compare";
+      }
     });
     d.wontBuySeeded = true;
     changed = true;
@@ -8336,6 +8340,14 @@ function InvoiceScanner({ data, persist, onClose }) {
         it.pack = Object.assign({}, it.pack || {});
         it.pack[vk] = per;
       }
+      if (r.pk && r.pk.ct > 0 && !(it.packCount && Number(it.packCount[vk]) > 0)) {
+        it.packCount = Object.assign({}, it.packCount || {});
+        it.packCount[vk] = r.pk.ct;
+      }
+      if (r.pk && r.pk.lb > 0 && !(it.packWeight && Number(it.packWeight[vk]) > 0)) {
+        it.packWeight = Object.assign({}, it.packWeight || {});
+        it.packWeight[vk] = r.pk.lb;
+      }
       n++;
     });
     persist(next);
@@ -9049,6 +9061,18 @@ function compSize(i, vk) {
         const s = scaleSize(packN, normUnit(i.unit));
         if (s) return { n: s.n, u: s.u, how: "typed" };
     }
+    // What the guide says the case weighs, whatever we happen to count this item
+    // in. Weight beats everything below it: "4/2.5#" against "1/10#" is four tubs
+    // against one, and comparing per TUB says they're miles apart when they are
+    // the same ten pounds. A pound is a pound and a tub is not a tub.
+    const lbs = i.packWeight && Number(i.packWeight[vk]);
+    if (lbs > 0) return { n: lbs, u: "lb", how: "pack" };
+    // Failing that, pieces per case. Paper, gloves and chemicals are half the
+    // money on the board and were being compared case to case on faith, because
+    // a case is not a measure. A count IS one — 1,000 gloves against 1,000 gloves
+    // is as real as 48 lb against 48 lb, as long as both sides state it.
+    const ct = i.packCount && Number(i.packCount[vk]);
+    if (ct > 0 && !HARD_UNITS[normUnit(i.unit)]) return { n: ct, u: "ct", how: "count" };
     if (vk === "qfc" && i.qfcPack) {
         const s = parseSizeText(i.qfcPack);
         if (s) return { n: s.n, u: s.u, how: "catalog" };
@@ -9067,7 +9091,7 @@ function sizeInText(i, vk) {
     const m = txt.match(/(\d+(?:\.\d+)?)\s?(#|lbs?|oz|gal|ct|pack)\b/i);
     return m ? m[1] + " " + m[2].toLowerCase() : "";
 }
-const UNIT_WORD = { lb: "lb", gal: "gal", l: "L", ea: "each", oz: "oz", qt: "qt" };
+const UNIT_WORD = { ct: "piece", lb: "lb", gal: "gal", l: "L", ea: "each", oz: "oz", qt: "qt" };
 function priceAge(p) {
     if (!p || !p.date)
         return "";
@@ -9095,8 +9119,14 @@ function sizeGapWhy(i, q, t) {
 // be taken is not a saving, so a flagged item leaves every total in both
 // directions. The price still shows; it just stops being counted.
 function wontBuyFrom(i, vk) { return !!(i && i.wontBuy && i.wontBuy[vk]); }
-function wontBuyBlocked(i) { return VENDORS.some((v) => v.kind === "food" && wontBuyFrom(i, v.key)); }
+// A count can agree and the comparison still be nonsense. Quality's medium glove
+// is black nitrile and Thomsen's is vinyl: both cases hold 1,000, so counting
+// makes the false comparison look MORE solid, not less. One line, two products —
+// until they're split apart, this item is out of every total.
+function notSameProduct(i) { return !!(i && i.notSame); }
+function wontBuyBlocked(i) { return notSameProduct(i) || VENDORS.some((v) => v.kind === "food" && wontBuyFrom(i, v.key)); }
 function wontBuyWhy(i) {
+    if (notSameProduct(i)) return "Not the same product on both sides" + (i.notSameWhy ? " \u2014 " + i.notSameWhy : "");
     const v = VENDORS.filter((x) => x.kind === "food").find((x) => wontBuyFrom(i, x.key));
     if (!v) return "";
     const note = (i.wontBuy && i.wontBuy[v.key + "Why"]) || "";
@@ -9258,6 +9288,39 @@ function SizeInput({ i, vk, patch }) {
                 ? "Their product name says “" + note + "” — check whether that's one of them or the whole " + label + "."
                 : "A weight if it has one: 50 lb, 8/6#, 4/1 gal, 24 ct."));
 }
+// How many come in a case. The guides state it for most things and the import
+// takes it; this is for the rest, and for the day a guide is wrong. It only
+// appears where it would change the answer: a weight already on file beats a
+// count, and an item counted in pounds never needed one.
+function CountInput({ i, vk, patch }) {
+    const [val, setVal] = useState("");
+    const [editing, setEditing] = useState(false);
+    const known = i.packCount && Number(i.packCount[vk]) > 0 ? Number(i.packCount[vk]) : null;
+    const weighed = i.packWeight && Number(i.packWeight[vk]) > 0;
+    if (HARD_UNITS[normUnit(i.unit)] || weighed) return null;
+    const save = () => {
+        const n = Number(String(val).replace(/[^0-9.]/g, ""));
+        if (!(n > 0)) return;
+        const pc = Object.assign({}, i.packCount || {});
+        pc[vk] = n;
+        patch(i.id, { packCount: pc });
+        setVal("");
+        setEditing(false);
+    };
+    if (known && !editing) {
+        return React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "JetBrains Mono", color: COLORS.basil } },
+            known + " per case",
+            React.createElement("button", { onClick: () => { setVal(String(known)); setEditing(true); }, className: "ml-2 underline",
+                style: { fontFamily: "Inter", color: COLORS.muted, background: "transparent", border: "none", padding: 0 } }, "edit"));
+    }
+    return React.createElement("div", { className: "flex items-center gap-1 mt-1" },
+        React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A5A00" } }, "pieces per case?"),
+        React.createElement("input", { inputMode: "numeric", placeholder: "?", value: val, onChange: (e) => setVal(e.target.value.replace(/[^0-9.]/g, "")),
+            onKeyDown: (e) => { if (e.key === "Enter") save(); },
+            className: "px-2 outline-none rounded", style: { border: "1px solid #F0DDA6", background: "#FFF6E0", fontFamily: "JetBrains Mono", fontSize: 12, minHeight: 28, width: 64 } }),
+        val ? React.createElement("button", { onClick: save, className: "text-xs px-2 py-1 rounded-full",
+            style: { fontFamily: "Inter", fontWeight: 700, background: COLORS.crust, color: COLORS.cream, border: "none" } }, "Save") : null);
+}
 // "Cheaper" is not the only question. Thomsen's souffle lids aren't Solo, so
 // that line was quietly inflating the totals with a saving nobody was ever going
 // to take. One tap parks a vendor on an item, with room to say why.
@@ -9309,7 +9372,8 @@ function PriceDetail({ i, vendorOf, patch }) {
                 p ? React.createElement("span", { className: "text-sm", style: { fontWeight: 400, color: "#5F676E" } }, " /" + (p.unit || "ea")) : null),
             p && priceAge(p) ? React.createElement("div", { className: "text-xs", style: { fontFamily: "Inter", color: COLORS.muted } }, priceAge(p)) : null,
             p ? React.createElement(PackInput, { i: i, vk: vk, patch: patch }) : null,
-            p ? React.createElement(SizeInput, { i: i, vk: vk, patch: patch }) : null));
+            p ? React.createElement(SizeInput, { i: i, vk: vk, patch: patch }) : null,
+            p ? React.createElement(CountInput, { i: i, vk: vk, patch: patch }) : null));
     };
     const base = c.basis || i.unit || "ea";
     let verdict;
@@ -9439,6 +9503,17 @@ function lineCompUnits(i, vk, c) {
 // on but can't stand behind — a box against a case, or a line quantity it had to
 // assume. Those used to land in the headline, which is how a $36 difference in
 // napkin cases became a saving nobody could find later.
+// A piece count settles it when we count this item in something that isn't
+// itself a measure, and at least one side hasn't said how many are in the case.
+function countWouldFix(i) {
+    if (HARD_UNITS[normUnit(i.unit)]) return false;
+    return VENDORS.filter((v) => v.kind === "food").some((v) => {
+        if (!vendorPriceOf(i, v.key)) return false;
+        const w = i.packWeight && Number(i.packWeight[v.key]);
+        const c = i.packCount && Number(i.packCount[v.key]);
+        return !(w > 0) && !(c > 0);
+    });
+}
 function orderSavings(inv, vid) {
     const vk = vendorKey(vid);
     const me = VENDOR_BY_ID[vid];
@@ -9446,7 +9521,7 @@ function orderSavings(inv, vid) {
     // score soda lines against a comparison Pepsi isn't part of.
     const other = me && me.kind === "food" ? VENDORS.find((v) => v.kind === "food" && v.id !== vid) : null;
     const r = { vid, other: other ? other.id : null, saved: 0, savedN: 0, movable: 0, movableN: 0, movableIds: [],
-        checkN: 0, checkIds: [], checkMove: 0, checkMoveN: 0, unknownN: 0, wontBuyN: 0, linesN: 0 };
+        checkN: 0, checkIds: [], countN: 0, countIds: [], checkMove: 0, checkMoveN: 0, unknownN: 0, wontBuyN: 0, linesN: 0 };
     if (!other) return r;
     inv.forEach((i) => {
         const need = Number(orderNeedOf(i, vid));
@@ -9462,6 +9537,10 @@ function orderSavings(inv, vid) {
         if (!c.trusted || lb.guessed) {
             r.checkN++;
             r.checkIds.push(i.id);
+            // Separate the ones a number would fix from the ones that need a
+            // judgement. "Put in a piece count" is ten seconds off the invoice;
+            // "these two cases might not hold the same thing" is not.
+            if (countWouldFix(i)) { r.countN++; r.countIds.push(i.id); }
             if (!mine && carriedBy(i, other.id)) { r.checkMove += dollars; r.checkMoveN++; }
             return;
         }
@@ -9551,9 +9630,34 @@ function parsePackSize(text) {
     const at = t.indexOf("PACK SIZE");
     let src = at !== -1 ? t.slice(at + 9).replace(/^[\s:]+/, "") : t;
     src = src.split("|")[0];
-    // "24/12 OZ X 1" means 24 twelve-ounce cans, not one — a slash pack is a
-    // second multiplier we can't safely fold in, so don't try.
-    if (/\d\s*\/\s*\d/.test(src)) return null;
+    // A slash pack with an X after it ("24/12 OZ X 1") carries two multipliers
+    // and we can't tell which is which, so don't try. A slash pack on its own is
+    // Quality's whole catalog and it's unambiguous: count / size each. "8/6#" is
+    // eight six-pound loaves, "10/100CT" ten sleeves of a hundred, "24/20OZ"
+    // twenty-four bottles. That reads out BOTH the weight and the piece count,
+    // which is the difference between comparing paper goods and guessing at them.
+    const hasX = /\bX\b/.test(src);
+    if (/\d\s*\/\s*#?\d/.test(src)) {
+        // "4/1/2GAL" is four half-gallons and the shape can't say so — two slashes
+        // is one multiplier too many, same reason as the X case.
+        if (hasX || (src.match(/\//g) || []).length > 1) return null;
+        const m = src.match(/(\d+)\s*\/\s*(?:#(\d+)|(\d+(?:\.\d+)?)\s*(LBS|LB|#|OZ|KG|G|CT|CTS|COUNT|GAL|GALLON))\s*$/);
+        if (!m) return null;
+        const cases = Number(m[1]);
+        if (!(cases > 0)) return null;
+        if (m[2]) return { text: m[0].trim(), each: 1, unit: "CT", count: cases, lb: null, ct: cases, gal: null }; // "6/#10" — six cans
+        const each = Number(m[3]);
+        const u = m[4] === "LBS" ? "LB" : m[4] === "GALLON" ? "GAL" : m[4] === "CTS" || m[4] === "COUNT" ? "CT" : m[4];
+        const lbEach = LB_PER[u];
+        return {
+            text: m[0].trim(), each: each, unit: u, count: cases,
+            lb: lbEach ? Math.round(each * cases * lbEach * 1e4) / 1e4 : null,
+            // A count pack multiplies out (ten sleeves of a hundred is a thousand);
+            // anything else, the count is how many containers came.
+            ct: u === "CT" ? each * cases : cases,
+            gal: u === "GAL" ? each * cases : null
+        };
+    }
     const U = "(LBS|LB|#|OZ|KG|G|CT|CTS|COUNT|GAL|GALLON)";
     let m, each, unit, count;
     if ((m = src.match(new RegExp("(\\d+(?:\\.\\d+)?)\\s*" + U + "\\s*(?:AVG\\s*)?X\\s*(\\d+)\\b")))) { each = Number(m[1]); unit = m[2]; count = Number(m[3]); }
@@ -9974,6 +10078,21 @@ function PriceQuotePanel({ data, persist }) {
             if (per > 0 && normUnit(r.line.unit) !== normUnit(it.unit) && !(it.pack && Number(it.pack[vk]) > 0)) {
                 it.pack = Object.assign({}, it.pack || {});
                 it.pack[vk] = per;
+            }
+            // The count and the raw pack text, every time. The text costs nothing
+            // and means the next time the parser learns something, nobody has to
+            // paste the list again to get the benefit.
+            if (r.line.pk && r.line.pk.ct > 0 && !(it.packCount && Number(it.packCount[vk]) > 0)) {
+                it.packCount = Object.assign({}, it.packCount || {});
+                it.packCount[vk] = r.line.pk.ct;
+            }
+            if (r.line.pk && r.line.pk.lb > 0 && !(it.packWeight && Number(it.packWeight[vk]) > 0)) {
+                it.packWeight = Object.assign({}, it.packWeight || {});
+                it.packWeight[vk] = r.line.pk.lb;
+            }
+            if (r.line.pack) {
+                it.packText = Object.assign({}, it.packText || {});
+                it.packText[vk] = r.line.pack;
             }
             // Their item number, so the next list off the same vendor matches on
             // the number instead of guessing from the name.
@@ -10616,8 +10735,14 @@ function FoodOrderSavings({ inv, onMoveAll, data }) {
     const checkN = sides.reduce((n, x) => n + (x.s.checkN || 0), 0);
     const checkMove = sides.reduce((n, x) => n + (x.s.checkMove || 0), 0);
     const unknownN = sides.reduce((n, x) => n + (x.s.unknownN || 0), 0);
-    const checkNames = sides.flatMap((x) => x.s.checkIds || []).map((id) => { const it = inv.find((r) => r.id === id); return it ? it.item : ""; }).filter(Boolean);
-    const checkList = checkNames.slice(0, 3).join(", ") + (checkNames.length > 3 ? " and " + (checkNames.length - 3) + " more" : "");
+    const nameList = (ids) => {
+        const names = ids.map((id) => { const it = inv.find((r) => r.id === id); return it ? it.item : ""; }).filter(Boolean);
+        return names.slice(0, 3).join(", ") + (names.length > 3 ? " and " + (names.length - 3) + " more" : "");
+    };
+    const countIds = sides.flatMap((x) => x.s.countIds || []);
+    const countN = sides.reduce((n, x) => n + (x.s.countN || 0), 0);
+    const countList = nameList(countIds);
+    const checkList = nameList(sides.flatMap((x) => x.s.checkIds || []).filter((id) => countIds.indexOf(id) === -1));
     const money = (n) => "$" + n.toFixed(2);
     const headline = savingsHeadline(data, sides);
     const wontBuyN = sides.reduce((n, x) => n + (x.s.wontBuyN || 0), 0);
@@ -10635,8 +10760,12 @@ function FoodOrderSavings({ inv, onMoveAll, data }) {
                 style: { fontFamily: "Inter", fontWeight: 700, background: "#1F6B34", color: "#FFFFFF", border: "none" } }, "Move all " + movableN)) : null,
         !savedN && !movableN && !checkN ? React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: "#1F6B34" } },
             unknownN === linesN ? "Nothing on this order can be compared yet." : "Every priced item is already on the cheaper side.") : null,
-        checkN > 0 ? React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", color: tone.fg, marginTop: (savedN || movableN) ? 6 : 0, paddingTop: (savedN || movableN) ? 6 : 0, borderTop: (savedN || movableN) ? "1px solid " + tone.line : "none" } },
-            React.createElement("span", { style: { fontWeight: 700 } }, "Worth a check · " + checkN + (checkN === 1 ? " item " : " items ")),
+        countN > 0 ? React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", color: tone.fg, marginTop: (savedN || movableN) ? 6 : 0, paddingTop: (savedN || movableN) ? 6 : 0, borderTop: (savedN || movableN) ? "1px solid " + tone.line : "none" } },
+            React.createElement("span", { style: { fontWeight: 700 } }, countN + (countN === 1 ? " item not counted" : " items not counted")),
+            " \u2014 they need a piece count before they can go in the total.",
+            React.createElement("div", { className: "text-xs mt-0.5", style: { color: "#8A9096" } }, "Open " + countList + " and put in how many come in a case.")) : null,
+        checkN > countN ? React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", color: tone.fg, marginTop: (savedN || movableN) ? 6 : 0, paddingTop: (savedN || movableN) ? 6 : 0, borderTop: (savedN || movableN) ? "1px solid " + tone.line : "none" } },
+            React.createElement("span", { style: { fontWeight: 700 } }, "Worth a check · " + (checkN - countN) + ((checkN - countN) === 1 ? " item " : " items ")),
             checkMove > 0 ? "look about " + money(checkMove) + " cheaper elsewhere, but we're comparing a box to a case." : "can't be compared size for size yet.",
             React.createElement("div", { className: "text-xs mt-0.5", style: { color: "#8A9096" } }, "Open " + checkList + " and either put the weight in or mark both sizes the same.")) : null,
         unknownN ? React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: "#8A9096" } }, unknownN + " not compared — one price only, or a pack size to fill in") : null,
