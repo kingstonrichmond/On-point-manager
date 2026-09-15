@@ -2,8 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>allday — shop manager</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#17191B">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="allday">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -86,6 +93,19 @@
     if (statusEl) statusEl.style.display = "none";
     box.style.display = "block";
     box.textContent = "Something failed to load (promise error). Screenshot this:\n\n" + (e.reason && e.reason.message ? e.reason.message : String(e.reason));
+  });
+
+  // Android offers "install" through this event, usually before React has
+  // mounted, so it's parked here and Settings picks it up.
+  window.__alldayInstall = null;
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    window.__alldayInstall = e;
+    window.dispatchEvent(new Event("opp:installable"));
+  });
+  window.addEventListener("appinstalled", function () {
+    window.__alldayInstall = null;
+    window.dispatchEvent(new Event("opp:installable"));
   });
 
   window.CHAT_ENDPOINT = "/.netlify/functions/chat";
@@ -770,6 +790,11 @@ const DEFAULT_DATA = {
   }
 };
 const FONTS = ""; // fonts load from the <link> in <head>
+// Shown in the header and matched by VERSION in sw.js. Bump both on a release:
+// the byte change is what makes browsers install the new worker and offer
+// "Updated - tap to reload". Forgetting costs only the toast; index.html is
+// fetched network-first, so an online open always gets the current build.
+const APP_VERSION = "v3";
 const COLORS = {
   crust: "#17191B",
   ink: "#17191B",
@@ -803,6 +828,40 @@ function TallyMark({ size = 28, ink = "#17191B", lamp = "#F2A900", style = {} })
       /* @__PURE__ */ React.createElement("line", { x1: 27, y1: 7, x2: 27, y2: 23 })),
     /* @__PURE__ */ React.createElement("line", { x1: 3, y1: 24, x2: 30, y2: 6, stroke: lamp, strokeWidth: 3, strokeLinecap: "round" }));
 }
+// ---- home screen -----------------------------------------------------------
+// Whether this device can put allday on its home screen, and how. Android hands
+// the page a beforeinstallprompt event (parked on window by the boot script,
+// since it can fire before React mounts); iOS never does, but Safari is the only
+// browser that defines navigator.standalone, false until it's installed. Once
+// running installed, display-mode is standalone and there's nothing to offer.
+function installStatus() {
+  try {
+    const nav = window.navigator || {};
+    const standalone = nav.standalone === true || !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+    if (standalone) return "installed";
+    if (window.__alldayInstall) return "prompt";
+    const ua = String(nav.userAgent || "");
+    if (nav.standalone === false && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua)) return "ios";
+  } catch (e) {}
+  return "none";
+}
+function installRows(status, onInstall, Row) {
+  if (status === "prompt") return Row(
+    "Put allday on this screen",
+    "Adds the icon to the home screen and opens full-screen, no address bar. Same app, same sign-in.",
+    /* @__PURE__ */ React.createElement("button", {
+      onClick: onInstall, className: "text-sm px-4 py-2.5 rounded-full",
+      style: { background: COLORS.crust, color: COLORS.cream, fontFamily: "Inter", fontWeight: 600, border: "none", minHeight: 44 }
+    }, "Install allday")
+  );
+  if (status === "ios") return Row(
+    "Put allday on this screen",
+    "In Safari, tap Share, then \u201CAdd to Home Screen\u201D. It opens full-screen with the allday icon, no address bar.",
+    null
+  );
+  return null;
+}
+
 // Row density is a per-tablet choice, not a shop-wide one: the kitchen screen
 // wants big rows you can read from the line, the office phone wants to see the
 // whole list. Stored device-local and broadcast so open tabs re-render at once.
@@ -1909,6 +1968,19 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
       localStorage.setItem("opp:device", v);
     } catch (e) {}
   };
+  const [install, setInstall] = useState(installStatus);
+  useEffect(() => {
+    const refresh = () => setInstall(installStatus());
+    window.addEventListener("opp:installable", refresh);
+    return () => window.removeEventListener("opp:installable", refresh);
+  }, []);
+  const doInstall = async () => {
+    const ev = window.__alldayInstall;
+    if (!ev) return;
+    window.__alldayInstall = null; // a prompt event is single-use
+    try { ev.prompt(); await ev.userChoice; } catch (e) {}
+    setInstall(installStatus());
+  };
   const [density, setDensityState] = useState(getDensity);
   const [autoStaff, setAutoStaffState] = useState(getAutoStaff);
   const chooseAutoStaff = (v) => { setAutoStaffState(v); setAutoStaff(v); };
@@ -2258,6 +2330,7 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
       "Each person also needs their ADP employee ID set in Crew \u2192 Staff before they'll show up in the export."),
 
     /* @__PURE__ */ React.createElement(SectionHeader, null, "This screen"),
+    installRows(install, doInstall, Row),
     Row(
       "Assistant voice",
       "Which voice Ask the Manager speaks with. The list comes from this device, so a tablet and a phone won't offer the same options \u2014 anything marked Natural or Neural sounds the least robotic.",
@@ -2750,7 +2823,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   const onSub = (s) => setSubFor(tab, s);
   // Short labels for the phone bar; the strip keeps the full names.
   const SHORT = { today: "Today", crew: "Crew", invorders: "Stock", preptasks: "Prep", reference: "Ref", phone: "Phone", liveops: "Live", settings: "Set" };
-  return /* @__PURE__ */ React.createElement("div", { className: "w-full min-h-screen flex flex-col", style: { background: COLORS.crust } }, /* @__PURE__ */ React.createElement("style", null, FONTS), /* @__PURE__ */ React.createElement("div", { className: "px-5 pt-6 pb-4 flex items-center gap-3", style: { borderBottom: "1px solid rgba(255,255,255,0.09)" } }, /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { className: "w-full min-h-screen flex flex-col", style: { background: COLORS.crust } }, /* @__PURE__ */ React.createElement("style", null, FONTS), /* @__PURE__ */ React.createElement("div", { className: "px-5 pt-6 pb-4 flex items-center gap-3", style: { borderBottom: "1px solid rgba(255,255,255,0.09)", paddingTop: "calc(24px + env(safe-area-inset-top, 0px))" } }, /* @__PURE__ */ React.createElement(
     "div",
     {
       className: "flex items-center justify-center flex-shrink-0",
@@ -2764,7 +2837,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
       style: { fontFamily: "Archivo Narrow", color: COLORS.cream, fontWeight: 600, letterSpacing: "0.01em" }
     },
     String((data.shopProfile && data.shopProfile.name) || "Your shop").toUpperCase()
-  ), /* @__PURE__ */ React.createElement("p", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: INK3, fontWeight: 500 } }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.lamp, fontWeight: 700 } }, "allday"), " \u00b7 v3"))), /* @__PURE__ */ React.createElement("div", { className: "opp-tabstrip gap-1 px-3 pt-3 overflow-x-auto", style: { background: COLORS.crust } }, tabs.map((t) => {
+  ), /* @__PURE__ */ React.createElement("p", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: INK3, fontWeight: 500 } }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.lamp, fontWeight: 700 } }, "allday"), " \u00b7 " + APP_VERSION))), /* @__PURE__ */ React.createElement("div", { className: "opp-tabstrip gap-1 px-3 pt-3 overflow-x-auto", style: { background: COLORS.crust } }, tabs.map((t) => {
     const Icon = t.icon;
     const active = tab === t.id;
     return /* @__PURE__ */ React.createElement(
@@ -13452,6 +13525,41 @@ const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(React.createElement(AppGate));
 const bootStatus = document.getElementById("boot-status");
 if (bootStatus) bootStatus.style.display = "none";
+</script>
+<script>
+  // Installable app: the service worker makes the shell open offline and never
+  // serves a stale build online (see sw.js). A registration failure is not a
+  // boot error - the app runs exactly as it does without one.
+  (function () {
+    if (!("serviceWorker" in navigator)) return;
+    var hadWorker = !!navigator.serviceWorker.controller;
+    function toast() {
+      if (document.getElementById("allday-update")) return;
+      var el = document.createElement("button");
+      el.id = "allday-update";
+      el.type = "button";
+      el.textContent = "Updated \u2014 tap to reload";
+      el.style.cssText = "position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top, 0px));transform:translateX(-50%);z-index:10001;" +
+        "background:#17191B;color:#F6F5F2;border:1px solid #F2A900;border-radius:999px;padding:10px 16px;" +
+        "font:600 14px Inter, sans-serif;box-shadow:0 6px 24px rgba(0,0,0,0.35);cursor:pointer";
+      el.onclick = function () { location.reload(); };
+      document.body.appendChild(el);
+    }
+    navigator.serviceWorker.addEventListener("message", function (e) {
+      if (e.data && e.data.type === "allday-updated" && hadWorker) toast();
+    });
+    window.addEventListener("load", function () {
+      try {
+        navigator.serviceWorker.register("/sw.js").then(function (reg) {
+          // A wall tablet never navigates, so ask for updates ourselves: when
+          // the screen comes back, and once an hour.
+          var check = function () { try { reg.update().catch(function () {}); } catch (e) {} };
+          document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") check(); });
+          setInterval(check, 60 * 60 * 1000);
+        }).catch(function () {});
+      } catch (e) {}
+    });
+  })();
 </script>
 </body>
 </html>
