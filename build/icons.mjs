@@ -11,7 +11,7 @@
 // The glow is blurred here with sharp rather than an SVG filter: librsvg draws
 // a filter's region with a faint edge you can see on a dark background.
 import sharp from "sharp";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -62,6 +62,6 @@ async function render(size, safe) {
 mkdirSync(OUT, { recursive: true });
 for (const [name, size, safe] of [["icon-192.png", 192, 0.64], ["icon-512.png", 512, 0.64], ["maskable-512.png", 512, 0.50]]) {
   const buf = await render(size, safe);
-  await sharp(buf).toFile(join(OUT, name));
+  writeFileSync(join(OUT, name), buf);
   console.log("wrote icons/" + name + " (" + Math.round(buf.length / 1024) + " KB)");
 }

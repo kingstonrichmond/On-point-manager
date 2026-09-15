@@ -76,9 +76,12 @@ export default async (req, context) => {
     case 'tool-calls':
       return json(await handleToolCalls(message, { shop, env }));
 
-    case 'end-of-call-report':
-      await saveCall(env, summarizeCallReport(message));
+    case 'end-of-call-report': {
+      const rec = summarizeCallReport(message);
+      await saveCall(env, rec);
+      await archiveCall(rec);
       return json({ ok: true });
+    }
 
     default:
       return json({ ok: true, ignored: type ?? 'unknown' });
@@ -104,6 +107,26 @@ import * as shopFns from './lib/shop-data.mjs';
 
 const CALL_KEEP_DAYS = 7;
 const CALL_KEEP_MAX = 500;
+
+// Every call also lands in its own store, by month, and nothing ages it out.
+// The synced document keeps a week because every tablet reads it whole on
+// every sync; the Calls list's "as far back as it goes" reads from here. A
+// failure here never touches the document write in saveCall.
+export const CALLS_STORE = 'onpoint-calls';
+async function archiveCall(rec) {
+  try {
+    const { getStore } = await import('@netlify/blobs');
+    const store = getStore({ name: CALLS_STORE, consistency: 'strong' });
+    const at = String(rec?.at ?? '');
+    const month = /^\d{4}-\d{2}/.test(at) ? at.slice(0, 7) : new Date().toISOString().slice(0, 7);
+    const key = 'calls/' + month;
+    const list = (await store.get(key, { type: 'json' })) ?? [];
+    const prior = Array.isArray(list) ? list.filter((c) => c && c.id !== rec.id) : [];
+    await store.setJSON(key, [...prior, rec]);
+  } catch (e) {
+    console.error('archiveCall failed', e.message);
+  }
+}
 
 async function saveCall(env, rec) {
   try {
