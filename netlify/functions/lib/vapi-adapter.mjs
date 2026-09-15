@@ -43,6 +43,14 @@ export function buildVapiAssistant(shop, env = process.env, { serverUrl } = {}) 
     silenceTimeoutSeconds: 20,
     maxDurationSeconds: 900,
     backgroundSound: 'off',
+    // One field from Vapi's end-of-call analysis: the frustration mark on the
+    // Calls list. "fine" is drawn as nothing — a mark on most rows is a mark on none.
+    analysisPlan: {
+      structuredDataPlan: {
+        enabled: true,
+        schema: { type: 'object', properties: { mood: { type: 'string', enum: ['fine', 'annoyed', 'angry'], description: 'How the caller seemed by the end of the call. fine unless they were clearly annoyed or angry.' } } },
+      },
+    },
     endCallFunctionEnabled: true,
     endCallMessage: `Thanks for calling ${shop.profile.name}, see you soon.`,
     serverMessages: ['tool-calls', 'end-of-call-report', 'status-update'],
@@ -97,6 +105,7 @@ export function summarizeCallReport(message) {
     endedReason: message.endedReason ?? null,
     summary: message.analysis?.summary ?? message.summary ?? '',
     successEvaluation: message.analysis?.successEvaluation ?? null,
+    mood: message.analysis?.structuredData?.mood ?? null,
     transcript: (message.transcript ?? '').slice(0, 8000),
     recordingUrl: message.recordingUrl ?? message.artifact?.recordingUrl ?? null,
     cost: message.cost ?? null,

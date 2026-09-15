@@ -104,25 +104,18 @@ function snapshot(shop) {
   };
 }
 import * as shopFns from './lib/shop-data.mjs';
+import { openCallsStore, archiveCall as archiveCallTo } from './lib/calls-store.mjs';
 
 const CALL_KEEP_DAYS = 7;
 const CALL_KEEP_MAX = 500;
 
-// Every call also lands in its own store, by month, and nothing ages it out.
-// The synced document keeps a week because every tablet reads it whole on
-// every sync; the Calls list's "as far back as it goes" reads from here. A
-// failure here never touches the document write in saveCall.
-export const CALLS_STORE = 'onpoint-calls';
+// Every call also lands in its own store, by month, and nothing ages it out
+// (lib/calls-store.mjs). The synced document keeps a week because every
+// tablet reads it whole on every sync; the Calls list's "All" reads from the
+// archive. A failure here never touches the document write in saveCall.
 async function archiveCall(rec) {
   try {
-    const { getStore } = await import('@netlify/blobs');
-    const store = getStore({ name: CALLS_STORE, consistency: 'strong' });
-    const at = String(rec?.at ?? '');
-    const month = /^\d{4}-\d{2}/.test(at) ? at.slice(0, 7) : new Date().toISOString().slice(0, 7);
-    const key = 'calls/' + month;
-    const list = (await store.get(key, { type: 'json' })) ?? [];
-    const prior = Array.isArray(list) ? list.filter((c) => c && c.id !== rec.id) : [];
-    await store.setJSON(key, [...prior, rec]);
+    await archiveCallTo(await openCallsStore(), rec);
   } catch (e) {
     console.error('archiveCall failed', e.message);
   }
