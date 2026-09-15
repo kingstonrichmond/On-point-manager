@@ -1199,13 +1199,26 @@ function migrateShopProfile(d) {
 // phone before the flag existed, so it's switched on once for them; every
 // other shop starts without it. Runs once (addonsSeeded), so a shop that turns
 // it off later stays off.
+function phoneInUse(d) {
+  const a = (d && d.phoneAgent) || {};
+  return (Array.isArray(d.phoneCalls) && d.phoneCalls.length > 0) || (Array.isArray(d.phoneOrders) && d.phoneOrders.length > 0)
+    || !!(a.voice || a.greetingOpen || a.greetingClosed || a.greeting || (a.pause && a.pause.on) || a.transferNumber);
+}
 function migrateAddons(d) {
-  if (!d || typeof d !== "object" || d.addonsSeeded) return { data: d, changed: false };
-  const used = (Array.isArray(d.phoneCalls) && d.phoneCalls.length > 0) || (Array.isArray(d.phoneOrders) && d.phoneOrders.length > 0);
-  const on = !!(d.addons && d.addons.answering) || used;
-  d.addons = Object.assign({}, d.addons || {}, { answering: on });
-  d.addonsSeeded = true;
-  return { data: d, changed: true };
+  if (!d || typeof d !== "object") return { data: d, changed: false };
+  let changed = false;
+  if (!d.addonsSeeded) {
+    d.addons = Object.assign({}, d.addons || {}, { answering: !!(d.addons && d.addons.answering) || phoneInUse(d) });
+    d.addonsSeeded = true; changed = true;
+  }
+  // v2: the first seed only counted calls in the synced document, which keeps
+  // a week - a shop whose phone had been quiet for a week seeded OFF with no
+  // switch to fix it. A configured phone counts too. Runs once.
+  if (!d.addonsSeededV2) {
+    if (!(d.addons && d.addons.answering) && phoneInUse(d)) d.addons = Object.assign({}, d.addons || {}, { answering: true });
+    d.addonsSeededV2 = true; changed = true;
+  }
+  return { data: d, changed };
 }
 const GUIDES = [
   { id: "g1", file: "/guides/pizza-sauce.jpg", title: "Pizza Sauce", sub: "3 cases Tomato Magic \u2014 full build", group: "Recipes" },
@@ -2329,6 +2342,17 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
       )
     ),
 
+    role === "admin" && /* @__PURE__ */ React.createElement(SectionHeader, null, "Add-ons"),
+    role === "admin" && Row(
+      "Phone answering",
+      "The Phone half of the app: the call list, Now, Numbers and Setup. Off means no Phone anywhere, for a shop that hasn't bought it.",
+      /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5", "data-addon-answering": answeringOn(data) ? "on" : "off" },
+        [[true, "On"], [false, "Off"]].map(([v, l]) => /* @__PURE__ */ React.createElement("button", {
+          key: l, onClick: () => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { addons: Object.assign({}, data.addons, { answering: v }), addonsSeeded: true, addonsSeededV2: true })),
+          className: "text-sm px-3.5 py-2 rounded-full",
+          style: { fontFamily: "Inter", fontWeight: 600, border: "1px solid " + (answeringOn(data) === v ? COLORS.crust : COLORS.line), background: answeringOn(data) === v ? COLORS.crust : "transparent", color: answeringOn(data) === v ? COLORS.cream : COLORS.crust }
+        }, l)))
+    ),
     role === "admin" && /* @__PURE__ */ React.createElement(SectionHeader, null, "Register (Clover)"),
     role === "admin" && React.createElement(CloverCatalogCard, null),
     role === "admin" && /* @__PURE__ */ React.createElement(SectionHeader, null, "Payroll (ADP)"),
