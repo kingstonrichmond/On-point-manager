@@ -2242,6 +2242,11 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
       /* @__PURE__ */ React.createElement("input", { value: (data && data.shopProfile && data.shopProfile.location) || "", onChange: (e) => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { shopProfile: Object.assign({}, data.shopProfile, { location: e.target.value }) })), className: "w-full px-3 outline-none opp-field" })
     ),
     role === "admin" && Row(
+      "Shop email",
+      "Where a reply to a reported call comes back to. Asked for once, the first time someone reports a call, if it isn't here.",
+      /* @__PURE__ */ React.createElement("input", { type: "email", inputMode: "email", value: (data && data.shopProfile && data.shopProfile.email) || "", placeholder: "you@yourshop.com", onChange: (e) => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { shopProfile: Object.assign({}, data.shopProfile, { email: e.target.value }) })), className: "w-full px-3 py-2.5 rounded outline-none opp-field", style: { border: `1px solid ${COLORS.line}`, fontFamily: "Inter" } })
+    ),
+    role === "admin" && Row(
       "Bookkeeper",
       "Who the tip sheet gets sent to. Their name goes on the note field and the copy button on the Tips tab.",
       /* @__PURE__ */ React.createElement("input", { value: (data && data.shopProfile && data.shopProfile.bookkeeper) || "", placeholder: "e.g. Val", onChange: (e) => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { shopProfile: Object.assign({}, data.shopProfile, { bookkeeper: e.target.value }) })), className: "w-full px-3 outline-none opp-field" })
@@ -2839,9 +2844,40 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   // after an await or inside a timer must use the function form (or clone
   // liveData()) — the `data` prop it closed over may be minutes old, and
   // writing it back would erase every edit made since.
+  // ---- reaching the phone ----------------------------------------------------
+  // The number runs a static Vapi assistant, so anything the phone should know
+  // (greetings, pause, the wait, today's hours, the menu, the 86 board, the
+  // block list) is pushed after it changes - from the device that changed it,
+  // a few seconds after the last edit, and only when the slice the phone reads
+  // actually moved. Another device's change arrives by sync and is not pushed
+  // again from here. Setup shows whether the last push landed.
+  const phoneFpRef = useRef("");
+  const phoneTimer = useRef(null);
+  const [phoneBusy, setPhoneBusy] = useState(false);
+  useEffect(() => { phoneFpRef.current = phoneFingerprint(data); }, [data]);
+  const syncPhone = () => {
+    if (phoneTimer.current) { clearTimeout(phoneTimer.current); phoneTimer.current = null; }
+    setPhoneBusy(true);
+    return fetch(SYNC_PHONE_URL, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
+      .then((r) => r.json().then((j) => (r.ok ? j : { ok: false, configured: true, error: (j && j.error) || "HTTP " + r.status })))
+      .catch((e) => ({ ok: false, configured: true, error: (e && e.message) || "no answer" }))
+      .then((res) => {
+        setPhoneBusy(false);
+        const rec = { ok: !!res.ok, configured: res.configured !== false, at: res.at || new Date().toISOString(), error: res.ok ? null : (res.error || "no answer"), note: res.note || null };
+        persist((d) => Object.assign(JSON.parse(JSON.stringify(d)), { phoneSync: rec }));
+        return rec;
+      });
+  };
+  const schedulePhoneSync = () => {
+    if (phoneTimer.current) clearTimeout(phoneTimer.current);
+    phoneTimer.current = setTimeout(() => { phoneTimer.current = null; syncPhone(); }, PHONE_SYNC_DELAY_MS);
+  };
   const persist = (nextOrFn) => {
     const next = typeof nextOrFn === "function" ? nextOrFn(dataRef.current) : nextOrFn;
     if (!next) return;
+    const fp = phoneFingerprint(next);
+    if (answeringOn(next) && phoneFpRef.current && fp !== phoneFpRef.current) schedulePhoneSync();
+    phoneFpRef.current = fp;
     dataRef.current = next;
     setData(next);
     cacheLocal(next);
@@ -2955,7 +2991,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "opp-content p-4", style: { background: COLORS.cream } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FDECEA", color: COLORS.alertDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab, onSub }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab, onSub }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab, onSub }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab, isAdmin, onSub }), surface === "phone" && /* @__PURE__ */ React.createElement(PhoneTab, { data, persist, isAdmin, item: tab, goTo }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { setBase(0, null); dirtyRef.current = false; await pull({ initial: true }); }, data, persist,
+  })), /* @__PURE__ */ React.createElement("div", { className: "opp-content p-4", style: { background: COLORS.cream } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FDECEA", color: COLORS.alertDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab, onSub }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab, onSub }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab, onSub }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab, isAdmin, onSub }), surface === "phone" && /* @__PURE__ */ React.createElement(PhoneTab, { data, persist, isAdmin, item: tab, goTo, onSyncPhone: syncPhone, phoneBusy }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { setBase(0, null); dirtyRef.current = false; await pull({ initial: true }); }, data, persist,
         onHoursChange: (next) => { const d = JSON.parse(JSON.stringify(dataRef.current)); d.shopHours = next; persist(d); } })),
   /* @__PURE__ */ React.createElement("nav", { className: "opp-tabbar", style: { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 9000, background: COLORS.crust, borderTop: "1px solid rgba(255,255,255,0.10)", paddingBottom: "env(safe-area-inset-bottom, 0px)", paddingLeft: "env(safe-area-inset-left, 0px)", paddingRight: "env(safe-area-inset-right, 0px)" } },
     tabs.map((t) => {
@@ -5413,6 +5449,15 @@ function TodayHoursCard({ data, persist, card, label }) {
 
   return React.createElement("div", { className: "px-4 py-4 mb-3", style: card },
     label("Today's hours", active ? React.createElement("span", { style: { fontFamily: "Inter", fontSize: 13, fontWeight: 700, color: "#8A5A00" } }, "not the usual") : null),
+    // The greeting in play today is editable right here - somebody sets "closed
+    // till four" at 11 and wants to fix the wording at 11:05 without going to
+    // Setup. Only today's copy changes; the preset it came from is untouched.
+    active ? React.createElement("div", { "data-today-greeting": "1", style: { marginBottom: 10 } },
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "#5F676E", marginBottom: 4 } }, "What the phone says today"),
+      React.createElement("textarea", { className: "w-full px-3 py-2 outline-none opp-field", rows: 2, style: { minHeight: 58, resize: "vertical", fontFamily: "Inter", fontSize: 14.5 },
+        placeholder: "Blank: the phone writes it from today's hours",
+        value: active.greeting || "",
+        onChange: (e) => persist && persist((d) => { const c = JSON.parse(JSON.stringify(d)); if (c.tempHours && c.tempHours.today) c.tempHours.today.greeting = e.target.value; return c; }) })) : null,
     active
       ? React.createElement("div", null,
           React.createElement("div", { style: { fontFamily: "Inter", fontSize: 16, fontWeight: 700, color: COLORS.crust } },
@@ -5465,6 +5510,17 @@ function callFlagged(c) { return callUpset(c) || !!(c && c.report); }
 // A tel: link only means something on a phone; on the line tablet it's a dead tap.
 function canPlaceCall() { try { return /iPhone|Android.+Mobile/i.test(navigator.userAgent || ""); } catch (e) { return false; } }
 const CALLS_URL = "/.netlify/functions/calls";
+const REPORT_URL = "/.netlify/functions/report-call";
+const SYNC_PHONE_URL = "/.netlify/functions/vapi-sync";
+const PHONE_SYNC_DELAY_MS = 4000;
+// The slice of the document the phone is built from. phoneSync itself is not
+// in it, so recording a push never triggers another.
+function phoneFingerprint(d) {
+  if (!d) return "";
+  const p = d.shopProfile || {};
+  try { return JSON.stringify([d.phoneAgent, d.wait, d.tempHours, d.shopHours, p.name, p.brandNotes, p.timezone, p.address, p.phone, d.menu, d.eightySix, d.prep && d.prep.lowStock]); } catch (e) { return ""; }
+}
+const REPORT_REASONS = ["Got the order wrong", "Said something wrong", "Should have handed it to a person", "Customer was frustrated", "Something else"];
 const monthLabel = (m) => { try { return new Date(m + "-01T12:00:00").toLocaleDateString([], { month: "short", year: "numeric" }); } catch (e) { return m; } };
 
 // ---- The call list ----------------------------------------------------------
@@ -5480,7 +5536,50 @@ function CallLog({ data, persist, isAdmin }) {
   const [numFilter, setNumFilter] = useState("");
   const [playing, setPlaying] = useState(null); // { id, t, d, paused }
   const [archive, setArchive] = useState({ months: null, loaded: {}, busy: false, error: "" });
+  const [reportFor, setReportFor] = useState("");
+  const [draft, setDraft] = useState({ reason: "", note: "", urgent: false, email: "" });
+  const [sending, setSending] = useState(false);
+  // Reports on calls that live only in the archive have nowhere in the synced
+  // document to sit; they're remembered here for this screen.
+  const [reportsHere, setReportsHere] = useState({});
   const audioRef = useRef(null);
+  const reportOf = (c) => reportsHere[c.id] || c.report || null;
+  const shopEmail = (data && data.shopProfile && data.shopProfile.email) || "";
+  const writeReport = (id, rep) => {
+    setReportsHere((o) => Object.assign({}, o, { [id]: rep }));
+    persist && persist((d) => { const n = JSON.parse(JSON.stringify(d)); n.phoneCalls = (n.phoneCalls || []).map((x) => (x.id === id ? Object.assign({}, x, { report: rep }) : x)); return n; });
+  };
+  const postReport = async (c, rep) => {
+    const r = await fetch(REPORT_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ callId: c.id, at: c.at, reason: rep.reason, note: rep.note, urgent: !!rep.urgent, by: rep.by || getWho() }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error((j && j.error) || ("HTTP " + r.status));
+    return j.report;
+  };
+  const sendReport = async (c) => {
+    if (!draft.reason || sending) return;
+    const email = shopEmail || draft.email.trim();
+    if (!email) return;
+    setSending(true);
+    if (!shopEmail && persist) persist((d) => { const n = JSON.parse(JSON.stringify(d)); n.shopProfile = Object.assign({}, n.shopProfile, { email }); return n; });
+    const local = { at: new Date().toISOString(), by: getWho(), reason: draft.reason, note: draft.note.trim(), urgent: !!draft.urgent, pending: true };
+    writeReport(c.id, local);
+    try { writeReport(c.id, await postReport(c, local)); }
+    catch (e) { writeReport(c.id, Object.assign({}, local, { pending: false, error: "couldn't send" + (e && e.message ? " \u2014 " + e.message : "") })); }
+    // and anything else still waiting goes with it
+    calls.filter((x) => x.id !== c.id && reportOf(x) && reportOf(x).error).slice(0, 3).forEach((x) => { postReport(x, reportOf(x)).then((rep) => writeReport(x.id, rep)).catch(() => {}); });
+    setSending(false); setReportFor(""); setDraft({ reason: "", note: "", urgent: false, email: "" });
+  };
+  const retryReport = async (c) => {
+    const rep = reportOf(c); if (!rep) return;
+    writeReport(c.id, Object.assign({}, rep, { pending: true, error: undefined }));
+    try { writeReport(c.id, await postReport(c, rep)); } catch (e) { writeReport(c.id, Object.assign({}, rep, { pending: false, error: "couldn't send" + (e && e.message ? " \u2014 " + e.message : "") })); }
+  };
+  const blockNumber = (num, on) => persist && persist((d) => {
+    const n = JSON.parse(JSON.stringify(d)); const k = phoneKeyClient(num); if (!k) return n;
+    const list = ((n.phoneAgent && n.phoneAgent.blocked) || []).filter((b) => phoneKeyClient(b && b.number) !== k);
+    n.phoneAgent = Object.assign({}, n.phoneAgent, { blocked: on ? list.concat([{ number: k, at: new Date().toISOString(), note: "from the call list" }]) : list });
+    return n;
+  });
   const docCalls = (data && data.phoneCalls) || [];
   const archived = Object.keys(archive.loaded).reduce((a, m) => a.concat(archive.loaded[m] || []), []);
   const seen = {};
@@ -5505,7 +5604,7 @@ function CallLog({ data, persist, isAdmin }) {
     const o = byCall[c.id];
     if (kind === "orders" && !o) return false;
     if (kind === "noorder" && o) return false;
-    if (kind === "flagged" && !callFlagged(c)) return false;
+    if (kind === "flagged" && !(callFlagged(c) || reportsHere[c.id])) return false;
     return hit(c);
   });
 
@@ -5604,7 +5703,17 @@ function CallLog({ data, persist, isAdmin }) {
                 callUpset(c) ? React.createElement("span", { title: "Sounded " + c.mood, "data-mood": c.mood, style: { marginLeft: 6, fontSize: 15 } }, "\u{1F620}") : null),
               React.createElement("div", { style: Object.assign({ flex: "0 0 auto" }, muted) }, (callDay(c.at) === today ? "" : new Date(c.at).toLocaleDateString([], { month: "short", day: "numeric" }) + " ") + t(c.at) + (c.durationSec != null ? " · " + dur(c.durationSec) : ""))),
             React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: COLORS.crust, marginTop: 2, display: "-webkit-box", WebkitLineClamp: isOpen ? "unset" : 2, WebkitBoxOrient: "vertical", overflow: "hidden" } }, c.summary || (c.endedReason ? "No summary · " + c.endedReason : "No summary")),
-            o ? orderLine(o) : null)),
+            o ? orderLine(o) : null,
+            (() => {
+              const r = reportOf(c); const blockedNow = c.blocked || isBlockedNumber(data, c.from);
+              if (!r && !blockedNow) return null;
+              const tagS = (bg, fg, bd) => ({ fontFamily: "Inter", fontSize: 12, fontWeight: 700, color: fg, background: bg, border: "1px solid " + bd, borderRadius: 999, padding: "2px 9px", display: "inline-block", marginTop: 4, marginRight: 6 });
+              return React.createElement("div", { "data-report-state": r ? (r.pending ? "pending" : r.error ? "error" : "sent") : "" },
+                r && r.pending ? React.createElement("span", { style: tagS("#F7F7F5", COLORS.steel, COLORS.line) }, "Sending\u2026") : null,
+                r && !r.pending && !r.error ? React.createElement("span", { style: tagS("#E4F1E6", "#1F6B34", "#BFDCC5") }, "Reported \u00b7 " + t(r.at)) : null,
+                r && !r.pending && r.error ? React.createElement("span", { style: tagS("#FFF6E0", "#8A5A00", "#F0DDA6") }, "Saved \u2014 couldn't send yet") : null,
+                blockedNow ? React.createElement("span", { style: tagS("#F2F2EF", COLORS.steel, COLORS.line) }, "Blocked") : null);
+            })())),
         rep ? React.createElement("button", { onClick: () => history(c.from), "data-repeat": rep.nth, style: Object.assign({ background: "transparent", border: "none", padding: "2px 0 0", marginLeft: c.recordingUrl ? 46 : 0 }, muted) }, ordinal(rep.nth) + " call in " + rep.mins + " min") : null,
         isOpen ? React.createElement("div", null,
           c.recordingUrl ? React.createElement("audio", { controls: true, preload: "none", src: c.recordingUrl, className: "w-full mt-2", style: { height: 36 },
@@ -5613,7 +5722,25 @@ function CallLog({ data, persist, isAdmin }) {
           c.transcript ? React.createElement("pre", { className: "text-xs whitespace-pre-wrap p-2.5 rounded mt-2", style: { background: "#FAFAF8", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono", color: COLORS.crust, maxHeight: 320, overflowY: "auto" } }, c.transcript) : React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: INK3, marginTop: 6 } }, "No transcript for this call."),
           React.createElement("div", { className: "flex gap-2 mt-2.5 flex-wrap", "data-actions": "1" },
             canPlaceCall() && c.from ? React.createElement("a", { href: "tel:" + c.from, style: action }, "Call back") : null,
-            c.from ? React.createElement("button", { onClick: () => history(c.from), style: action }, "History") : null)) : null,
+            c.from ? React.createElement("button", { onClick: () => history(c.from), style: action }, "History") : null,
+            React.createElement("button", { onClick: () => { setReportFor(reportFor === c.id ? "" : c.id); setDraft({ reason: "", note: "", urgent: false, email: "" }); }, style: action }, reportOf(c) && !reportOf(c).error ? "Report again" : reportOf(c) && reportOf(c).error ? "Retry sending" : "Report"),
+            c.from ? React.createElement("button", { onClick: () => blockNumber(c.from, !isBlockedNumber(data, c.from)), style: action }, isBlockedNumber(data, c.from) ? "Unblock" : "Block") : null),
+          reportOf(c) && reportOf(c).error && reportFor !== c.id ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#8A5A00", marginTop: 6 } }, "The report is saved but hasn't reached support yet (" + reportOf(c).error + "). ",
+            React.createElement("button", { onClick: () => retryReport(c), style: { background: "transparent", border: "none", padding: 0, fontFamily: "Inter", fontSize: 12.5, fontWeight: 700, color: COLORS.ink } }, "Send it now \u203a")) : null,
+          reportFor === c.id ? React.createElement("div", { "data-report-sheet": c.id, className: "px-3 py-3 mt-2 rounded", style: { background: "#FAFAF8", border: "1px solid " + COLORS.line } },
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, fontWeight: 700, color: COLORS.crust, marginBottom: 6 } }, "Report this call"),
+            React.createElement("div", { className: "flex flex-wrap gap-1.5 mb-2" }, REPORT_REASONS.map((rs) => chip(draft.reason === rs, rs, () => setDraft(Object.assign({}, draft, { reason: rs })), "rs" + rs))),
+            React.createElement("textarea", { className: "w-full px-3 py-2 outline-none opp-field", rows: 2, placeholder: "Anything else worth knowing (optional)", value: draft.note, onChange: (e) => setDraft(Object.assign({}, draft, { note: e.target.value })), style: { fontFamily: "Inter", fontSize: 14, minHeight: 56, resize: "vertical" } }),
+            React.createElement("label", { className: "flex items-start gap-2 mt-2", style: { fontFamily: "Inter", fontSize: 13.5, color: COLORS.crust, cursor: "pointer" } },
+              React.createElement("input", { type: "checkbox", checked: !!draft.urgent, onChange: (e) => setDraft(Object.assign({}, draft, { urgent: e.target.checked })), style: { marginTop: 3 } }),
+              React.createElement("span", null, React.createElement("b", null, "This is still happening"), React.createElement("span", { style: { color: COLORS.steel } }, " \u2014 the phone is doing this to every caller right now. Marked URGENT so it's seen first."))),
+            !shopEmail ? React.createElement("div", { style: { marginTop: 8 } },
+              React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: COLORS.steel, marginBottom: 3 } }, "Where should the reply go? Asked once; it's saved with the shop."),
+              React.createElement("input", { type: "email", inputMode: "email", className: "w-full px-3 outline-none opp-field", placeholder: "you@yourshop.com", value: draft.email, onChange: (e) => setDraft(Object.assign({}, draft, { email: e.target.value })) })) : null,
+            React.createElement("div", { className: "flex items-center gap-2 mt-2.5 flex-wrap" },
+              React.createElement(TicketButton, { onClick: () => sendReport(c), style: { opacity: !draft.reason || sending || (!shopEmail && !draft.email.trim()) ? 0.5 : 1 } }, sending ? "Sending\u2026" : "Send"),
+              React.createElement("button", { onClick: () => setReportFor(""), style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.crust } }, "Cancel"),
+              React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12.5, color: COLORS.steel, flex: 1, minWidth: 180 } }, "Goes to " + SUPPORT_EMAIL + " with the recording, the transcript and what the phone was set to. You'll get an email back, usually by the next morning."))) : null) : null,
         isPlaying && playing.d > 0 ? React.createElement("div", { "data-progress": "1", style: { position: "absolute", left: 0, right: 0, bottom: 0, height: 2, background: COLORS.line } },
           React.createElement("div", { style: { width: Math.min(100, 100 * playing.t / playing.d) + "%", height: "100%", background: COLORS.lamp } })) : null);
     }),
@@ -5711,7 +5838,7 @@ function PhoneNumbers({ data }) {
 // line sits on top of every item and taps through to Now, so the pause is never
 // more than a tap away. The menu, prices and 86 board it reads are the same
 // ones the rest of the app edits; there is nothing to set up twice.
-function PhoneTab({ data, persist, isAdmin, item, goTo }) {
+function PhoneTab({ data, persist, isAdmin, item, goTo, onSyncPhone, phoneBusy }) {
   const CARD = { background: COLORS.card, borderRadius: 18, boxShadow: "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)" };
   const label = (t, right) => React.createElement("div", { className: "flex items-baseline justify-between mb-2.5" },
     React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, t),
@@ -5742,7 +5869,7 @@ function PhoneTab({ data, persist, isAdmin, item, goTo }) {
     React.createElement(WaitControl, { key: "wait", data, persist, who: getWho(), card: CARD, label }),
     React.createElement(TodayHoursCard, { key: "hours", data, persist, card: CARD, label })];
   else if (item === "numbers") body = React.createElement(PhoneNumbers, { data });
-  else if (item === "setup") body = React.createElement(PhoneVoiceCard, { data, persist, canEdit: isAdmin });
+  else if (item === "setup") body = React.createElement(PhoneVoiceCard, { data, persist, canEdit: isAdmin, onSyncPhone, phoneBusy });
   else body = React.createElement(CallLog, { data, persist, isAdmin });
   return React.createElement("div", null, header, body);
 }
@@ -5980,18 +6107,65 @@ function KitchenWorkCard({ data, persist, diag, filterLine, est }) {
 }
 
 
-// ---- Phone voice + languages (Settings) ------------------------------------
-// Both live in data.phoneAgent, and the assistant is rebuilt from that on every
-// inbound call — so a change here is live on the NEXT call, no redeploy.
+// ---- Phone voice + languages (Setup) ------------------------------------------
+// All of it lives in data.phoneAgent. The number runs a static Vapi assistant,
+// so a change here is pushed to it a few seconds later (syncPhone, in the app
+// root) rather than picked up per call.
 const VOICE_CHOICES = [{"id": "vapi:Elliot", "label": "Elliot", "note": "Male, Canadian. Warm and even \u2014 the safe default.", "tier": "standard", "multilingual": true, "voice": {"provider": "vapi", "voiceId": "Elliot", "version": 2, "language": "auto"}}, {"id": "vapi:Savannah", "label": "Savannah", "note": "Female, US Southern. Friendly, unhurried.", "tier": "standard", "multilingual": true, "voice": {"provider": "vapi", "voiceId": "Savannah", "version": 2, "language": "auto"}}, {"id": "vapi:Emma", "label": "Emma", "note": "Female, neutral American. Clear and businesslike.", "tier": "standard", "multilingual": true, "voice": {"provider": "vapi", "voiceId": "Emma", "version": 2, "language": "auto"}}, {"id": "vapi:Clara", "label": "Clara", "note": "Female, softer and conversational.", "tier": "standard", "multilingual": true, "voice": {"provider": "vapi", "voiceId": "Clara", "version": 2, "language": "auto"}}, {"id": "vapi:Kai", "label": "Kai", "note": "Male, younger sounding, upbeat.", "tier": "standard", "multilingual": true, "voice": {"provider": "vapi", "voiceId": "Kai", "version": 2, "language": "auto"}}, {"id": "vapi:Nico", "label": "Nico", "note": "Male, relaxed.", "tier": "standard", "multilingual": true, "voice": {"provider": "vapi", "voiceId": "Nico", "version": 2, "language": "auto"}}, {"id": "deepgram:aura-2-thalia-en", "label": "Thalia", "note": "Female, US. Cheapest option, English + Spanish.", "tier": "cheap", "multilingual": false, "voice": {"provider": "deepgram", "voiceId": "aura-2-thalia-en"}}, {"id": "deepgram:aura-2-apollo-en", "label": "Apollo", "note": "Male, US. Cheapest option, English + Spanish.", "tier": "cheap", "multilingual": false, "voice": {"provider": "deepgram", "voiceId": "aura-2-apollo-en"}}, {"id": "openai:nova", "label": "Nova (OpenAI)", "note": "Female, natural. Cheap, and speaks whatever language it is handed.", "tier": "cheap", "multilingual": true, "voice": {"provider": "openai", "model": "gpt-4o-mini-tts", "voiceId": "nova"}}, {"id": "openai:ash", "label": "Ash (OpenAI)", "note": "Male, easy-going. Cheap, multilingual.", "tier": "cheap", "multilingual": true, "voice": {"provider": "openai", "model": "gpt-4o-mini-tts", "voiceId": "ash"}}, {"id": "11labs:sarah", "label": "Sarah (ElevenLabs)", "note": "The most human-sounding tier. Roughly 10\u00d7 the voice cost \u2014 see the note below.", "tier": "premium", "multilingual": true, "voice": {"provider": "11labs", "model": "eleven_flash_v2_5", "voiceId": "sarah"}}];
 const LANGUAGE_CHOICES = [{"code": "en", "label": "English", "native": "English"}, {"code": "es", "label": "Spanish", "native": "Espa\u00f1ol"}, {"code": "pt", "label": "Portuguese", "native": "Portugu\u00eas"}, {"code": "fr", "label": "French", "native": "Fran\u00e7ais"}, {"code": "it", "label": "Italian", "native": "Italiano"}, {"code": "zh", "label": "Mandarin", "native": "\u4e2d\u6587"}, {"code": "vi", "label": "Vietnamese", "native": "Ti\u1ebfng Vi\u1ec7t"}, {"code": "ru", "label": "Russian", "native": "\u0420\u0443\u0441\u0441\u043a\u0438\u0439"}, {"code": "pl", "label": "Polish", "native": "Polski"}, {"code": "ar", "label": "Arabic", "native": "\u0627\u0644\u0639\u0631\u0628\u064a\u0629"}];
 const VOICE_COST_NOTE = "Voice is billed per character spoken, not per minute. The cheap and standard voices land around a penny or two a minute; ElevenLabs is roughly ten times that. At your volume that is the difference between about $60 and about $700 a month.";
 const MODEL_CHOICES = [{"id": "anthropic:claude-haiku-4-5", "label": "Claude Haiku", "note": "Strong at following a long list of \"never do X\" rules \u2014 and this prompt has ten. Good default.", "cost": "~$0.02/min", "provider": "anthropic", "model": "claude-haiku-4-5"}, {"id": "openai:gpt-5-mini", "label": "GPT-5 mini", "note": "Fast and cheaper. Very capable at this kind of scripted task.", "cost": "~$0.01/min", "provider": "openai", "model": "gpt-5-mini"}, {"id": "google:gemini-3.0-flash", "label": "Gemini Flash", "note": "Fast, cheap, solid tool use. Worth a try if the others feel slow.", "cost": "~$0.03/min", "provider": "google", "model": "gemini-3.0-flash"}, {"id": "openai:gpt-5-nano", "label": "GPT-5 nano", "note": "Cheapest and quickest. Watch it on complicated orders before trusting it.", "cost": "~$0.003/min", "provider": "openai", "model": "gpt-5-nano"}];
 const MODEL_NOTE = "Bigger is not better here. A frontier model adds a pause before every reply and several times the cost, and takes the order no more accurately \u2014 the menu, the prices and the rules are all handled outside the model. Judge these by how quickly they come back and whether they get the order right, not by benchmarks.";
 
-function PhoneVoiceCard({ data, persist, canEdit }) {
+// ---- Setup ---------------------------------------------------------------------
+// What the phone says and does, most-edited first. Every greeting is a plain box
+// first on screen; presets are chips above it that fill it. No character cap:
+// the greeting is spoken, so length costs seconds, not correctness - the hint
+// says how many. The number runs a static assistant, so everything here is
+// pushed to it a few seconds after a change (see syncPhone in the app root)
+// and the status line at the top says whether that landed.
+const SUPPORT_EMAIL = "support@alldayops.app";
+const SPEAK_WPS = 2.5;
+const saySeconds = (t) => Math.max(1, Math.round(String(t || "").trim().split(/\s+/).filter(Boolean).length / SPEAK_WPS));
+const GREETING_PRESETS = {
+  greetingOpen: [
+    "Thanks for calling {shop} — pickup order, or a question?",
+    "Hi, you've reached {shop}. What can I get started for you?",
+    "{shop}, this is the phone assistant. Pickup order, or a question?"],
+  greetingClosed: [
+    "Thanks for calling {shop}. We're closed right now — I can still answer questions if you have any.",
+    "You've reached {shop} after hours. I can take a question, or you can call back when we open."],
+  greetingPaused: [
+    "Thanks for calling {shop} — we're slammed and not taking phone orders right now. Try again in a bit.",
+    "Thanks for calling {shop}. The kitchen's backed up, so we're not taking phone orders at the moment — I can still answer questions."],
+  greetingOff: [
+    "Thanks for calling {shop}. Our phone assistant is off right now — please try again a little later."]
+};
+const phoneKeyClient = (s) => { const d = String(s || "").replace(/\D/g, ""); return d.length === 11 && d[0] === "1" ? d.slice(1) : d; };
+function isBlockedNumber(data, num) { const k = phoneKeyClient(num); return !!k && ((data && data.phoneAgent && data.phoneAgent.blocked) || []).some((b) => phoneKeyClient(b && b.number) === k); }
+
+function PhoneSyncLine({ data, onSyncPhone, phoneBusy, canEdit }) {
+  const s = (data && data.phoneSync) || null;
+  const when = (iso) => { try { return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; } };
+  let tone = "#F7F7F5", color = "#5F676E", text;
+  if (phoneBusy) text = "Updating the phone…";
+  else if (!s) text = "Changes here are pushed to the phone a few seconds after you make them.";
+  else if (s.ok) { tone = "#E4F1E6"; color = "#1F6B34"; text = "Phone updated " + when(s.at) + (s.note ? " · " + s.note : ""); }
+  else if (s.configured === false) { tone = "#FFF6E8"; color = "#8A5A00"; text = "Changes here stay here until the Vapi key is set in Netlify (VAPI_API_KEY and VAPI_ASSISTANT_ID)."; }
+  else { tone = "#FDECEA"; color = COLORS.alertDark; text = "Couldn't update the phone" + (s.at ? " at " + when(s.at) : "") + ": " + (s.error || "no answer"); }
+  return React.createElement("div", { "data-phone-sync": s ? (s.ok ? "ok" : s.configured === false ? "unconfigured" : "error") : "none", className: "flex items-center gap-2 px-3 py-2 mb-3 rounded", style: { background: tone, color, fontFamily: "Inter", fontSize: 13 } },
+    React.createElement("span", { style: { flex: 1 } }, text),
+    canEdit && onSyncPhone ? React.createElement("button", { onClick: () => onSyncPhone(), disabled: !!phoneBusy, style: { background: "transparent", border: "1px solid " + color, color, borderRadius: 999, padding: "6px 10px", fontFamily: "Inter", fontSize: 12.5, fontWeight: 600, opacity: phoneBusy ? 0.5 : 1, whiteSpace: "nowrap" } }, s && !s.ok && s.configured !== false ? "Try again" : "Push to the phone now") : null);
+}
+
+function PhoneVoiceCard({ data, persist, canEdit, onSyncPhone, phoneBusy }) {
   const [custom, setCustom] = useState("");
+  const [confirmOff, setConfirmOff] = useState(false);
+  const [newBlock, setNewBlock] = useState("");
+  const [faqQ, setFaqQ] = useState("");
+  const [faqA, setFaqA] = useState("");
   const agent = (data && data.phoneAgent) || {};
+  const shopName = (data && data.shopProfile && data.shopProfile.name) || "the shop";
   const voice = agent.voice || { provider: "vapi", voiceId: "Elliot" };
   const langs = (agent.languages && agent.languages.length ? agent.languages : ["en"]);
   const patch = (p) => canEdit && persist && persist((d) => {
@@ -6008,113 +6182,166 @@ function PhoneVoiceCard({ data, persist, canEdit }) {
   const isCurrent = (c) => c.voice.provider === voice.provider && c.voice.voiceId === voice.voiceId;
   const known = VOICE_CHOICES.some(isCurrent);
   const tierLabel = { cheap: "cheapest", standard: "standard", premium: "premium — costs much more" };
+  const H = (t) => React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontSize: 18, letterSpacing: ".02em", marginBottom: 2 } }, t);
+  const sub = (t) => React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginBottom: 10 } }, t);
+  const small = (t) => React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "#5F676E", marginBottom: 4 } }, t);
+  const rule = () => React.createElement("div", { style: { height: 1, background: COLORS.line, margin: "16px 0 14px" } });
+  const chip = (txt, on, onClick, key) => React.createElement("button", { key: key || txt, onClick, className: "text-xs px-2.5 py-1.5 rounded-full",
+    style: { fontFamily: "Inter", fontWeight: 600, border: "1px solid " + (on ? COLORS.crust : COLORS.line), background: on ? COLORS.crust : "transparent", color: on ? COLORS.cream : COLORS.crust, textAlign: "left" } }, txt);
+  const pill = (txt, on, onClick) => React.createElement("button", { key: txt, onClick,
+    style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, borderRadius: 999, padding: "8px 14px", minHeight: 40, border: "1px solid " + (on ? "transparent" : COLORS.line), background: on ? COLORS.crust : COLORS.card, color: on ? "#FFFFFF" : COLORS.crust } }, txt);
 
-  const row = (c) => React.createElement("button", { key: c.id, onClick: () => pickVoice(c.voice),
-    className: "w-full text-left px-3 py-2.5",
-    style: { border: "1px solid " + (isCurrent(c) ? COLORS.lamp : COLORS.line), background: isCurrent(c) ? COLORS.lampTint : COLORS.card,
-             borderRadius: 12, marginBottom: 6, display: "block" } },
+  // every greeting: presets above, the box under, the seconds it takes to say
+  const greetingBox = (key, title, blankMeans) => {
+    const val = agent[key] || "";
+    const presets = (GREETING_PRESETS[key] || []).map((p) => p.replace(/\{shop\}/g, shopName));
+    return React.createElement("div", { key, "data-greeting": key, style: { marginBottom: 12 } },
+      small(title),
+      React.createElement("div", { className: "flex flex-wrap gap-1.5 mb-1.5" }, presets.map((p, i) => chip(p.length > 60 ? p.slice(0, 57) + "…" : p, val === p, () => patch({ [key]: p }), key + i))),
+      React.createElement("textarea", { className: "w-full px-3 py-2 outline-none opp-field", rows: 2, placeholder: blankMeans,
+        style: { minHeight: 62, resize: "vertical", fontFamily: "Inter", fontSize: 15 },
+        value: val, onChange: (e) => patch({ [key]: e.target.value }) }),
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, color: "#8A9096", marginTop: 3 } },
+        val.trim() ? "Takes about " + saySeconds(val) + (saySeconds(val) === 1 ? " second" : " seconds") + " to say." : "Blank: the phone writes this one itself from the hours and the wait."));
+  };
+  const voiceRow = (c) => React.createElement("button", { key: c.id, onClick: () => pickVoice(c.voice), className: "w-full text-left px-3 py-2.5",
+    style: { border: "1px solid " + (isCurrent(c) ? COLORS.lamp : COLORS.line), background: isCurrent(c) ? COLORS.lampTint : COLORS.card, borderRadius: 12, marginBottom: 6, display: "block" } },
     React.createElement("div", { className: "flex items-baseline justify-between gap-2" },
       React.createElement("span", { style: { fontFamily: "Inter", fontWeight: 700, fontSize: 15.5, color: COLORS.crust } }, c.label),
-      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".05em",
-        color: c.tier === "premium" ? COLORS.alertDark : "#8A9096" } }, tierLabel[c.tier] || c.tier)),
+      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".05em", color: c.tier === "premium" ? COLORS.alertDark : "#8A9096" } }, tierLabel[c.tier] || c.tier)),
     React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13.5, color: "#5F676E", marginTop: 1 } }, c.note));
+  const speed = Number(agent.voiceSpeed) || 1;
+  const faq = Array.isArray(agent.faq) ? agent.faq : [];
+  const addFaq = () => { if (!faqQ.trim() || !faqA.trim()) return; patch({ faq: faq.concat([{ q: faqQ.trim(), a: faqA.trim() }]) }); setFaqQ(""); setFaqA(""); };
+  const blocked = Array.isArray(agent.blocked) ? agent.blocked : [];
+  const addBlock = () => { const k = phoneKeyClient(newBlock); if (k.length < 7 || blocked.some((b) => phoneKeyClient(b.number) === k)) return; patch({ blocked: blocked.concat([{ number: k, at: new Date().toISOString(), note: "" }]) }); setNewBlock(""); };
+  const off = !!agent.off;
 
   return React.createElement("div", { className: "px-4 py-4 mb-3", style: { background: COLORS.card, borderRadius: 18, boxShadow: "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)" } },
-    React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontSize: 18, letterSpacing: ".02em", marginBottom: 2 } }, "PHONE VOICE"),
-    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginBottom: 10 } },
-      "Takes effect on the next call. To hear one first: Vapi dashboard \u2192 Resources \u2192 Voice Library has a play button on every voice."),
-    VOICE_CHOICES.map(row),
+    React.createElement(PhoneSyncLine, { data, onSyncPhone, phoneBusy, canEdit }),
+    off ? React.createElement("div", { "data-off": "1", className: "px-3 py-2.5 mb-3 rounded", style: { background: "#FDECEA", color: COLORS.alertDark, fontFamily: "Inter", fontSize: 13.5, fontWeight: 600 } }, "The phone is OFF. Callers hear one line and the call ends. Turn it back on at the bottom of this page.") : null,
 
+    H("GREETINGS"),
+    sub("What the phone says first, in each state. Tap a line to use it, or write your own — as long as you like."),
+    greetingBox("greetingOpen", "While you're open", "Thanks for calling " + shopName + " — pickup order, or a question?"),
+    greetingBox("greetingClosed", "After hours", "Thanks for calling " + shopName + ". We're closed right now — we open at eleven."),
+    greetingBox("greetingPaused", "While orders are paused", "Thanks for calling — we're slammed and not taking phone orders right now."),
+    rule(),
+
+    H("QUESTIONS IT SHOULD ANSWER"),
+    sub("Things callers ask that aren't on the menu — gluten-free, parking, do you do catering. The phone answers exactly what you write here; anything not on the list still gets “let me get you a person.”"),
+    faq.map((f, i) => React.createElement("div", { key: i, "data-faq": i, className: "px-3 py-2 mb-2", style: { border: "1px solid " + COLORS.line, borderRadius: 12 } },
+      React.createElement("div", { className: "flex items-start justify-between gap-2" },
+        React.createElement("div", { style: { minWidth: 0 } },
+          React.createElement("div", { style: { fontFamily: "Inter", fontWeight: 700, fontSize: 14.5, color: COLORS.crust } }, f.q),
+          React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: "#5F676E", marginTop: 2 } }, f.a)),
+        canEdit ? React.createElement("button", { onClick: () => patch({ faq: faq.filter((x, j) => j !== i) }), style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 13, color: COLORS.alertDark, flex: "0 0 auto" } }, "Remove") : null))),
+    canEdit ? React.createElement("div", { style: { marginBottom: 4 } },
+      React.createElement("input", { className: "w-full px-3 outline-none opp-field mb-1.5", placeholder: "The question — “Do you have gluten-free?”", value: faqQ, onChange: (e) => setFaqQ(e.target.value) }),
+      React.createElement("div", { className: "flex gap-2" },
+        React.createElement("input", { className: "flex-1 px-3 outline-none opp-field", placeholder: "The answer — “Yes, small only, $3 extra.”", value: faqA, onChange: (e) => setFaqA(e.target.value), onKeyDown: (e) => { if (e.key === "Enter") addFaq(); } }),
+        React.createElement(TicketButton, { onClick: addFaq }, "Add"))) : (faq.length ? null : sub("Nothing yet.")),
+    rule(),
+
+    H("VOICE"),
+    sub("Takes effect on the next call. To hear one first: Vapi dashboard → Resources → Voice Library has a play button on every voice."),
+    VOICE_CHOICES.map(voiceRow),
     React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#8A5A00", background: "#FFF6E8", border: "1px solid rgba(179,107,0,.25)", borderRadius: 10, padding: "8px 10px", margin: "4px 0 12px" } }, VOICE_COST_NOTE),
-
-    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "#5F676E", marginBottom: 5 } }, "Something else"),
+    small("Something else"),
     React.createElement("div", { className: "flex gap-2" },
-      React.createElement("input", { className: "flex-1 px-3 outline-none opp-field", placeholder: "paste a voice ID from Vapi",
-        value: custom, onChange: (e) => setCustom(e.target.value) }),
+      React.createElement("input", { className: "flex-1 px-3 outline-none opp-field", placeholder: "paste a voice ID from Vapi", value: custom, onChange: (e) => setCustom(e.target.value) }),
       React.createElement(TicketButton, { onClick: () => { if (custom.trim()) { pickVoice({ provider: "vapi", voiceId: custom.trim(), version: 2, language: "auto" }); setCustom(""); } } }, "Use")),
-    !known ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: COLORS.crust, marginTop: 6 } },
-      "Currently using a custom voice: ", React.createElement("b", null, voice.provider + " / " + voice.voiceId)) : null,
+    !known ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: COLORS.crust, marginTop: 6 } }, "Currently using a custom voice: ", React.createElement("b", null, voice.provider + " / " + voice.voiceId)) : null,
+    React.createElement("div", { style: { marginTop: 12 } }, small("Speed"),
+      React.createElement("div", { className: "flex gap-2 flex-wrap", "data-speed": speed },
+        [[0.85, "Slower"], [1, "Normal"], [1.15, "Faster"]].map(([v, l]) => pill(l, Math.abs(speed - v) < 0.01, () => patch({ voiceSpeed: v }))))),
+    React.createElement("div", { style: { marginTop: 12 } }, small("Background"),
+      React.createElement("div", { className: "flex gap-2 flex-wrap", "data-ambient": agent.ambient === "office" ? "office" : "off" },
+        pill("Quiet", agent.ambient !== "office", () => patch({ ambient: "off" })),
+        pill("A little room noise", agent.ambient === "office", () => patch({ ambient: "office" }))),
+      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#8A9096", marginTop: 6 } }, "Some shops like a faint sound behind the voice so it doesn't feel like a booth.")),
+    rule(),
 
-    React.createElement("div", { style: { height: 1, background: COLORS.line, margin: "16px 0 14px" } }),
+    H("LANGUAGES"),
+    sub(langs.length > 1 ? "The phone will answer a caller in whichever of these they speak, and take the whole order in it." : "English only. Turn one on and the phone will answer callers who speak it."),
+    React.createElement("div", { className: "flex flex-wrap gap-2" },
+      LANGUAGE_CHOICES.map((l) => { const on = langs.indexOf(l.code) >= 0;
+        return React.createElement("button", { key: l.code, onClick: () => toggleLang(l.code), disabled: l.code === "en",
+          style: { fontFamily: "Inter", fontSize: 14.5, fontWeight: 600, borderRadius: 999, padding: "9px 15px", minHeight: 44, border: "1px solid " + (on ? "transparent" : COLORS.line), background: on ? COLORS.crust : COLORS.card, color: on ? "#FFFFFF" : COLORS.crust, opacity: l.code === "en" ? 0.75 : 1 } },
+          l.label, l.code === "en" ? " · always" : ""); })),
+    langs.length > 1 ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#8A9096", marginTop: 10 } }, "Menu items keep their English names in any language. Anything the phone can't handle goes to a person.") : null,
+    rule(),
 
-    React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontSize: 18, letterSpacing: ".02em", marginBottom: 2 } }, "BRAIN"),
-    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginBottom: 10 } },
-      "Which model takes the order. If a call ever fails the moment it connects, a wrong model name here is the first thing to check — Vapi's own model list has the current ones."),
-    MODEL_CHOICES.map((mc) => {
-      const on = mc.provider === (agent.modelProvider || "anthropic") && mc.model === (agent.model || "claude-haiku-4-5");
-      return React.createElement("button", { key: mc.id, onClick: () => patch({ modelProvider: mc.provider, model: mc.model }),
-        className: "w-full text-left px-3 py-2.5",
-        style: { border: "1px solid " + (on ? COLORS.lamp : COLORS.line), background: on ? COLORS.lampTint : COLORS.card,
-                 borderRadius: 12, marginBottom: 6, display: "block" } },
+    H("BRAIN"),
+    sub("Which model takes the order. If a call ever fails the moment it connects, a wrong model name here is the first thing to check — Vapi's own model list has the current ones."),
+    MODEL_CHOICES.map((mc) => { const on = mc.provider === (agent.modelProvider || "anthropic") && mc.model === (agent.model || "claude-haiku-4-5");
+      return React.createElement("button", { key: mc.id, onClick: () => patch({ modelProvider: mc.provider, model: mc.model }), className: "w-full text-left px-3 py-2.5",
+        style: { border: "1px solid " + (on ? COLORS.lamp : COLORS.line), background: on ? COLORS.lampTint : COLORS.card, borderRadius: 12, marginBottom: 6, display: "block" } },
         React.createElement("div", { className: "flex items-baseline justify-between gap-2" },
           React.createElement("span", { style: { fontFamily: "Inter", fontWeight: 700, fontSize: 15.5, color: COLORS.crust } }, mc.label),
           React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, color: "#8A9096" } }, mc.cost)),
-        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13.5, color: "#5F676E", marginTop: 1 } }, mc.note));
-    }),
+        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13.5, color: "#5F676E", marginTop: 1 } }, mc.note)); }),
     React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#5F676E", background: "#F7F7F5", borderRadius: 10, padding: "8px 10px", margin: "2px 0 4px" } }, MODEL_NOTE),
-    !MODEL_CHOICES.some((mc) => mc.provider === (agent.modelProvider || "anthropic") && mc.model === (agent.model || "claude-haiku-4-5"))
-      ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: COLORS.crust, marginTop: 4 } },
-          "Currently set to ", React.createElement("b", null, (agent.modelProvider || "?") + " / " + (agent.model || "?"))) : null,
+    rule(),
 
-    React.createElement("div", { style: { height: 1, background: COLORS.line, margin: "16px 0 14px" } }),
-
-    React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontSize: 18, letterSpacing: ".02em", marginBottom: 2 } }, "LANGUAGES"),
-    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginBottom: 10 } },
-      langs.length > 1
-        ? "The phone will answer a caller in whichever of these they speak, and take the whole order in it."
-        : "English only. Turn one on and the phone will answer callers who speak it."),
-    React.createElement("div", { className: "flex flex-wrap gap-2" },
-      LANGUAGE_CHOICES.map((l) => {
-        const on = langs.indexOf(l.code) >= 0;
-        return React.createElement("button", { key: l.code, onClick: () => toggleLang(l.code), disabled: l.code === "en",
-          style: { fontFamily: "Inter", fontSize: 14.5, fontWeight: 600, borderRadius: 999, padding: "9px 15px", minHeight: 44,
-                   border: "1px solid " + (on ? "transparent" : COLORS.line), background: on ? COLORS.crust : COLORS.card,
-                   color: on ? "#FFFFFF" : COLORS.crust, opacity: l.code === "en" ? 0.75 : 1 } },
-          l.label, l.code === "en" ? " \u00b7 always" : "");
-      })),
-    langs.length > 1 ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#8A9096", marginTop: 10 } },
-      "Menu items keep their English names in any language. Anything the phone can't handle goes to a person.") : null,
-    React.createElement("div", { style: { height: 1, background: COLORS.line, margin: "16px 0 14px" } }),
-
-    React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontSize: 18, letterSpacing: ".02em", marginBottom: 2 } }, "WHAT IT SAYS FIRST"),
-    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginBottom: 10 } },
-      "Leave one blank and the phone writes that greeting itself from the hours and the wait. Fill one in and it says exactly that."),
-    [["greetingOpen", "While you're open", "Thanks for calling On Point Pizza — pickup order, or a question?"],
-     ["greetingClosed", "After hours", "Thanks for calling On Point Pizza. We're closed right now — we open at eleven."],
-     ["greetingPaused", "While orders are paused", "Thanks for calling — we're slammed and not taking phone orders right now."]].map((g) =>
-      React.createElement("div", { key: g[0], style: { marginBottom: 10 } },
-        React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "#5F676E", marginBottom: 4 } }, g[1]),
-        React.createElement("textarea", { className: "w-full px-3 py-2 outline-none opp-field", rows: 2, placeholder: g[2],
-          style: { minHeight: 62, resize: "vertical", fontFamily: "Inter", fontSize: 15 },
-          value: agent[g[0]] || "", onChange: (e) => patch({ [g[0]]: e.target.value }) }))),
-
-    React.createElement("div", { style: { height: 1, background: COLORS.line, margin: "16px 0 14px" } }),
-
-    React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontSize: 18, letterSpacing: ".02em", marginBottom: 2 } }, "DELIVERY"),
-    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginBottom: 10 } },
-      "What the phone does when someone asks for delivery."),
+    H("DELIVERY"),
+    sub("What the phone does when someone asks for delivery."),
     React.createElement("div", { className: "flex flex-wrap gap-2", style: { marginBottom: 10 } },
-      [["link", "Text them the online link", "No drivers of our own — delivery is through online ordering"],
-       ["in-house", "Take it on the phone", "We deliver ourselves; the phone asks for the address"],
-       ["none", "Pickup only", "No delivery at all"]].map((o) => {
-        const cur = agent.delivery === undefined || agent.delivery === true || agent.delivery === false
-          ? (agent.delivery === true ? "in-house" : agent.delivery === false ? "none" : "link") : agent.delivery;
+      [["link", "Text them the online link", "No drivers of our own — delivery is through online ordering"], ["in-house", "Take it on the phone", "We deliver ourselves; the phone asks for the address"], ["none", "Pickup only", "No delivery at all"]].map((o) => {
+        const cur = agent.delivery === undefined || agent.delivery === true || agent.delivery === false ? (agent.delivery === true ? "in-house" : agent.delivery === false ? "none" : "link") : agent.delivery;
         const on = cur === o[0];
         return React.createElement("button", { key: o[0], onClick: () => patch({ delivery: o[0] }), className: "text-left px-3 py-2",
           style: { flex: "1 1 160px", borderRadius: 12, border: "1px solid " + (on ? COLORS.lamp : COLORS.line), background: on ? COLORS.lampTint : COLORS.card } },
           React.createElement("div", { style: { fontFamily: "Inter", fontWeight: 700, fontSize: 14.5, color: COLORS.crust } }, o[1]),
-          React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#5F676E" } }, o[2]));
-      })),
-    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "#5F676E", marginBottom: 4 } }, "Online ordering link"),
-    React.createElement("input", { className: "w-full px-3 outline-none opp-field", placeholder: "oppgansett.com",
-      value: agent.orderLink || "", onChange: (e) => patch({ orderLink: e.target.value }) }),
-    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#8A9096", marginTop: 6 } },
-      "Texted to callers who want delivery. Blank = whatever the menu's info note says. Texting needs Twilio set up in Netlify; until then the phone reads the link out loud."),
+          React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#5F676E" } }, o[2])); })),
+    small("Online ordering link"),
+    React.createElement("input", { className: "w-full px-3 outline-none opp-field", placeholder: "oppgansett.com", value: agent.orderLink || "", onChange: (e) => patch({ orderLink: e.target.value }) }),
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#8A9096", marginTop: 6 } }, "Texted to callers who want delivery. Blank = whatever the menu's info note says. Texting needs Twilio set up in Netlify; until then the phone reads the link out loud."),
+    rule(),
 
-    React.createElement("div", { style: { height: 1, background: COLORS.line, margin: "16px 0 14px" } }),
     React.createElement(TempHoursSettings, { data, persist, canEdit }),
+    rule(),
 
-    !canEdit ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginTop: 10 } }, "Unlock admin to change these.") : null);
+    H("HANDING OFF TO A PERSON"),
+    sub("Where the phone sends a caller who needs a human. Not the shop's own line if that forwards to the assistant — that loops."),
+    small("Transfer number"),
+    React.createElement("input", { className: "w-full px-3 outline-none opp-field", placeholder: "(401) 555-0100", inputMode: "tel", value: agent.transferNumber || "", onChange: (e) => patch({ transferNumber: e.target.value }) }),
+    React.createElement("div", { className: "flex items-center gap-2", style: { marginTop: 10 }, "data-transfer-closed": agent.transferWhenClosed === false ? "off" : "on" },
+      pill("Transfer after close too", agent.transferWhenClosed !== false, () => patch({ transferWhenClosed: true })),
+      pill("Take a message after close", agent.transferWhenClosed === false, () => patch({ transferWhenClosed: false }))),
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: "#8A9096", marginTop: 6 } }, "On by default: somebody calling at 9:17 about the 8:40 order that came out wrong should still get a person. If nobody picks up, the phone takes a name and number either way."),
+    rule(),
+
+    H("BLOCKED CALLERS"),
+    sub("A blocked number still gets picked up: it hears one line — “we're not able to take this call” — and the call ends. Block from a call's row, or add a number here."),
+    blocked.map((b, i) => React.createElement("div", { key: b.number || i, "data-blocked": b.number, className: "flex items-center justify-between gap-2 px-3 py-2 mb-1.5", style: { border: "1px solid " + COLORS.line, borderRadius: 12 } },
+      React.createElement("div", null,
+        React.createElement("div", { style: { fontFamily: "JetBrains Mono", fontSize: 14, color: COLORS.crust } }, fmtPhone(b.number)),
+        b.note || b.at ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, color: "#8A9096" } }, [b.note, b.at ? "blocked " + new Date(b.at).toLocaleDateString([], { month: "short", day: "numeric" }) : ""].filter(Boolean).join(" · ")) : null),
+      canEdit ? React.createElement("button", { onClick: () => patch({ blocked: blocked.filter((x) => x !== b) }), style: { background: "transparent", border: "1px solid " + COLORS.line, borderRadius: 999, padding: "6px 10px", fontFamily: "Inter", fontSize: 13, fontWeight: 600, color: COLORS.crust } }, "Unblock") : null)),
+    !blocked.length ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginBottom: 6 } }, "Nobody blocked.") : null,
+    canEdit ? React.createElement("div", { className: "flex gap-2" },
+      React.createElement("input", { className: "flex-1 px-3 outline-none opp-field", placeholder: "(401) 555-0100", inputMode: "tel", value: newBlock, onChange: (e) => setNewBlock(e.target.value), onKeyDown: (e) => { if (e.key === "Enter") addBlock(); } }),
+      React.createElement(TicketButton, { onClick: addBlock }, "Block")) : null,
+    rule(),
+
+    H("SUPPORT"),
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: COLORS.crust } }, React.createElement("a", { href: "mailto:" + SUPPORT_EMAIL, style: { color: COLORS.ink, fontWeight: 600, textDecoration: "none" } }, SUPPORT_EMAIL)),
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginTop: 2 } }, "Report a call from its row in Calls and it lands here with the recording and the transcript. Reports get a reply, usually by the next morning."),
+
+    canEdit ? [rule(),
+      React.createElement("div", { key: "off", "data-off-control": "1" },
+        H(off ? "THE PHONE IS OFF" : "OFF"),
+        sub(off ? "Callers are picked up, hear the line below, and the call ends. Nothing is taken." : "Turns the assistant off: callers still get picked up, hear one line, and the call ends. For pausing orders while you catch up, use Now → Pause instead."),
+        greetingBox("greetingOff", "What it says while off", "Thanks for calling " + shopName + ". Our phone assistant is off right now — please try again a little later."),
+        off
+          ? React.createElement(TicketButton, { onClick: () => patch({ off: false }) }, "Turn the phone back on")
+          : confirmOff
+            ? React.createElement("div", { className: "flex gap-2 flex-wrap items-center" },
+                React.createElement(TicketButton, { onClick: () => { patch({ off: true }); setConfirmOff(false); }, color: COLORS.alert, style: { color: "#FFFFFF" } }, "Yes, turn it off"),
+                React.createElement("button", { onClick: () => setConfirmOff(false), style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.crust } }, "Keep it on"))
+            : React.createElement("button", { onClick: () => setConfirmOff(true), style: { background: "transparent", border: "1px solid " + COLORS.alertDark, color: COLORS.alertDark, borderRadius: 12, minHeight: 44, padding: "0 16px", fontFamily: "Inter", fontSize: 15, fontWeight: 600 } }, "Turn the phone off…"))]
+      : React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginTop: 14 } }, "Unlock admin to change these."));
 }
 
 // Saved "we're not opening till four" days. Applying one is a tap on the Today

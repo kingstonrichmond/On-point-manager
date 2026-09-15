@@ -45,3 +45,13 @@ export async function monthCalls(store, month) {
   const list = (await store.get('calls/' + month, { type: 'json' })) ?? [];
   return Array.isArray(list) ? list : [];
 }
+
+/** Patch one archived record in place (e.g. attach a report). Returns true if found. */
+export async function patchArchivedCall(store, month, id, patch) {
+  const list = await monthCalls(store, month);
+  if (!list) return false;
+  let hit = false;
+  const next = list.map((c) => (c && c.id === id ? (hit = true, { ...c, ...patch }) : c));
+  if (hit) await store.setJSON('calls/' + month, next);
+  return hit;
+}

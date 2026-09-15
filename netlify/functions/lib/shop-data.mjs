@@ -382,6 +382,8 @@ function normalizeProfile(data) {
     phone: p.phone ?? info.phone ?? '',
     address: p.address ?? info.address ?? p.location ?? '',
     brandNotes: p.brandNotes ?? p.notes ?? '',
+    location: p.location ?? '',
+    email: String(p.email ?? '').trim(),
     timezone: p.timezone ?? 'America/New_York',
   };
 }
@@ -508,7 +510,31 @@ function normalizeAgentSettings(data) {
     // Vapi's docs are explicit that a model won't do it without being told.
     languages: (arr(a.languages).length ? arr(a.languages) : ['en']).map((x) => String(x).toLowerCase()),
     minutesBeforeCloseCutoff: num(a.minutesBeforeCloseCutoff, 15),
+    // Off: the phone picks up, says one line, and ends the call. Nothing else.
+    off: !!a.off,
+    greetingOff: a.greetingOff ?? '',
+    // After close, someone with a problem about an order already placed can
+    // still reach a person. The owner's call: default ON.
+    transferWhenClosed: a.transferWhenClosed !== false,
+    // Blocked numbers get a polite hang-up, not a rejected ring.
+    blocked: arr(a.blocked).map(normalizeBlocked).filter(Boolean),
+    // Owner-typed question/answer pairs, read into the prompt as one block.
+    faq: arr(a.faq).map((f) => ({ q: String(f?.q ?? '').trim(), a: String(f?.a ?? '').trim() })).filter((f) => f.q && f.a),
+    ambient: a.ambient === 'office' ? 'office' : 'off',
+    voiceSpeed: Math.min(1.5, Math.max(0.7, num(a.voiceSpeed, 1) || 1)),
   };
+}
+
+/** The last ten digits — how a number is compared no matter how it was typed. */
+export const phoneKey = (s) => { const d = String(s ?? '').replace(/\D/g, ''); return d.length === 11 && d[0] === '1' ? d.slice(1) : d; };
+function normalizeBlocked(b) {
+  const number = phoneKey(typeof b === 'string' ? b : b?.number);
+  if (number.length < 7) return null;
+  return { number, at: (b && b.at) || null, note: String((b && b.note) || '').slice(0, 120) };
+}
+export function isBlocked(shop, number) {
+  const k = phoneKey(number);
+  return !!k && (shop?.agent?.blocked || []).some((b) => b.number === k);
 }
 
 /** Build the normalized snapshot the agent reads. */
