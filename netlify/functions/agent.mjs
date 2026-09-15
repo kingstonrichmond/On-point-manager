@@ -15,7 +15,8 @@
 // Request → Response). `path` gives it the clean URL /agent.
 
 import { loadShopData, normalizeShop } from './lib/shop-data.mjs';
-import { buildVapiAssistant, handleToolCalls, summarizeCallReport } from './lib/vapi-adapter.mjs';
+import { buildVapiAssistant, blockedAssistant, handleToolCalls, summarizeCallReport, callInfo } from './lib/vapi-adapter.mjs';
+import { isBlocked } from './lib/shop-data.mjs';
 
 export const config = { path: '/agent' };
 
@@ -70,7 +71,9 @@ export default async (req, context) => {
 
   switch (type) {
     case 'assistant-request':
-      // Vapi asks us, per inbound call, which assistant to run → fresh prompt every call
+      // Vapi asks us, per inbound call, which assistant to run → fresh prompt every call.
+      // A blocked number still gets picked up: one polite line, then the call ends.
+      if (isBlocked(shop, callInfo(message).from)) return json({ assistant: blockedAssistant(shop, env) });
       return json({ assistant: buildVapiAssistant(shop, env, { serverUrl }) });
 
     case 'tool-calls':
@@ -78,6 +81,7 @@ export default async (req, context) => {
 
     case 'end-of-call-report': {
       const rec = summarizeCallReport(message);
+      if (isBlocked(shop, rec.from)) rec.blocked = true;
       await saveCall(env, rec);
       await archiveCall(rec);
       return json({ ok: true });

@@ -27,22 +27,26 @@ export function buildVapiAssistant(shop, env = process.env, { serverUrl } = {}) 
     firstMessage: greeting(shop),
     firstMessageMode: 'assistant-speaks-first',
     model: {
-      provider: env.VAPI_MODEL_PROVIDER || 'anthropic',
-      model: env.VAPI_MODEL || 'claude-haiku-4-5-20251001', // fast + cheap; swap in the dashboard if Vapi names it differently
+      // An env override wins (it's what's known to work on this account); the
+      // Brain picker in Setup is what applies when none is set.
+      provider: env.VAPI_MODEL_PROVIDER || shop.agent.modelProvider || 'anthropic',
+      model: env.VAPI_MODEL || shop.agent.model || 'claude-haiku-4-5-20251001',
       temperature: 0.3,
       maxTokens: 250,
       messages: [{ role: 'system', content: buildSystemPrompt(shop) }],
       tools: [...functionTools, ...transfer],
     },
-    transcriber: parseJSON(env.VAPI_TRANSCRIBER_JSON, { provider: 'deepgram', model: 'nova-3', language: 'en', keywords: keywordsFor(shop) }),
+    transcriber: parseJSON(env.VAPI_TRANSCRIBER_JSON, { provider: 'deepgram', model: 'nova-3', language: (shop.agent.languages || ['en']).length > 1 ? 'multi' : 'en', keywords: keywordsFor(shop) }),
     // Vapi retired Paige on 1 March 2026 and now REJECTS any assistant that asks
     // for a retired voice, which fails assistant-request outright — no call, no
     // fallback. version 2 is what Vapi's own voices need (see DEFAULT_VOICE in
     // shop-data.mjs). Pick a different one in the Vapi dashboard; any provider works.
-    voice: parseJSON(env.VAPI_VOICE_JSON, { provider: 'vapi', voiceId: 'Savannah', version: 2 }),
+    // The voice is shop data (Setup's picker), not an env var: changing it is a
+    // tap, not a redeploy. Speed rides along only when it's been moved off 1.
+    voice: withSpeed(shop.agent.voice || parseJSON(env.VAPI_VOICE_JSON, { provider: 'vapi', voiceId: 'Savannah', version: 2 }), shop.agent.voiceSpeed),
     silenceTimeoutSeconds: 20,
     maxDurationSeconds: 900,
-    backgroundSound: 'off',
+    backgroundSound: shop.agent.ambient === 'office' ? 'office' : 'off',
     // One field from Vapi's end-of-call analysis: the frustration mark on the
     // Calls list. "fine" is drawn as nothing — a mark on most rows is a mark on none.
     analysisPlan: {
@@ -57,6 +61,37 @@ export function buildVapiAssistant(shop, env = process.env, { serverUrl } = {}) 
     ...(serverUrl ? { server: { url: serverUrl } } : {}),
     metadata: { shop: shop.profile.name, builtAt: new Date().toISOString() },
   };
+}
+
+function withSpeed(voice, speed) {
+  const v = { ...(voice || {}) };
+  const sp = Number(speed);
+  if (Number.isFinite(sp) && sp > 0 && Math.abs(sp - 1) > 0.001) v.speed = Math.round(sp * 100) / 100;
+  return v;
+}
+
+/** The whole assistant for a caller on the block list: one polite line, then the call ends. */
+export function blockedAssistant(shop, env = process.env) {
+  const a = buildVapiAssistant(shop, env, {});
+  return {
+    ...a,
+    firstMessage: "Sorry, we're not able to take this call.",
+    model: { ...a.model, tools: [], messages: [{ role: 'system', content: 'The caller is on the block list. Say nothing beyond the first message. End the call.' }] },
+    maxDurationSeconds: 12,
+    endCallMessage: 'Goodbye.',
+  };
+}
+
+// What Setup pushes to the static assistant the number runs (vapi-sync.mjs):
+// everything that is the shop's to decide, and nothing that is the account's -
+// no name, no server URL, no metadata. Tools carry no server of their own so
+// they inherit the assistant's.
+const PATCH_FIELDS = ['firstMessage', 'firstMessageMode', 'model', 'transcriber', 'voice', 'analysisPlan', 'backgroundSound', 'silenceTimeoutSeconds', 'maxDurationSeconds', 'endCallFunctionEnabled', 'endCallMessage', 'serverMessages'];
+export function assistantPatch(shop, env = process.env) {
+  const a = buildVapiAssistant(shop, env, {});
+  const out = {};
+  for (const k of PATCH_FIELDS) if (a[k] !== undefined) out[k] = a[k];
+  return out;
 }
 
 /** Menu words the transcriber should bias toward (Deepgram keyword boosting). */

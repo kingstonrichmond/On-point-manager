@@ -6,6 +6,7 @@ import {
   normalizeShop, shopStatus, hoursText, hourLabel, findMenuItems, isEightySixed, priceText, menuText, menuNotes, squash, updateShopData, sayable,
 } from './shop-data.mjs';
 import { languageName, voiceSupportsMultilingual } from './voices.mjs';
+import { phoneKey } from './shop-data.mjs';
 import { makeSink } from './order-sink.mjs';
 
 // ------------------------------------------------------------------ prompt
@@ -34,7 +35,7 @@ export function buildSystemPrompt(shop, at = new Date()) {
   return `You are the phone host for ${shop.profile.name}${shop.profile.address ? ` (${shop.profile.address})` : ''}. You answer the phone, take orders${a.delivery ? ' for pickup or delivery' : ' for pickup'}, and answer questions. You sound like a friendly, competent person who works there — brief, warm, natural. This is a voice call: keep every reply short (one or two sentences), never read lists unless asked, never use markdown, and say numbers the way a person would ("eighteen fifty", "about forty-five minutes").
 
 CURRENT STATUS (${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][st.dow]} ${hourLabel(st.hour)}): ${st.open ? `OPEN, closes at ${st.closesAt}${st.minutesToClose <= 45 ? ` — only ${st.minutesToClose} minutes left` : ''}` : (st.today.closed ? 'CLOSED ALL DAY today' : `CLOSED right now — opens ${st.opensAt}`)}.${st.temporary ? ` TODAY'S HOURS ARE DIFFERENT FROM USUAL${st.today.name ? ` (${st.today.name})` : ''} — quote today's, not the normal ones.` : ''}
-${st.paused ? `\n*** PHONE ORDERS ARE PAUSED RIGHT NOW${a.pause.reason ? ` (${a.pause.reason})` : ''}. Do NOT take an order, and do not promise a time. Tell the caller we're not taking phone orders at the moment and they can try again shortly.${a.pausedAnswersQuestions ? ' You may still answer questions about the menu and hours.' : ' Offer to put them through to someone.'} ***\n` : ''}
+${a.off ? `\n*** THE PHONE ASSISTANT IS SWITCHED OFF. Say the greeting, take no order, answer no questions, and end the call politely. ***\n` : ''}${a.blocked.length ? `\nBLOCKED CALLERS: the caller's number is {{customer.number}}. If it is one of these — ${a.blocked.map((b) => '+1' + b.number).join(', ')} — say exactly "Sorry, we're not able to take this call." and end the call at once. No order, no transfer, nothing else.\n` : ''}${st.paused ? `\n*** PHONE ORDERS ARE PAUSED RIGHT NOW${a.pause.reason ? ` (${a.pause.reason})` : ''}. Do NOT take an order, and do not promise a time. Tell the caller we're not taking phone orders at the moment and they can try again shortly.${a.pausedAnswersQuestions ? ' You may still answer questions about the menu and hours.' : ' Offer to put them through to someone.'} ***\n` : ''}
 HOURS: ${hoursText(shop)}.
 CURRENT WAIT: ${wait === null ? 'not set by the kitchen — use get_wait_time before promising any time, and if it is still unknown say you can\'t promise a time tonight' : `${wait} minutes for pickup (set by the kitchen${shop.wait.updatedAt ? ' ' + shop.wait.updatedAt : ''})`}.
 ${out86.length ? `WHOLE CATEGORIES OUT TODAY: ${out86.join(', ')}.\n` : ''}${outItems.length ? `ITEMS OUT TODAY (86'd): ${outItems.join(', ')}.\n` : ''}${shop.clover?.added?.length ? `(the register has ${shop.clover.added.join(', ')} marked out)\n` : ''}${shop.eightySix.low?.length ? `RUNNING LOW (may run out during the call — fine to sell, don't promise): ${shop.eightySix.low.join(', ')}.\n` : ''}DELIVERY: ${a.delivery ? `yes — we deliver. For delivery orders get the street address${a.deliveryNotes ? ' (' + a.deliveryNotes + ')' : ''}.` : 'no in-house delivery — pickup only from the shop.'}
@@ -48,10 +49,11 @@ RULES
 5. Take the order item by item: size, quantity, any changes. Repeat the full order back once before placing it, then call place_order. Get the caller's first name and a callback number before placing (the caller ID is usually right — confirm it, don't re-ask digit by digit).
 6. After place_order: if the result says the kitchen has it, say so and give the pickup time. If it says staff will key it in, say "you're all set, it'll be ready in about N minutes" — do NOT claim the kitchen already has the ticket.
 7. Hand off to a person (use transfer_to_staff, or transferCall if available) when: the caller asks for a person twice; a large or catering order (more than ${a.maxPizzasPerCall} pizzas); a complaint about a previous order; anything about a refund, payment problem, an allergy question you cannot answer from the menu description, ${a.delivery ? '' : 'a delivery request (we do not deliver in-house), '}or anything you are not sure about. Before transferring say "let me grab someone for you". If nobody picks up, take a message with flag_for_staff.
-8. Within ${a.minutesBeforeCloseCutoff} minutes of close, tell the caller we are about to close and only take the order if it is simple; after close, give tomorrow's hours and do not take an order.
+8. Within ${a.minutesBeforeCloseCutoff} minutes of close, tell the caller we are about to close and only take the order if it is simple; after close, give tomorrow's hours and do not take an order.${a.transferWhenClosed ? ' After close a caller with a problem about an order they already placed can still be handed to a person (transfer_to_staff); if nobody picks up, take a message with flag_for_staff.' : ' After close do not transfer; take a message with flag_for_staff.'}
 9. Never make up specials, deals, or ingredients. If you don't know, say so and offer to have someone call back.
 10. ${a.upsell ? 'You may suggest one add-on (a drink or a side) once, casually — never push.' : 'Do not upsell.'}
-${langRule}${menuNotes(shop.raw) ? `\nMENU NOTES: ${menuNotes(shop.raw)}` : ''}${a.extraNotes ? `\nSHOP NOTES: ${a.extraNotes}` : ''}${shop.profile.brandNotes ? `\nABOUT US: ${shop.profile.brandNotes}` : ''}
+11. If the caller may be calling about an order they placed today (is it ready, forgot a drink, said no onions), call lookup_recent_order first — it looks up their own number, today only — and open with what it finds: "calling about the large pepperoni from seven-oh-four? It's due at seven forty-five." A change to that order goes to the kitchen with flag_for_staff; do not place a second order for it.
+${langRule}${menuNotes(shop.raw) ? `\nMENU NOTES: ${menuNotes(shop.raw)}` : ''}${a.extraNotes ? `\nSHOP NOTES: ${a.extraNotes}` : ''}${a.faq.length ? `\nFAQ — answer these exactly as written, in your own words only where the caller asks something adjacent:\n${a.faq.map((f) => `- Q: ${f.q} → A: ${f.a}`).join('\n')}` : ''}${shop.profile.brandNotes ? `\nABOUT US: ${shop.profile.brandNotes}` : ''}
 
 MENU (in-store prices; anything marked 86'd is out today)
 ${menuText(shop, { withPrices: true })}
@@ -66,6 +68,7 @@ export function greeting(shop, at = new Date()) {
 
   // Most specific state first. Each is blank by default and falls through to
   // the generated line, so a shop only writes the ones it cares about.
+  if (a.off) return a.greetingOff || `Thanks for calling ${shop.profile.name}. Our phone assistant is off right now — please try again a little later.`;
   if (st.paused) {
     if (a.greetingPaused) return a.greetingPaused;
     return `Thanks for calling ${shop.profile.name}. We're not taking phone orders at the moment — the kitchen is backed up. ${a.pausedAnswersQuestions ? "I can still answer questions, or you're welcome to try again in a bit." : "Please try again in a little while."}`;
@@ -137,6 +140,11 @@ export const TOOLS = [
     name: 'transfer_to_staff',
     description: 'Hand the call to a person at the counter. Call this only after telling the caller you are transferring them.',
     parameters: { type: 'object', properties: { reason: { type: 'string' } }, required: ['reason'] },
+  },
+  {
+    name: 'lookup_recent_order',
+    description: 'Look up any order placed TODAY from the number the caller is calling from. Use it when they may be calling back about an order: is it ready, forgot something, a change. Returns nothing about other days or other numbers.',
+    parameters: { type: 'object', properties: {} },
   },
   {
     name: 'flag_for_staff',
@@ -244,6 +252,7 @@ export function createHandlers({ shop, env = process.env, sink = makeSink(env), 
 
     async place_order(args) {
       const st = shopStatus(shop, now());
+      if (shop.agent.off) return { ok: false, error: 'The phone assistant is switched off. Do not take the order; say we are not taking calls right now and end the call.' };
       if (st.paused) return { ok: false, error: 'Phone orders are paused right now. Do not take the order — say we are not taking phone orders at the moment and they can try again shortly.' };
       if (!st.open) return { ok: false, error: 'Shop is closed; do not place the order. Give the next opening time.' };
       const lines = [], problems = [];
@@ -289,6 +298,31 @@ export function createHandlers({ shop, env = process.env, sink = makeSink(env), 
           ? `Say: the kitchen has it, ${type === 'delivery' ? 'it\'ll be on its way in about' : 'it\'ll be ready in about'} ${shop.wait.pickupMin ?? 'a few'} minutes, under the name ${args.customer_name}.`
           : `Say: you're all set, ${type === 'delivery' ? 'it\'ll be on its way in about' : 'it\'ll be ready in about'} ${shop.wait.pickupMin ?? 'a few'} minutes, under the name ${args.customer_name}. Do NOT say the kitchen already has the ticket.`,
       };
+    },
+
+    async lookup_recent_order() {
+      const mine = phoneKey(call.from);
+      if (!mine) return { orders: [], note: 'No caller number on this call. Ask for the name the order is under and use flag_for_staff.' };
+      const tz = shop.profile.timezone || 'America/New_York';
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(now());
+      const dayOf = (iso) => { try { return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(iso)); } catch { return ''; } };
+      const clock = (iso) => { try { return new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' }).format(new Date(iso)); } catch { return ''; } };
+      const orders = (Array.isArray(shop.raw?.phoneOrders) ? shop.raw.phoneOrders : [])
+        .filter((o) => o && phoneKey(o.caller?.phone) === mine && dayOf(o.createdAt) === today)
+        .sort((x, y) => (x.createdAt < y.createdAt ? 1 : -1))
+        .slice(0, 3)
+        .map((o) => ({
+          placed_at: clock(o.createdAt),
+          items: (o.items || []).map((l) => `${l.qty || 1} ${l.size ? l.size + ' ' : ''}${l.name}${l.mods && l.mods.length ? ' (' + l.mods.join(', ') + ')' : ''}`),
+          subtotal: o.subtotal,
+          order_type: o.type || 'pickup',
+          quoted_wait_min: o.quotedWaitMin ?? null,
+          due_at: o.quotedWaitMin != null ? clock(new Date(Date.parse(o.createdAt) + o.quotedWaitMin * 60000).toISOString()) : null,
+          picked_up: o.status === 'done',
+          in_kitchen: !!(o.posResult && o.posResult.ok) || !!o.keyedIntoPos,
+        }));
+      if (!orders.length) return { orders: [], note: 'No order today from this number. Ask what they are calling about.' };
+      return { orders, instruction: 'Open with the most recent one: what it was, when it was placed, when it is due. If they want to change it, use flag_for_staff with the change — do not place a second order.' };
     },
 
     async transfer_to_staff({ reason }) {
