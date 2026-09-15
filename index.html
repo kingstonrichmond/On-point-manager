@@ -1115,6 +1115,17 @@ function migrateShopProfile(d) {
     d.shopProfile.bookkeeper = d.shopProfile.name === "On Point Pizza" ? "Val" : "";
     changed = true;
   }
+  // v3: the one wont-buy call the owner has already made out loud. Seeded here
+  // rather than in the inventory seed because his document was written before
+  // the flag existed — and only where it hasn't been touched, so a shop that
+  // decides otherwise keeps its answer.
+  if (!d.wontBuySeeded) {
+    (d.inventory || []).forEach((i) => {
+      if (i.item === "Souffle Lids" && !i.wontBuy) i.wontBuy = { thomsen: true, thomsenWhy: "not Solo" };
+    });
+    d.wontBuySeeded = true;
+    changed = true;
+  }
   d.shopProfileVersion = SHOP_PROFILE_VERSION;
   return { data: d, changed };
 }
@@ -2143,6 +2154,13 @@ function SettingsTab({ sync, syncSecs, setSyncSecs, onSyncNow, onReloadFromServe
       "Bookkeeper",
       "Who the tip sheet gets sent to. Their name goes on the note field and the copy button on the Tips tab.",
       /* @__PURE__ */ React.createElement("input", { value: (data && data.shopProfile && data.shopProfile.bookkeeper) || "", placeholder: "e.g. Val", onChange: (e) => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { shopProfile: Object.assign({}, data.shopProfile, { bookkeeper: e.target.value }) })), className: "w-full px-3 outline-none opp-field" })
+    ),
+    role === "admin" && Row(
+      "Main distributor",
+      "Who you'd buy from if you weren't comparing at all. Only used to word the savings headline on Stock \u2014 with one set it reads \u201cordering everything from them would have cost $X more\u201d; with none it reads as the cost of picking arbitrarily.",
+      /* @__PURE__ */ React.createElement("select", { value: (data && data.shopProfile && data.shopProfile.mainDistributor) || "", onChange: (e) => persist && persist(Object.assign(JSON.parse(JSON.stringify(data)), { shopProfile: Object.assign({}, data.shopProfile, { mainDistributor: e.target.value }) })), className: "w-full px-3 outline-none opp-field" },
+        /* @__PURE__ */ React.createElement("option", { value: "" }, "No main one \u2014 we shop around"),
+        VENDORS.filter((v) => v.kind === "food").map((v) => /* @__PURE__ */ React.createElement("option", { key: v.id, value: v.id }, v.label)))
     ),
     role === "admin" && Row(
       "Brand notes",
@@ -9072,21 +9090,46 @@ function sizeGapWhy(i, q, t) {
 // when we count in a real measure and only a guess when it's box against case.
 // `trusted` is the difference, and it's what decides whether a number is money
 // or just a lead.
+// Some items are cheaper at a vendor this shop won't buy from, for reasons a
+// price can't see — Thomsen's souffle lids aren't Solo. A saving that will never
+// be taken is not a saving, so a flagged item leaves every total in both
+// directions. The price still shows; it just stops being counted.
+function wontBuyFrom(i, vk) { return !!(i && i.wontBuy && i.wontBuy[vk]); }
+function wontBuyBlocked(i) { return VENDORS.some((v) => v.kind === "food" && wontBuyFrom(i, v.key)); }
+function wontBuyWhy(i) {
+    const v = VENDORS.filter((x) => x.kind === "food").find((x) => wontBuyFrom(i, x.key));
+    if (!v) return "";
+    const note = (i.wontBuy && i.wontBuy[v.key + "Why"]) || "";
+    return "Not buying " + v.short + (note ? " \u2014 " + note : "");
+}
+// Catch weight moves delivery to delivery. Gorgonzola at $4.08 against $4.06 is
+// not a difference worth switching a vendor over, it's the same cheese weighed
+// twice, so anything inside 3% of the cheaper side reads as level.
+const NOISE_FLOOR = 0.03;
+function levelPegged(qb, tb) {
+    const lo = Math.min(qb, tb);
+    // The epsilon is not fussiness: 1.03 - 1.00 is 0.030000000000000027 in binary,
+    // so without it a gap of exactly 3% falls on whichever side the float dust
+    // lands, and the same two prices could read level one week and not the next.
+    return !(lo > 0) || Math.abs(qb - tb) <= NOISE_FLOOR * lo + 1e-9;
+}
 function cheaperSide(i) {
     const q = vendorPriceOf(i, "qfc"), t = vendorPriceOf(i, "thomsen");
-    const blank = (extra) => Object.assign({ side: null, diff: 0, comparable: false, trusted: false, basis: null, how: "", why: "", q, t, qb: null, tb: null }, extra || {});
+    const blocked = wontBuyBlocked(i);
+    const blank = (extra) => Object.assign({ side: null, diff: 0, comparable: false, trusted: false, basis: null, how: "", why: "", blocked, q, t, qb: null, tb: null }, extra || {});
     if (!q || !t)
         return blank();
     // Best case: both sides land on the same real measure.
     const a = compSize(i, "qfc"), b = compSize(i, "thomsen");
     if (a && b && a.u === b.u && a.n > 0 && b.n > 0) {
         const qb = q.amt / a.n, tb = t.amt / b.n;
+        const level = levelPegged(qb, tb);
         return {
-            side: qb === tb ? "even" : (qb < tb ? "qfc" : "thomsen"),
-            diff: Math.abs(qb - tb),
+            side: level ? "even" : (qb < tb ? "qfc" : "thomsen"),
+            diff: level ? 0 : Math.abs(qb - tb),
             comparable: true, trusted: true, basis: UNIT_WORD[a.u] || a.u, basisU: a.u,
             how: a.how === "unit" && b.how === "unit" ? "unit" : "size",
-            why: "", q, t, qb, tb
+            level, blocked, why: "", q, t, qb, tb
         };
     }
     // Fallback: price per the unit we count in. Fine when that unit is itself a
@@ -9098,12 +9141,13 @@ function cheaperSide(i) {
     // to vouch that the two cases hold the same amount — sameSize is that, and
     // it's usually the honest answer: a case of 12 in pizza boxes is 50 either way.
     const trusted = !!HARD_UNITS[normUnit(i.unit)] || i.sameSize === true;
+    const level = levelPegged(qb, tb);
     return {
-        side: qb === tb ? "even" : (qb < tb ? "qfc" : "thomsen"),
-        diff: Math.abs(qb - tb),
+        side: level ? "even" : (qb < tb ? "qfc" : "thomsen"),
+        diff: level ? 0 : Math.abs(qb - tb),
         comparable: true, trusted, basis: i.unit || "ea",
         how: HARD_UNITS[normUnit(i.unit)] ? "count" : (trusted ? "vouched" : "count"),
-        why: trusted ? "" : sizeGapWhy(i, q, t), q, t, qb, tb
+        level, blocked, why: trusted ? "" : sizeGapWhy(i, q, t), q, t, qb, tb
     };
 }
 // Show the size box when the number is missing or can't be trusted: a pack size
@@ -9214,6 +9258,34 @@ function SizeInput({ i, vk, patch }) {
                 ? "Their product name says “" + note + "” — check whether that's one of them or the whole " + label + "."
                 : "A weight if it has one: 50 lb, 8/6#, 4/1 gal, 24 ct."));
 }
+// "Cheaper" is not the only question. Thomsen's souffle lids aren't Solo, so
+// that line was quietly inflating the totals with a saving nobody was ever going
+// to take. One tap parks a vendor on an item, with room to say why.
+function WontBuyRow({ i, patch }) {
+    const [why, setWhy] = useState("");
+    const food = VENDORS.filter((v) => v.kind === "food");
+    const flagged = food.find((v) => wontBuyFrom(i, v.key));
+    const set = (vk, on, note) => {
+        const w = Object.assign({}, i.wontBuy || {});
+        if (on) { w[vk] = true; if (note != null) w[vk + "Why"] = note; }
+        else { delete w[vk]; delete w[vk + "Why"]; }
+        patch(i.id, { wontBuy: w });
+    };
+    if (flagged) {
+        const note = (i.wontBuy && i.wontBuy[flagged.key + "Why"]) || "";
+        return React.createElement("div", { className: "flex items-center gap-2 mt-1.5 flex-wrap" },
+            React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A5A00" } },
+                "Won't buy from " + flagged.short + (note ? " \u2014 " + note : "")),
+            React.createElement("input", { placeholder: "why? e.g. not Solo", value: note, onChange: (e) => set(flagged.key, true, e.target.value),
+                className: "px-2 outline-none rounded", style: { border: "1px solid " + COLORS.line, fontFamily: "Inter", fontSize: 12, minHeight: 30, width: 150, background: "#FAFAF8" } }),
+            React.createElement("button", { onClick: () => set(flagged.key, false), className: "text-xs underline",
+                style: { background: "transparent", border: "none", color: COLORS.muted, padding: 0 } }, "count it again"));
+    }
+    return React.createElement("div", { className: "flex items-center gap-1.5 mt-1.5 flex-wrap" },
+        React.createElement("span", { className: "text-xs", style: { fontFamily: "Inter", color: "#8A9096" } }, "Won't buy this from:"),
+        food.map((v) => React.createElement("button", { key: v.id, onClick: () => set(v.key, true, why), className: "text-xs px-2.5 py-1 rounded-full",
+            style: { fontFamily: "Inter", fontWeight: 600, border: "1px solid " + COLORS.line, background: "transparent", color: COLORS.crust } }, v.short)));
+}
 function PriceDetail({ i, vendorOf, patch }) {
     const c = cheaperSide(i);
     const col = (vk, key) => {
@@ -9257,7 +9329,10 @@ function PriceDetail({ i, vendorOf, patch }) {
             : "Can't compare these two yet \u2014 " + (c.why || "no size on file") + ".";
     }
     else if (c.side === "even")
-        verdict = "Same price either way \u2014 $" + c.qb.toFixed(2) + " per " + base + ".";
+        verdict = c.level && c.qb !== c.tb
+            ? "About the same \u2014 $" + Math.min(c.qb, c.tb).toFixed(2) + " vs $" + Math.max(c.qb, c.tb).toFixed(2) + " per " + base +
+              ", inside the 3% that catch weight moves on its own."
+            : "Same price either way \u2014 $" + c.qb.toFixed(2) + " per " + base + ".";
     else {
         const winner = c.side === "qfc" ? "QFC" : "Thomsen";
         const bigUnit = c.side === "qfc" ? c.t : c.q;
@@ -9272,7 +9347,9 @@ function PriceDetail({ i, vendorOf, patch }) {
         React.createElement("div", { className: "flex gap-2 flex-wrap" },
             col("qfc", "QFC"),
             col("thomsen", "Thomsen")),
-        React.createElement("div", { className: "text-sm mt-2 px-2.5 py-2 rounded", style: { background: COLORS.cream, fontFamily: "Inter", color: COLORS.crust } }, verdict),
+        React.createElement("div", { className: "text-sm mt-2 px-2.5 py-2 rounded", style: { background: c.blocked ? "#FBF7EE" : COLORS.cream, fontFamily: "Inter", color: COLORS.crust } },
+            c.blocked ? wontBuyWhy(i) + ". Price still shown, left out of the totals." : verdict),
+        React.createElement(WontBuyRow, { i: i, patch: patch }),
         // The comparison ran, but on two units nobody has vouched for. Say it
         // right under the number rather than letting the number speak for itself.
         c.comparable && !c.trusted ? React.createElement("div", { className: "text-xs mt-1.5 px-2.5 py-2 rounded", style: { background: "#FFF6E0", border: "1px solid #F0DDA6", fontFamily: "Inter", color: "#8A5A00" } },
@@ -9369,13 +9446,14 @@ function orderSavings(inv, vid) {
     // score soda lines against a comparison Pepsi isn't part of.
     const other = me && me.kind === "food" ? VENDORS.find((v) => v.kind === "food" && v.id !== vid) : null;
     const r = { vid, other: other ? other.id : null, saved: 0, savedN: 0, movable: 0, movableN: 0, movableIds: [],
-        checkN: 0, checkIds: [], checkMove: 0, checkMoveN: 0, unknownN: 0, linesN: 0 };
+        checkN: 0, checkIds: [], checkMove: 0, checkMoveN: 0, unknownN: 0, wontBuyN: 0, linesN: 0 };
     if (!other) return r;
     inv.forEach((i) => {
         const need = Number(orderNeedOf(i, vid));
         if (!(need > 0)) return;
         r.linesN++;
         const c = cheaperSide(i);
+        if (c.blocked) { r.wontBuyN++; return; }
         if (!c.comparable || c.side === "even") { if (!c.comparable) r.unknownN++; return; }
         const lb = lineCompUnits(i, vk, c);
         if (lb.n == null) { r.unknownN++; return; }
@@ -10218,7 +10296,7 @@ function FoodOrderTab({ data, persist }) {
         const vid = vidOf(i);
         if ((VENDOR_BY_ID[vid] || {}).kind !== "food") return null;
         const c = cheaperSide(i);
-        if (!c.comparable || c.side === "even") return null;
+        if (c.blocked || !c.comparable || c.side === "even") return null;
         const win = c.side === "qfc" ? "QFC" : "Thomsen";
         if (win === vid || !carriedBy(i, win)) return null;
         return { vid: win, diff: c.diff, base: c.basis || i.unit || "ea", trusted: c.trusted };
@@ -10314,7 +10392,7 @@ function FoodOrderTab({ data, persist }) {
         }
         const cats = groupByStation(onList);
         return React.createElement("div", null,
-            React.createElement(FoodOrderSavings, { inv: inv, onMoveAll: moveAll }),
+            React.createElement(FoodOrderSavings, { inv: inv, onMoveAll: moveAll, data: data }),
             React.createElement("div", { className: "space-y-1.5" }, cats.flatMap((g) => g.items).map((i) => {
                 const vid = onVid(i);
                 const o = orderOf(i, vid);
@@ -10404,7 +10482,7 @@ function FoodOrderTab({ data, persist }) {
         }
         return React.createElement("div", null,
             !packMode ? lensChips() : null,
-            !packMode && onList.length ? React.createElement(FoodOrderSavings, { inv: inv, onMoveAll: moveAll }) : null,
+            !packMode && onList.length ? React.createElement(FoodOrderSavings, { inv: inv, onMoveAll: moveAll, data: data }) : null,
             cats.map((g) => React.createElement("div", { key: g.name, className: "mb-4" },
                 React.createElement(StationHeader, { g: g }),
                 React.createElement("div", { className: "space-y-1.5" }, g.items.map((i) => setupRow(i))))),
@@ -10497,7 +10575,36 @@ function FoodOrderTab({ data, persist }) {
 // $X on N items already on the cheaper side · move M more and save $Y." It's
 // the sell, and it's information: the move-all button is there, and nothing
 // moves until it's tapped. Built on orderSavings from each vendor's side.
-function FoodOrderSavings({ inv, onMoveAll }) {
+// The combined headline used to add the two sides together and call the total a
+// saving. Arithmetically fine, but the baseline it implies — "we'd have bought
+// every line from whichever vendor was dearer" — is not a week that happens, so
+// the number reads inflated to anyone who checks it. Every figure here now names
+// the thing it's measured against.
+//
+// With a main distributor set, the counterfactual is "what if I'd just used
+// them for everything": the extra sits on the lines that are NOT with them, so
+// the figure is the OTHER side's total. (The spec's example pairs the label with
+// the named vendor's own side; that sentence isn't true of that number, and the
+// point of this pass is numbers that survive being checked by hand.)
+//
+// With none set, half the sum: a shop that isn't comparing isn't systematically
+// picking the dearer vendor, it's picking arbitrarily, so it lands wrong about
+// half the time. That's the expected cost of the coin flip.
+function savingsHeadline(data, sides) {
+    const money = (n) => "$" + n.toFixed(2);
+    const mainId = (data && data.shopProfile && data.shopProfile.mainDistributor) || "";
+    const main = VENDOR_BY_ID[mainId] && VENDOR_BY_ID[mainId].kind === "food" ? VENDOR_BY_ID[mainId] : null;
+    const total = sides.reduce((n, x) => n + (x.s.saved || 0), 0);
+    if (!total) return null;
+    if (main) {
+        const other = sides.find((x) => x.vid !== main.id);
+        const amt = other ? other.s.saved || 0 : 0;
+        if (!amt) return null;
+        return "Ordering everything from " + main.short + " would have cost " + money(amt) + " more";
+    }
+    return "Not comparing prices at all would have cost about " + money(total / 2) + " more";
+}
+function FoodOrderSavings({ inv, onMoveAll, data }) {
     const sides = [["QFC", "Thomsen"], ["Thomsen", "QFC"]].map(([vid, other]) => ({ vid, other, s: orderSavings(inv, vid) }));
     const linesN = sides.reduce((n, x) => n + (x.s.linesN || 0), 0);
     if (!linesN) return null;
@@ -10512,12 +10619,15 @@ function FoodOrderSavings({ inv, onMoveAll }) {
     const checkNames = sides.flatMap((x) => x.s.checkIds || []).map((id) => { const it = inv.find((r) => r.id === id); return it ? it.item : ""; }).filter(Boolean);
     const checkList = checkNames.slice(0, 3).join(", ") + (checkNames.length > 3 ? " and " + (checkNames.length - 3) + " more" : "");
     const money = (n) => "$" + n.toFixed(2);
+    const headline = savingsHeadline(data, sides);
+    const wontBuyN = sides.reduce((n, x) => n + (x.s.wontBuyN || 0), 0);
     const tone = movableN ? { bg: "#FFF6E0", fg: "#8A5A00", line: "#F0DDA6" }
         : (checkN && !savedN) ? { bg: "#FBF7EE", fg: "#8A5A00", line: "#E8DFC9" }
         : { bg: "#E4F1E6", fg: "#1F6B34", line: "#BFDCC5" };
     return React.createElement("div", { className: "px-3 py-2.5 rounded mb-2", style: { background: tone.bg, border: "1px solid " + tone.line } },
-        savedN > 0 ? React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: "#1F6B34" } },
-            "Saving " + money(saved) + " on " + savedN + (savedN === 1 ? " item" : " items") + " already on the cheaper vendor") : null,
+        headline ? React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: "#1F6B34" } }, headline) : null,
+        savedN > 0 ? React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#5F676E" } },
+            sides.filter((x) => x.s.savedN > 0).map((x) => (VENDOR_BY_ID[x.vid] || {}).short + ": saving " + money(x.s.saved) + " vs " + (VENDOR_BY_ID[x.other] || {}).short).join("  \u00b7  ")) : null,
         movableN > 0 ? React.createElement("div", { className: "flex items-center gap-2 flex-wrap", style: { marginTop: savedN ? 4 : 0 } },
             React.createElement("div", { className: "text-sm flex-1", style: { fontFamily: "Inter", fontWeight: 600, color: tone.fg, minWidth: 160 } },
                 "Move " + movableN + (movableN === 1 ? " item" : " items") + " to the cheaper vendor → save " + money(movable) + " more"),
@@ -10530,6 +10640,8 @@ function FoodOrderSavings({ inv, onMoveAll }) {
             checkMove > 0 ? "look about " + money(checkMove) + " cheaper elsewhere, but we're comparing a box to a case." : "can't be compared size for size yet.",
             React.createElement("div", { className: "text-xs mt-0.5", style: { color: "#8A9096" } }, "Open " + checkList + " and either put the weight in or mark both sizes the same.")) : null,
         unknownN ? React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: "#8A9096" } }, unknownN + " not compared — one price only, or a pack size to fill in") : null,
+        wontBuyN ? React.createElement("div", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: "#8A9096" } },
+            wontBuyN + (wontBuyN === 1 ? " item is" : " items are") + " left out — marked as a vendor you won't buy from") : null,
         React.createElement("div", { className: "text-xs mt-1.5 pt-1.5", style: { fontFamily: "Inter", color: "#8A9096", borderTop: "1px solid " + tone.line } },
             "Last price on file each side, per pound where we have a weight. Double-check the pack before you switch a vendor on price alone."));
 }
