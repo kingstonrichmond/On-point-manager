@@ -9586,6 +9586,44 @@ function worthMoving(inv) {
     rows.sort((a, b) => (a.suspect === b.suspect ? b.perCase - a.perCase : (a.suspect ? 1 : -1)));
     return { rows: rows.filter((r) => !r.suspect), suspects: rows.filter((r) => r.suspect), already, unverified, held };
 }
+// §9. The annual number, and the reason it goes in last: every rule above has
+// to be in first, or this multiplies a guess by 52 and hands back something that
+// looks great and won't survive being checked.
+//
+// gap per case x usual cases per week x 52, and an item only counts when it
+// clears ALL of it: verified size for size, not won't-buy, not the-same-product,
+// outside the noise floor, and with a real `usual` on file. Never a default,
+// never "assume one case" — an item nobody has ordered contributes nothing.
+//
+// On the objection that `usual` is contaminated by the comparison: it isn't.
+// `usual` measures how much product goes through the shop, not which vendor was
+// picked. The gap comes from the price lists, the volume comes from the order
+// history, and neither is derived from the other.
+const WEEKS_PER_YEAR = 52;
+function annualProjection(inv) {
+    const scan = worthMoving(inv);
+    const byId = {};
+    scan.rows.forEach((r) => { byId[r.id] = r; });
+    let annual = 0, counted = 0;
+    const comparable = (inv || []).filter((i) => VENDORS.filter((v) => v.kind === "food").every((v) => vendorPriceOf(i, v.key)));
+    comparable.forEach((i) => {
+        const r = byId[i.id];
+        if (!r) return; // already on the cheaper side, unverified, blocked, or level
+        // The most recent usual on any food vendor: how many cases a week.
+        const weekly = VENDORS.filter((v) => v.kind === "food")
+            .map((v) => Number(usualOf(i, v.id)) || 0)
+            .reduce((m, n) => Math.max(m, n), 0);
+        if (!(weekly > 0)) return;
+        annual += r.perCase * weekly * WEEKS_PER_YEAR;
+        counted++;
+    });
+    return {
+        annual: Math.round(annual / 100) * 100,
+        counted,
+        comparable: comparable.length,
+        exact: annual
+    };
+}
 function orderSavings(inv, vid) {
     const vk = vendorKey(vid);
     const me = VENDOR_BY_ID[vid];
@@ -10866,12 +10904,17 @@ function FoodOrderSavings({ inv, onMoveAll, data }) {
     const checkList = nameList(sides.flatMap((x) => x.s.checkIds || []).filter((id) => countIds.indexOf(id) === -1));
     const money = (n) => "$" + n.toFixed(2);
     const headline = savingsHeadline(data, sides);
+    const proj = annualProjection(inv);
     const wontBuyN = sides.reduce((n, x) => n + (x.s.wontBuyN || 0), 0);
     const tone = movableN ? { bg: "#FFF6E0", fg: "#8A5A00", line: "#F0DDA6" }
         : (checkN && !savedN) ? { bg: "#FBF7EE", fg: "#8A5A00", line: "#E8DFC9" }
         : { bg: "#E4F1E6", fg: "#1F6B34", line: "#BFDCC5" };
     return React.createElement("div", { className: "px-3 py-2.5 rounded mb-2", style: { background: tone.bg, border: "1px solid " + tone.line } },
         headline ? React.createElement("div", { className: "text-sm", style: { fontFamily: "Inter", fontWeight: 600, color: "#1F6B34" } }, headline) : null,
+        proj && proj.annual > 0 ? React.createElement("div", { className: "text-sm mt-0.5", style: { fontFamily: "Inter", fontWeight: 600, color: "#1F6B34" } },
+            "Roughly " + money(proj.annual) + " a year at what you actually order",
+            React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", fontWeight: 400, color: "#8A9096" } },
+                "based on " + proj.counted + " of " + proj.comparable + " comparable items \u2014 the rest have no order history yet")) : null,
         savedN > 0 ? React.createElement("div", { className: "text-xs mt-0.5", style: { fontFamily: "Inter", color: "#5F676E" } },
             sides.filter((x) => x.s.savedN > 0).map((x) => (VENDOR_BY_ID[x.vid] || {}).short + ": saving " + money(x.s.saved) + " vs " + (VENDOR_BY_ID[x.other] || {}).short).join("  \u00b7  ")) : null,
         movableN > 0 ? React.createElement("div", { className: "flex items-center gap-2 flex-wrap", style: { marginTop: savedN ? 4 : 0 } },
