@@ -56,7 +56,7 @@
   /* ---- navigation: a strip on tablets, a bottom bar on phones ---- */
   .opp-tabstrip { display: flex; }
   .opp-tabbar { display: none; }
-  .opp-content { flex: 1 1 auto; }
+  .opp-content { flex: 1 1 auto; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important; }
   @media (max-width: 639px) {
     .opp-tabstrip { display: none; }
     .opp-tabbar { display: flex; }
@@ -794,7 +794,7 @@ const FONTS = ""; // fonts load from the <link> in <head>
 // the byte change is what makes browsers install the new worker and offer
 // "Updated - tap to reload". Forgetting costs only the toast; index.html is
 // fetched network-first, so an online open always gets the current build.
-const APP_VERSION = "v3";
+const APP_VERSION = "v4";
 const COLORS = {
   crust: "#17191B",
   ink: "#17191B",
@@ -1191,6 +1191,21 @@ function migrateShopProfile(d) {
   }
   d.shopProfileVersion = SHOP_PROFILE_VERSION;
   return { data: d, changed };
+}
+// ---- add-ons ---------------------------------------------------------------
+// data.addons = { answering: true } is the only entitlement the app has. Absent
+// or false means no Phone surface at all - not greyed out, not an upsell. A
+// shop that already has calls or phone orders on file was plainly using the
+// phone before the flag existed, so it's switched on once for them; every
+// other shop starts without it. Runs once (addonsSeeded), so a shop that turns
+// it off later stays off.
+function migrateAddons(d) {
+  if (!d || typeof d !== "object" || d.addonsSeeded) return { data: d, changed: false };
+  const used = (Array.isArray(d.phoneCalls) && d.phoneCalls.length > 0) || (Array.isArray(d.phoneOrders) && d.phoneOrders.length > 0);
+  const on = !!(d.addons && d.addons.answering) || used;
+  d.addons = Object.assign({}, d.addons || {}, { answering: on });
+  d.addonsSeeded = true;
+  return { data: d, changed: true };
 }
 const GUIDES = [
   { id: "g1", file: "/guides/pizza-sauce.jpg", title: "Pizza Sauce", sub: "3 cases Tomato Magic \u2014 full build", group: "Recipes" },
@@ -2500,16 +2515,75 @@ function LockScreen({ onUnlocked }) {
   );
 }
 
+// ---- two surfaces --------------------------------------------------------------
+// Ops is the shop; Phone is the second half of the product, sold as an add-on.
+// One nav renders both from one array, so the surface only decides which set
+// of items the bar or strip shows - never a second bar. Which surface, and
+// which item on each, is remembered per device: the line tablet settles on
+// Ops/Today and stays, the owner's phone opens on Phone/Calls.
+const OPS_TAB_IDS = ["today", "crew", "invorders", "preptasks", "reference", "liveops", "settings"];
+const PHONE_TAB_IDS = ["calls", "now", "numbers", "setup"];
+// The old single Phone tab. Anything still asking for it lands on Calls.
+const LEGACY_TABS = { phone: "calls" };
+const NAV_KEYS = { surface: "opp:surface", ops: "opp:tab:ops", phone: "opp:tab:phone" };
+function surfaceOf(id) { return PHONE_TAB_IDS.indexOf(id) !== -1 ? "phone" : "ops"; }
+function answeringOn(data) { return !!(data && data.addons && data.addons.answering); }
+function loadNav() {
+  const nav = { surface: "ops", tabs: { ops: "today", phone: "calls" } };
+  try {
+    if (localStorage.getItem(NAV_KEYS.surface) === "phone") nav.surface = "phone";
+    const o = localStorage.getItem(NAV_KEYS.ops), p = localStorage.getItem(NAV_KEYS.phone);
+    if (OPS_TAB_IDS.indexOf(o) !== -1) nav.tabs.ops = o;
+    if (PHONE_TAB_IDS.indexOf(p) !== -1) nav.tabs.phone = p;
+  } catch (e) {}
+  return nav;
+}
+function saveNav(nav) {
+  try {
+    localStorage.setItem(NAV_KEYS.surface, nav.surface);
+    localStorage.setItem(NAV_KEYS.ops, nav.tabs.ops);
+    localStorage.setItem(NAV_KEYS.phone, nav.tabs.phone);
+  } catch (e) {}
+}
+// Picking an item picks its surface too: goTo("calls") from Ops flips to Phone.
+function navWithTab(nav, id) {
+  const t = LEGACY_TABS[id] || id;
+  const s = surfaceOf(t);
+  if (nav.surface === s && nav.tabs[s] === t) return nav;
+  return { surface: s, tabs: Object.assign({}, nav.tabs, { [s]: t }) };
+}
+// The two halves, one tap either way, at every width. Not a menu, not a swipe.
+// The Phone half carries the open-order badge so it's worth a glance from Ops.
+function SurfacePill({ surface, onChange, phoneBadge }) {
+  const half = (id, txt, badge) => {
+    const on = surface === id;
+    return /* @__PURE__ */ React.createElement("button", {
+      key: id, onClick: () => onChange(id), "aria-pressed": on ? "true" : "false",
+      style: { background: on ? "#FFFFFF" : "transparent", color: on ? COLORS.crust : "#B8BDC2", border: "none", borderRadius: 999, padding: "0 14px", minHeight: 36, fontFamily: "Inter", fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }
+    }, txt, badge ? /* @__PURE__ */ React.createElement("span", {
+      style: { background: COLORS.lamp, color: COLORS.ink, borderRadius: 999, minWidth: 18, height: 18, padding: "0 5px", fontFamily: "JetBrains Mono", fontSize: 11, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }
+    }, badge) : null);
+  };
+  return /* @__PURE__ */ React.createElement("div", { "data-surface-pill": "1", className: "flex items-center flex-shrink-0", style: { marginLeft: "auto", background: "rgba(255,255,255,0.10)", borderRadius: 999, padding: 3 } },
+    half("ops", "Ops"), half("phone", "Phone", phoneBadge));
+}
+
 function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   const isAdmin = role === "admin";
   var _a;
   const [data, setData] = useState(null);
-  const [rawTab, setTab] = useState("today");
+  const [nav, setNav] = useState(loadNav);
+  useEffect(() => { saveNav(nav); }, [nav]);
+  const answering = answeringOn(data);
+  const surface = answering ? nav.surface : "ops";
+  const rawTab = nav.tabs[surface];
+  const setTab = (id) => setNav((n) => navWithTab(n, id));
+  const setSurface = (s) => setNav((n) => (n.surface === s ? n : Object.assign({}, n, { surface: s })));
   // Which sub-tab each group is on. Lives here, not inside the group, so
   // leaving Crew for Today and coming back lands on the same screen.
   const [subs, setSubs] = useState({});
   const setSubFor = (t, s) => setSubs((prev) => (prev[t] === s ? prev : Object.assign({}, prev, { [t]: s })));
-  const goTo = (t, s) => { setTab(t); if (s) setSubFor(t, s); };
+  const goTo = (t, s) => { const id = LEGACY_TABS[t] || t; setTab(id); if (s) setSubFor(id, s); };
   const [timers, setTimers] = useState(loadTimers);
   const [timerNow, setTimerNow] = useState(Date.now());
   const anyTimer = (timers || []).length > 0;
@@ -2598,7 +2672,8 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
     const mt = migrateTimeOff(mr.data);
     const ml = migrateTaskLibrary(mt.data);
     const msp = migrateShopProfile(ml.data);
-    return { data: msp.data, changed: ms.changed || mi.changed || mr.changed || mt.changed || ml.changed || msp.changed };
+    const ma = migrateAddons(msp.data);
+    return { data: ma.data, changed: ms.changed || mi.changed || mr.changed || mt.changed || ml.changed || msp.changed || ma.changed };
   };
 
   // Pull the server copy and fold it into whatever is on screen. Anything this
@@ -2805,25 +2880,35 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
   // per-tablet preferences, and nothing worth hiding. The rows inside it that
   // do matter are gated by role instead.
   const ADMIN_TABS = { liveops: 1 };
-  const tabs = [
+  const openPhoneOrders = ((data && data.phoneOrders) || []).filter((o) => o.status !== "done").length;
+  const OPS_TABS = [
     { id: "today", label: "Today", icon: Activity },
     { id: "crew", label: "Crew", icon: Users, badge: offSoon },
     { id: "invorders", label: "Inventory & Orders", icon: Package, badge: lowStockCount + foodOrderNeed + belmontNeed + boardFlags },
     { id: "preptasks", label: "Prep & Tasks", icon: ClipboardList, badge: prepTodo + openTasks },
     { id: "reference", label: "Reference", icon: BookOpen },
-    { id: "phone", label: "Phone", icon: PhoneIcon, badge: ((data && data.phoneOrders) || []).filter((o) => o.status !== "done").length },
     { id: "liveops", label: "Live Ops", icon: Thermometer },
     { id: "settings", label: "Settings", icon: Sliders, badge: 0 }
-  ].filter((t) => isAdmin || !ADMIN_TABS[t.id]);
+  ];
+  // The second half of the app. Calls is the front page; Now is what changes
+  // mid-rush; Numbers counts; Setup is what the phone says and does. Named
+  // Setup, not Settings - there's already a Settings in Ops.
+  const PHONE_TABS = [
+    { id: "calls", label: "Calls", icon: PhoneIcon, badge: openPhoneOrders },
+    { id: "now", label: "Now", icon: Clock },
+    { id: "numbers", label: "Numbers", icon: DollarSign },
+    { id: "setup", label: "Setup", icon: Sliders }
+  ];
+  const tabs = (surface === "phone" ? PHONE_TABS : OPS_TABS).filter((t) => isAdmin || !ADMIN_TABS[t.id]);
   // If this tablet was left on a tab its role can't see, fall back during
-  // render rather than in an effect — no hook below the early return, and no
+  // render rather than in an effect - no hook below the early return, and no
   // flash of the wrong screen.
-  const tab = tabs.some((t) => t.id === rawTab) ? rawTab : "today";
+  const tab = tabs.some((t) => t.id === rawTab) ? rawTab : tabs[0].id;
   const subTab = subs[tab] || "";
   const onSub = (s) => setSubFor(tab, s);
   // Short labels for the phone bar; the strip keeps the full names.
-  const SHORT = { today: "Today", crew: "Crew", invorders: "Stock", preptasks: "Prep", reference: "Ref", phone: "Phone", liveops: "Live", settings: "Set" };
-  return /* @__PURE__ */ React.createElement("div", { className: "w-full min-h-screen flex flex-col", style: { background: COLORS.crust } }, /* @__PURE__ */ React.createElement("style", null, FONTS), /* @__PURE__ */ React.createElement("div", { className: "px-5 pt-6 pb-4 flex items-center gap-3", style: { borderBottom: "1px solid rgba(255,255,255,0.09)", paddingTop: "calc(24px + env(safe-area-inset-top, 0px))" } }, /* @__PURE__ */ React.createElement(
+  const SHORT = { today: "Today", crew: "Crew", invorders: "Stock", preptasks: "Prep", reference: "Ref", liveops: "Live", settings: "Set", calls: "Calls", now: "Now", numbers: "Numbers", setup: "Setup" };
+  return /* @__PURE__ */ React.createElement("div", { className: "w-full min-h-screen flex flex-col", style: { background: COLORS.crust, paddingLeft: "env(safe-area-inset-left, 0px)", paddingRight: "env(safe-area-inset-right, 0px)" } }, /* @__PURE__ */ React.createElement("style", null, FONTS), /* @__PURE__ */ React.createElement("div", { className: "px-5 pt-6 pb-4 flex items-center gap-3", style: { borderBottom: "1px solid rgba(255,255,255,0.09)", paddingTop: "calc(24px + env(safe-area-inset-top, 0px))" } }, /* @__PURE__ */ React.createElement(
     "div",
     {
       className: "flex items-center justify-center flex-shrink-0",
@@ -2837,7 +2922,7 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
       style: { fontFamily: "Archivo Narrow", color: COLORS.cream, fontWeight: 600, letterSpacing: "0.01em" }
     },
     String((data.shopProfile && data.shopProfile.name) || "Your shop").toUpperCase()
-  ), /* @__PURE__ */ React.createElement("p", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: INK3, fontWeight: 500 } }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.lamp, fontWeight: 700 } }, "allday"), " \u00b7 " + APP_VERSION))), /* @__PURE__ */ React.createElement("div", { className: "opp-tabstrip gap-1 px-3 pt-3 overflow-x-auto", style: { background: COLORS.crust } }, tabs.map((t) => {
+  ), /* @__PURE__ */ React.createElement("p", { className: "text-xs mt-1", style: { fontFamily: "Inter", color: INK3, fontWeight: 500 } }, /* @__PURE__ */ React.createElement("span", { style: { color: COLORS.lamp, fontWeight: 700 } }, "allday"), " \u00b7 " + APP_VERSION)), answering ? /* @__PURE__ */ React.createElement(SurfacePill, { surface, onChange: setSurface, phoneBadge: openPhoneOrders }) : null), /* @__PURE__ */ React.createElement("div", { className: "opp-tabstrip gap-1 px-3 pt-3 overflow-x-auto", style: { background: COLORS.crust } }, tabs.map((t) => {
     const Icon = t.icon;
     const active = tab === t.id;
     return /* @__PURE__ */ React.createElement(
@@ -2870,16 +2955,16 @@ function PizzaOpsManager({ role, enforced, onRoleChange, onSignOut }) {
         t.badge
       )
     );
-  })), /* @__PURE__ */ React.createElement("div", { className: "opp-content p-4", style: { background: COLORS.cream } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FDECEA", color: COLORS.alertDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab, onSub }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab, onSub }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab, onSub }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab, isAdmin, onSub }), tab === "phone" && /* @__PURE__ */ React.createElement(PhoneTab, { data, persist, isAdmin }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { setBase(0, null); dirtyRef.current = false; await pull({ initial: true }); }, data, persist,
+  })), /* @__PURE__ */ React.createElement("div", { className: "opp-content p-4", style: { background: COLORS.cream } }, sync.state === "offline" && /* @__PURE__ */ React.createElement("div", { className: "text-sm mb-3 px-3 py-2.5 rounded flex items-start gap-2", style: { background: "#FDECEA", color: COLORS.alertDark, fontFamily: "Inter" } }, /* @__PURE__ */ React.createElement(AlertTriangle, { size: 15, style: { flexShrink: 0, marginTop: 2 } }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", null, "Not syncing with the other devices \u2014 changes are saved here and will go up when it reconnects."), sync.why ? /* @__PURE__ */ React.createElement("div", { className: "text-xs mt-1", style: { opacity: .85 } }, sync.why) : null)), tab === "today" && /* @__PURE__ */ React.createElement(TodayTab, { data, persist, goTo, timers, setTimers, now: timerNow }), tab === "crew" && /* @__PURE__ */ React.createElement(CrewTab, { data, persist, isAdmin, offSoon, initialSub: subTab, onSub }), tab === "invorders" && /* @__PURE__ */ React.createElement(InventoryOrdersTab, { data, persist, isAdmin, lowStockCount, foodOrderNeed, belmontNeed, boardFlags, initialSub: subTab, onSub }), tab === "preptasks" && /* @__PURE__ */ React.createElement(PrepTasksTab, { data, persist, prepTodo, openTasks, timers, setTimers, now: timerNow, initialSub: subTab, onSub }), tab === "reference" && /* @__PURE__ */ React.createElement(ReferenceTab, { data, persist, initialSub: subTab, isAdmin, onSub }), surface === "phone" && /* @__PURE__ */ React.createElement(PhoneTab, { data, persist, isAdmin, item: tab, goTo }), tab === "liveops" && /* @__PURE__ */ React.createElement(LiveOpsTab, { data, persist }), tab === "settings" && /* @__PURE__ */ React.createElement(SettingsTab, { sync, syncSecs, setSyncSecs, role, enforced, onRoleChange, onSignOut, rev: revRef.current, onSyncNow: () => pull(), onReloadFromServer: async () => { setBase(0, null); dirtyRef.current = false; await pull({ initial: true }); }, data, persist,
         onHoursChange: (next) => { const d = JSON.parse(JSON.stringify(dataRef.current)); d.shopHours = next; persist(d); } })),
-  /* @__PURE__ */ React.createElement("nav", { className: "opp-tabbar", style: { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 9000, background: COLORS.crust, borderTop: "1px solid rgba(255,255,255,0.10)", paddingBottom: "env(safe-area-inset-bottom, 0px)" } },
+  /* @__PURE__ */ React.createElement("nav", { className: "opp-tabbar", style: { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 9000, background: COLORS.crust, borderTop: "1px solid rgba(255,255,255,0.10)", paddingBottom: "env(safe-area-inset-bottom, 0px)", paddingLeft: "env(safe-area-inset-left, 0px)", paddingRight: "env(safe-area-inset-right, 0px)" } },
     tabs.map((t) => {
       const Icon = t.icon;
       const active = tab === t.id;
       return /* @__PURE__ */ React.createElement("button", {
         key: t.id,
         onClick: () => { setTab(t.id); try { window.scrollTo({ top: 0 }); } catch (e) {} },
-        className: "flex flex-col items-center justify-center relative",
+        className: "flex flex-col items-center justify-center relative" + (active ? " opp-tab-active" : ""),
         style: { background: "transparent", border: "none", minHeight: 64, padding: "8px 1px 6px", color: active ? COLORS.lamp : "#8A9096", flex: "1 1 0", minWidth: 0, overflow: "hidden" }
       },
         /* @__PURE__ */ React.createElement("span", { style: { position: "relative", display: "inline-flex" } },
@@ -5224,6 +5309,8 @@ function WaitMini({ data, persist, who, goTo }) {
   const cur = wait.pickupMin == null ? WAIT_DEFAULT : wait.pickupMin;
   const pz = (data && data.phoneAgent && data.phoneAgent.pause) || {};
   const paused = !!pz.on && !(pz.until && Date.parse(pz.until) < Date.now());
+  // Off is the state the crew must never miss: in red, on the Today strip.
+  const phoneOff = !!(data && data.phoneAgent && data.phoneAgent.off);
   const set = (m) => {
     persist && persist((d) => Object.assign(JSON.parse(JSON.stringify(d)), { wait: { pickupMin: m, updatedAt: new Date().toISOString(), by: who || "tablet" } }));
     pushWaitEverywhere({ pickupMin: m, paused, pausedUntil: pz.until || null });
@@ -5235,16 +5322,18 @@ function WaitMini({ data, persist, who, goTo }) {
              fontFamily: "Inter", fontSize: 22, fontWeight: 700, color: COLORS.crust, lineHeight: 1, flex: "0 0 auto", opacity: off(delta) ? 0.35 : 1 } }, txt);
   const newOrders = ((data && data.phoneOrders) || []).filter((o) => o.status !== "done").length;
   const untilLabel = pz.until ? new Date(pz.until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : null;
-  return React.createElement("div", { className: "flex items-center gap-2 px-3 mb-3", style: { background: paused ? "#FDECEA" : COLORS.card, borderRadius: 16, boxShadow: "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)", border: paused ? "1px solid rgba(200,56,47,0.3)" : "none", minHeight: 56 } },
-    React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: paused ? COLORS.alertDark : INK2, textTransform: "uppercase", flex: "0 0 auto" } }, paused ? "Phone paused" : "Phone wait"),
-    paused
+  return React.createElement("div", { className: "flex items-center gap-2 px-3 mb-3", style: { background: paused || phoneOff ? "#FDECEA" : COLORS.card, borderRadius: 16, boxShadow: "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)", border: paused || phoneOff ? "1px solid rgba(200,56,47,0.3)" : "none", minHeight: 56 } },
+    React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: paused || phoneOff ? COLORS.alertDark : INK2, textTransform: "uppercase", flex: "0 0 auto" } }, phoneOff ? "Phone off" : paused ? "Phone paused" : "Phone wait"),
+    phoneOff
+      ? React.createElement("span", { style: { flex: 1, fontFamily: "Inter", fontSize: 13, color: COLORS.crust } }, "nobody is answering \u2014 turn it back on in Setup")
+      : paused
       ? React.createElement("span", { style: { flex: 1, fontFamily: "Inter", fontSize: 13, color: COLORS.crust } }, untilLabel ? "back on at " + untilLabel : "until you turn it back on")
       : [bump(-WAIT_STEP, "−"),
          React.createElement("span", { key: "n", style: { minWidth: 58, textAlign: "center", fontFamily: "Archivo Narrow", fontSize: 24, lineHeight: 1, color: COLORS.crust } }, cur,
            React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 600, color: COLORS.steel, marginLeft: 3 } }, "min")),
          bump(WAIT_STEP, "+"),
          React.createElement("span", { key: "sp", style: { flex: 1 } })],
-    React.createElement("button", { onClick: () => goTo && goTo("phone"), style: { background: "transparent", border: "none", padding: "6px 0 6px 6px", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, color: COLORS.ink, flex: "0 0 auto" } },
+    React.createElement("button", { onClick: () => goTo && goTo("calls"), style: { background: "transparent", border: "none", padding: "6px 0 6px 6px", fontFamily: "Inter", fontSize: 13.5, fontWeight: 600, color: COLORS.ink, flex: "0 0 auto" } },
       (newOrders ? newOrders + (newOrders === 1 ? " order" : " orders") : "Phone") + " ›"));
 }
 
@@ -5419,40 +5508,126 @@ function CallLog({ data, persist, isAdmin }) {
       orphanOrders.slice(-10).reverse().map((o) => React.createElement("div", { key: o.id, style: { padding: "6px 0" } }, orderLine(o), open === o.id ? orderDetail(o) : React.createElement("button", { onClick: () => setOpen(o.id), style: { background: "transparent", border: "none", padding: 0, fontFamily: "Inter", fontSize: 12.5, color: COLORS.ink, marginTop: 2 } }, "Details ›")))) : null);
 }
 
-// ---- The Phone tab ------------------------------------------------------------
-// Everything about the phone assistant in one place: the wait, pausing, today's
-// hours, what it says, and the calls it took. The voice/brain/greeting settings
-// come from inject-voice.py (the slot below); the menu and 86 board it reads are
-// the same ones the rest of the app edits, so there's nothing to set up twice.
-function PhoneTab({ data, persist, isAdmin }) {
+// ---- Numbers -----------------------------------------------------------------
+// Counted, not modelled. The dollar figure is order value that came through the
+// phone this calendar month, labelled as exactly that; nothing here estimates
+// what would have been lost without the phone. Reads right on a shop that took
+// nine calls today: words where a chart would be empty, no "0% up" anywhere.
+function phoneStats(data, now) {
+  const at = now ? new Date(now) : new Date();
+  const calls = (data && data.phoneCalls) || [];
+  const orders = (data && data.phoneOrders) || [];
+  const todayIso = at.toLocaleDateString("en-CA");
+  const month = todayIso.slice(0, 7);
+  const since = (n) => new Date(at.getTime() - n * 864e5).toLocaleDateString("en-CA");
+  const dayOf = (iso) => { const d = callDay(iso); return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : ""; };
+  const win = (from) => {
+    const cs = calls.filter((c) => dayOf(c.at) >= from);
+    const os = orders.filter((o) => dayOf(o.createdAt) >= from);
+    return { calls: cs.length, orders: os.length, minutes: Math.round(cs.reduce((n, c) => n + (Number(c.durationSec) || 0), 0) / 60) };
+  };
+  const monthOrders = orders.filter((o) => dayOf(o.createdAt).slice(0, 7) === month);
+  const monthDollars = monthOrders.reduce((n, o) => n + (Number(o.subtotal) || 0), 0);
+  const hourOf = (iso) => { try { const h = new Date(iso).getHours(); return h >= 0 && h < 24 ? h : -1; } catch (e) { return -1; } };
+  const byHour = []; for (let h = 0; h < 24; h++) byHour.push(0);
+  const monthByHour = byHour.slice();
+  const from30 = since(29);
+  calls.forEach((c) => {
+    const d = dayOf(c.at), h = hourOf(c.at);
+    if (!d || h < 0) return;
+    if (d === todayIso) byHour[h]++;
+    if (d >= from30) monthByHour[h]++;
+  });
+  let peak = -1;
+  monthByHour.forEach((n, h) => { if (n > 0 && (peak < 0 || n > monthByHour[peak])) peak = h; });
+  return {
+    monthDollars, monthOrders: monthOrders.length,
+    today: win(todayIso), week: win(since(6)), month: win(from30),
+    byHour, hourNow: at.getHours(), peak, peakCalls: peak < 0 ? 0 : monthByHour[peak]
+  };
+}
+const phoneMoney = (n) => "$" + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function PhoneNumbers({ data }) {
+  const s = phoneStats(data);
+  const hrs = hoursOn(data) || {};
+  const open = Number.isFinite(Number(hrs.open)) ? Math.floor(Number(hrs.open)) : 10;
+  const close = Number.isFinite(Number(hrs.close)) ? Math.ceil(Number(hrs.close)) : 22;
+  const hours = []; for (let h = open; h < Math.max(close, open + 1); h++) hours.push(h);
+  const peakBar = hours.reduce((m, h) => Math.max(m, s.byHour[h % 24]), 0);
+  const card = { background: COLORS.card, borderRadius: 18, boxShadow: "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)" };
+  const cap = (t) => React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase", marginBottom: 8 } }, t);
+  const muted = { fontFamily: "Inter", fontSize: 13, color: COLORS.steel };
+  const row = (label, w) => React.createElement("div", { key: label, className: "flex items-baseline gap-2", style: { padding: "7px 0", borderTop: "1px solid " + COLORS.line } },
+    React.createElement("span", { style: { fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.crust, flex: 1 } }, label),
+    [[w.calls, "calls"], [w.orders, "orders"], [w.minutes, "min"]].map(([n, u]) => React.createElement("span", { key: u, style: { fontFamily: "JetBrains Mono", fontSize: 13.5, color: COLORS.crust, minWidth: 78, textAlign: "right" } },
+      n, React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, color: COLORS.steel } }, " " + u))));
+  return React.createElement("div", null,
+    React.createElement("div", { className: "px-4 py-4 mb-3", style: card },
+      React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontWeight: 600, fontSize: 30, lineHeight: 1.1, color: COLORS.crust } }, phoneMoney(s.monthDollars) + " in phone orders this month"),
+      React.createElement("div", { style: Object.assign({ marginTop: 6 }, muted) },
+        s.monthOrders
+          ? s.monthOrders + (s.monthOrders === 1 ? " order" : " orders") + " · " + phoneMoney(s.monthDollars / s.monthOrders) + " average · order value through the phone, not profit"
+          : "No phone orders yet this month.")),
+    React.createElement("div", { className: "px-4 py-4 mb-3", style: card },
+      cap("Today by hour"),
+      s.today.calls
+        ? React.createElement("div", { className: "flex items-end gap-1", style: { height: 76 } }, hours.map((h) => {
+            const n = s.byHour[h % 24], live = (h % 24) === s.hourNow;
+            return React.createElement("div", { key: h, className: "flex flex-col items-center justify-end", style: { flex: 1, height: "100%", minWidth: 0 } },
+              n ? React.createElement("span", { style: { fontFamily: "JetBrains Mono", fontSize: 10, color: live ? COLORS.crust : COLORS.steel, marginBottom: 2 } }, n) : null,
+              React.createElement("div", { style: { width: "100%", height: Math.max(3, Math.round(46 * n / (peakBar || 1))), borderRadius: 3, background: live ? COLORS.lamp : n ? COLORS.crust : COLORS.line } }),
+              React.createElement("span", { style: { fontFamily: "Inter", fontSize: 9, color: live ? COLORS.crust : COLORS.steel, marginTop: 3, fontWeight: live ? 700 : 400, whiteSpace: "nowrap" } }, ((h - open) % 3 === 0 || live) ? hourLabel(h) : " "));
+          }))
+        : React.createElement("div", { style: muted }, "No calls yet today.")),
+    React.createElement("div", { className: "px-4 py-4 mb-3", style: card },
+      cap("Counted"),
+      row("Today", s.today), row("Last 7 days", s.week), row("Last 30 days", s.month),
+      s.peak >= 0 ? React.createElement("div", { style: Object.assign({ marginTop: 10 }, muted) }, "Busiest hour over 30 days: " + hourLabel(s.peak) + "–" + hourLabel(s.peak + 1) + ", " + s.peakCalls + (s.peakCalls === 1 ? " call" : " calls") + ".") : null,
+      React.createElement("div", { style: Object.assign({ marginTop: 6 }, muted) }, "Calls and minutes are what the phone actually took. Nothing here is an estimate.")));
+}
+
+// ---- The Phone surface ---------------------------------------------------------
+// Not a page any more but the router for the second half of the app: Calls (the
+// front page), Now (what you change mid-rush), Numbers, Setup. The dark status
+// line sits on top of every item and taps through to Now, so the pause is never
+// more than a tap away. The menu, prices and 86 board it reads are the same
+// ones the rest of the app edits; there is nothing to set up twice.
+function PhoneTab({ data, persist, isAdmin, item, goTo }) {
   const CARD = { background: COLORS.card, borderRadius: 18, boxShadow: "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)" };
   const label = (t, right) => React.createElement("div", { className: "flex items-baseline justify-between mb-2.5" },
     React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, t),
     right || null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const pz = (data && data.phoneAgent && data.phoneAgent.pause) || {};
   const paused = !!pz.on && !(pz.until && Date.parse(pz.until) < Date.now());
+  const off = !!(data && data.phoneAgent && data.phoneAgent.off);
   const today = new Date().toLocaleDateString("en-CA");
   const callsToday = ((data && data.phoneCalls) || []).filter((c) => callDay(c.at) === today).length;
   const ordersToday = ((data && data.phoneOrders) || []).filter((o) => callDay(o.createdAt) === today).length;
   const openOrders = ((data && data.phoneOrders) || []).filter((o) => o.status !== "done").length;
   const wait = (data && data.wait) || {};
   const cur = wait.pickupMin == null ? WAIT_DEFAULT : wait.pickupMin;
-  return React.createElement("div", null,
-    React.createElement("div", { className: "px-5 py-4 mb-3", style: { background: COLORS.crust, borderRadius: 20, borderLeft: "6px solid " + (paused ? COLORS.alert : COLORS.basil) } },
-      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: paused ? "#F26B5E" : "#7CC48A", textTransform: "uppercase" } }, paused ? "Phone orders paused" : "Phone answering · quoting " + cur + " min"),
-      React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontWeight: 600, fontSize: 27, lineHeight: 1.12, color: "#FFFFFF", marginTop: 5 } },
-        callsToday ? callsToday + (callsToday === 1 ? " call" : " calls") + " today · " + ordersToday + (ordersToday === 1 ? " order" : " orders") : "No calls yet today"),
-      React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginTop: 5 } }, openOrders ? openOrders + " phone order" + (openOrders === 1 ? "" : "s") + " not picked up yet" : "The menu, prices and the 86 board come from the rest of the app — nothing to keep in sync.")),
-    React.createElement(PausePhoneCard, { data, persist, card: CARD, label }),
-    React.createElement(WaitControl, { data, persist, who: getWho(), card: CARD, label }),
-    React.createElement(TodayHoursCard, { data, persist, card: CARD, label }),
-    React.createElement(CallLog, { data, persist, isAdmin }),
-    isAdmin ? React.createElement("div", { className: "mb-3" },
-      React.createElement("button", { onClick: () => setSettingsOpen(!settingsOpen), className: "w-full text-left px-4 py-3", style: Object.assign({}, CARD, { border: "none", fontFamily: "Inter", fontSize: 14, fontWeight: 600, color: COLORS.crust }) },
-        (settingsOpen ? "▾ " : "▸ ") + "Voice, greetings, languages, delivery, temporary hours"),
-      settingsOpen ? React.createElement("div", { className: "mt-3" }, React.createElement(PhoneVoiceCard, { data, persist, canEdit: true })) : null) : null);
+  const red = off || paused;
+  const status = off ? "Phone off" : paused ? "Phone orders paused" : "Answering · quoting " + cur + " min";
+  const header = React.createElement("button", { onClick: () => goTo && goTo("now"), className: "w-full text-left px-5 py-4 mb-3",
+      style: { background: COLORS.crust, borderRadius: 20, border: "none", borderLeft: "6px solid " + (red ? COLORS.alert : COLORS.basil), cursor: "pointer" } },
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: red ? "#F26B5E" : "#7CC48A", textTransform: "uppercase" } }, status),
+    React.createElement("div", { style: { fontFamily: "Archivo Narrow", fontWeight: 600, fontSize: 27, lineHeight: 1.12, color: "#FFFFFF", marginTop: 5 } },
+      callsToday ? callsToday + (callsToday === 1 ? " call" : " calls") + " today · " + ordersToday + (ordersToday === 1 ? " order" : " orders") : "No calls yet today"),
+    React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: "#8A9096", marginTop: 5 } },
+      openOrders ? openOrders + " phone order" + (openOrders === 1 ? "" : "s") + " not picked up yet"
+        : item === "now" ? "The menu, prices and the 86 board come from the rest of the app."
+        : "Tap to change the wait, pause the phone, or set today’s hours ›"));
+  let body;
+  if (item === "now") body = [
+    React.createElement(PausePhoneCard, { key: "pause", data, persist, card: CARD, label }),
+    React.createElement(WaitControl, { key: "wait", data, persist, who: getWho(), card: CARD, label }),
+    React.createElement(TodayHoursCard, { key: "hours", data, persist, card: CARD, label })];
+  else if (item === "numbers") body = React.createElement(PhoneNumbers, { data });
+  else if (item === "setup") body = React.createElement(PhoneVoiceCard, { data, persist, canEdit: isAdmin });
+  else body = React.createElement(CallLog, { data, persist, isAdmin });
+  return React.createElement("div", null, header, body);
 }
+
 
 
 
@@ -7727,7 +7902,7 @@ function TimerOverlay({ timers, setTimers, now }) {
     };
     const place = pos
         ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" }
-        : { right: 10, bottom: 10 };
+        : { right: "calc(10px + env(safe-area-inset-right, 0px))", bottom: "calc(10px + env(safe-area-inset-bottom, 0px))" };
     return (React.createElement("div", { className: "opp-timer-overlay", ref: boxRef,
         onPointerDown: onDown, onPointerMove: onMove, onPointerUp: onUp, onPointerCancel: onUp,
         style: Object.assign({
@@ -8437,7 +8612,7 @@ function InvoiceScanner({ data, persist, onClose }) {
     { className: "fixed inset-0 z-50 flex flex-col", style: { background: COLORS.cream } },
     /* @__PURE__ */ React.createElement(
       "div",
-      { className: "flex items-center justify-between px-4 py-3 flex-shrink-0", style: { background: COLORS.crust } },
+      { className: "flex items-center justify-between px-4 py-3 flex-shrink-0", style: { background: COLORS.crust, paddingTop: "calc(12px + env(safe-area-inset-top, 0px))" } },
       /* @__PURE__ */ React.createElement("div", { className: "text-lg", style: { fontFamily: "Archivo Narrow", color: COLORS.cream } }, "Scan an invoice"),
       /* @__PURE__ */ React.createElement(
         "button",
@@ -12091,7 +12266,7 @@ function ShopCamPanel({ data, busyAnalyze, onAnalyze }) {
           },
           /* @__PURE__ */ React.createElement(
             "div",
-            { className: "flex items-center justify-between px-4 py-3", style: { background: COLORS.crust } },
+            { className: "flex items-center justify-between px-4 py-3", style: { background: COLORS.crust, paddingTop: "calc(12px + env(safe-area-inset-top, 0px))" } },
             /* @__PURE__ */ React.createElement(
               "span",
               { className: "text-base", style: { fontFamily: "Archivo Narrow", color: COLORS.cream } },
@@ -12626,7 +12801,7 @@ function GuidesTab({ data, persist }) {
           },
           /* @__PURE__ */ React.createElement(
             "div",
-            { className: "sticky top-0 flex items-center justify-between px-4 py-3", style: { background: COLORS.crust } },
+            { className: "sticky top-0 flex items-center justify-between px-4 py-3", style: { background: COLORS.crust, paddingTop: "calc(12px + env(safe-area-inset-top, 0px))" } },
             /* @__PURE__ */ React.createElement(
               "span",
               { className: "text-base", style: { fontFamily: "Archivo Narrow", color: COLORS.cream } },
@@ -13546,7 +13721,10 @@ if (bootStatus) bootStatus.style.display = "none";
       document.body.appendChild(el);
     }
     navigator.serviceWorker.addEventListener("message", function (e) {
-      if (e.data && e.data.type === "allday-updated" && hadWorker) toast();
+      // A page opened fresh after a deploy already runs the new build; only a
+      // page still on an older one has anything to reload for.
+      var pageVersion = null; try { pageVersion = APP_VERSION; } catch (err) {}
+      if (e.data && e.data.type === "allday-updated" && hadWorker && e.data.version !== pageVersion) toast();
     });
     window.addEventListener("load", function () {
       try {

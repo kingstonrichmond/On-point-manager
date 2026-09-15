@@ -16,7 +16,7 @@
    change is what makes browsers install the new worker and show the reload
    toast. Forgetting to bump costs only the toast — index.html is network-first
    regardless, so an online open always gets the current build. */
-const VERSION = "v3";
+const VERSION = "v4";
 const CACHE = "allday-" + VERSION;
 const NET_TIMEOUT_MS = 3000;
 const SHELL = "/";
@@ -31,19 +31,16 @@ const isFont = (url) => url.hostname === "fonts.googleapis.com" || url.hostname 
 const isFunction = (url) => url.origin === self.location.origin && url.pathname.indexOf("/.netlify/") === 0;
 const isShell = (url) => url.origin === self.location.origin && (url.pathname === "/" || url.pathname === "/index.html");
 
-// Store a URL in the cache. A CORS fetch first, so a 404 or a 500 can be seen
-// and refused. Only if that *throws* (a host with no CORS headers) take the
-// opaque no-cors response instead: its status is invisible, so that path must
-// never run for a host that just answered with an error. Never throws itself -
-// one asset failing must not fail the install; the runtime handler picks it up
-// on first use.
+// Store a URL in the cache - only from a CORS fetch, whose status can be seen.
+// An opaque (no-cors) response might be a 503 page from the CDN's edge, and a
+// 503 stored as react.production.min.js is served on every open until the next
+// deploy. So a host that won't answer CORS is simply not precached; the runtime
+// handler serves it straight from the network instead. Never throws - one
+// asset failing must not fail the install.
 async function precache(cache, url) {
   let r;
-  try { r = await fetch(url, { cache: "no-cache" }); }
-  catch (e) {
-    try { r = await fetch(url, { mode: "no-cors", cache: "no-cache" }); } catch (e2) { return false; }
-  }
-  if (!r || !(r.ok || r.type === "opaque")) return false;
+  try { r = await fetch(url, { cache: "no-cache" }); } catch (e) { return false; }
+  if (!r || !r.ok) return false;
   try { await cache.put(url, r); return true; } catch (e) { return false; }
 }
 
@@ -68,23 +65,28 @@ self.addEventListener("activate", (e) => {
 });
 
 // The shell: try the network, briefly. Online you always get the current build
-// and the cache is refreshed behind you; offline you get the last one. A slow
-// first-ever load keeps waiting for the network rather than failing, and a
-// failed first-ever load fails the way the browser does today, not with a blank
-// cached page.
-async function shell(req) {
+// and the cache is refreshed behind you; offline you get the last one. The race
+// is against the response's headers, not its body - a slow link must not hand
+// back the old build while the new one is still downloading - and the cache
+// write happens in the background, tied to the event so the worker isn't shut
+// down before it lands. A 5xx from the origin counts as "no answer" when there
+// is a cached copy. A slow first-ever load keeps waiting for the network
+// rather than failing, and a failed first-ever load fails the way the browser
+// does today, not with a blank cached page.
+async function shell(req, event) {
   const cache = await caches.open(CACHE);
-  const net = fetch(req).then(async (r) => {
-    if (r && r.status === 200 && r.type === "basic") { try { await cache.put(SHELL, r.clone()); } catch (e) {} }
-    return r;
-  });
+  const net = fetch(req);
   net.catch(() => {});
+  const store = net.then((r) => {
+    if (r && r.status === 200 && r.type === "basic") return cache.put(SHELL, r.clone());
+  }).catch(() => {});
+  if (event && event.waitUntil) event.waitUntil(store);
   const timer = new Promise((resolve) => setTimeout(() => resolve("timeout"), NET_TIMEOUT_MS));
   try {
     const r = await Promise.race([net, timer]);
-    if (r !== "timeout") return r;
+    if (r !== "timeout" && r.status < 500) return r;
     const cached = await cache.match(SHELL);
-    return cached || net;
+    return cached || (r === "timeout" ? net : r);
   } catch (e) {
     const cached = await cache.match(SHELL);
     if (cached) return cached;
@@ -92,20 +94,31 @@ async function shell(req) {
   }
 }
 
+// A CORS fetch first so the status is visible: only an OK response is stored.
+// If the host won't answer CORS, the plain (opaque) response is served to the
+// page but never kept - it could be an error page wearing status 0.
+async function fetchVisible(req) {
+  try {
+    const r = await fetch(req.url, { cache: "no-cache" });
+    return { r, visible: true };
+  } catch (e) {
+    return { r: await fetch(req), visible: false };
+  }
+}
 async function cacheFirst(req) {
   const cache = await caches.open(CACHE);
   const hit = await cache.match(req, { ignoreVary: true });
   if (hit) return hit;
-  const r = await fetch(req);
-  if (r && (r.ok || r.type === "opaque")) { try { await cache.put(req, r.clone()); } catch (e) {} }
+  const { r, visible } = await fetchVisible(req);
+  if (visible && r && r.ok) { try { await cache.put(req.url, r.clone()); } catch (e) {} }
   return r;
 }
 
 async function staleWhileRevalidate(req) {
   const cache = await caches.open(CACHE);
   const hit = await cache.match(req, { ignoreVary: true });
-  const refresh = fetch(req).then((r) => {
-    if (r && (r.ok || r.type === "opaque")) cache.put(req, r.clone()).catch(() => {});
+  const refresh = fetchVisible(req).then(({ r, visible }) => {
+    if (visible && r && r.ok) cache.put(req.url, r.clone()).catch(() => {});
     return r;
   }).catch(() => null);
   if (hit) return hit;
@@ -120,7 +133,7 @@ self.addEventListener("fetch", (e) => {
   try { url = new URL(req.url); } catch (err) { return; }
   if (isFunction(url)) return;
   if (req.mode === "navigate") {
-    if (isShell(url)) e.respondWith(shell(req));
+    if (isShell(url)) e.respondWith(shell(req, e));
     return;
   }
   if (isCdn(url)) { e.respondWith(cacheFirst(req)); return; }
