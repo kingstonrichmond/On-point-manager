@@ -5438,17 +5438,60 @@ function fmtPhone(p) {
   return p || "";
 }
 function callDay(iso) { try { return new Date(iso).toLocaleDateString("en-CA"); } catch (e) { return ""; } }
+// ---- Repeat calls -------------------------------------------------------------
+// Same number, within twenty minutes of the previous one: "3rd call in 12 min".
+// A caption, not a flag — the owner finds these interesting, not alarming, and
+// most of them are somebody calling back about the order they just placed.
+const REPEAT_WINDOW_MS = 20 * 60000;
+function callRepeats(calls) {
+  const byNum = {}, out = {};
+  (calls || []).slice().sort((a, b) => (a.at < b.at ? -1 : 1)).forEach((c) => {
+    if (!c || !c.from) return;
+    const t = Date.parse(c.at);
+    if (isNaN(t)) return;
+    const prev = byNum[c.from];
+    if (prev && t - prev.last <= REPEAT_WINDOW_MS) {
+      prev.n += 1; prev.last = t;
+      out[c.id] = { nth: prev.n, mins: Math.max(1, Math.round((t - prev.first) / 60000)) };
+    } else byNum[c.from] = { first: t, last: t, n: 1 };
+  });
+  return out;
+}
+function ordinal(n) { const r = n % 100; return n + (r >= 11 && r <= 13 ? "th" : n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th"); }
+// The frustration mark: one face, no tiers, no explanation chip. Whatever Vapi's
+// analysis called it, only a clear annoyed/angry draws anything.
+function callUpset(c) { return !!(c && c.mood && /annoy|angry|frustrat|upset|irritat/i.test(String(c.mood))); }
+function callFlagged(c) { return callUpset(c) || !!(c && c.report); }
+// A tel: link only means something on a phone; on the line tablet it's a dead tap.
+function canPlaceCall() { try { return /iPhone|Android.+Mobile/i.test(navigator.userAgent || ""); } catch (e) { return false; } }
+const CALLS_URL = "/.netlify/functions/calls";
+const monthLabel = (m) => { try { return new Date(m + "-01T12:00:00").toLocaleDateString([], { month: "short", year: "numeric" }); } catch (e) { return m; } };
+
+// ---- The call list ----------------------------------------------------------
+// The reason anyone opens the Phone half. Audio first: a play button at the left
+// edge of every row that has a recording, playing in place, one at a time. The
+// synced document holds a week; "All" reads older months from the archive.
 function CallLog({ data, persist, isAdmin }) {
   const [q, setQ] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
   const [open, setOpen] = useState("");
-  const [days, setDays] = useState(2);
-  const calls = ((data && data.phoneCalls) || []).slice().sort((a, b) => (a.at < b.at ? 1 : -1));
+  const [range, setRange] = useState(2);       // days back; 0 means all
+  const [kind, setKind] = useState("all");     // all | orders | noorder | flagged
+  const [numFilter, setNumFilter] = useState("");
+  const [playing, setPlaying] = useState(null); // { id, t, d, paused }
+  const [archive, setArchive] = useState({ months: null, loaded: {}, busy: false, error: "" });
+  const audioRef = useRef(null);
+  const docCalls = (data && data.phoneCalls) || [];
+  const archived = Object.keys(archive.loaded).reduce((a, m) => a.concat(archive.loaded[m] || []), []);
+  const seen = {};
+  const calls = docCalls.concat(archived).filter((c) => c && c.id && !seen[c.id] && (seen[c.id] = true)).sort((a, b) => (a.at < b.at ? 1 : -1));
   const orders = (data && data.phoneOrders) || [];
   const byCall = {}; orders.forEach((o) => { if (o.callId) byCall[o.callId] = o; });
   const orphanOrders = orders.filter((o) => !o.callId || !calls.some((c) => c.id === o.callId));
+  const repeats = callRepeats(calls);
   const t = (iso) => { try { return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; } };
   const dur = (s) => (s == null ? "" : s < 60 ? s + "s" : Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"));
-  const cutoff = new Date(Date.now() - days * 864e5).toLocaleDateString("en-CA");
+  const cutoff = new Date(Date.now() - range * 864e5).toLocaleDateString("en-CA");
   const needle = q.trim().toLowerCase();
   const hit = (c) => {
     if (!needle) return true;
@@ -5456,7 +5499,44 @@ function CallLog({ data, persist, isAdmin }) {
     const hay = [c.from, fmtPhone(c.from), c.summary, c.transcript, o && o.caller && o.caller.name, o && (o.items || []).map((i) => i.name).join(" ")].filter(Boolean).join(" ").toLowerCase();
     return hay.indexOf(needle) !== -1;
   };
-  const shown = calls.filter((c) => (needle ? true : callDay(c.at) >= cutoff)).filter(hit);
+  const shown = calls.filter((c) => {
+    if (numFilter && c.from !== numFilter) return false;
+    if (!needle && range && callDay(c.at) < cutoff) return false;
+    const o = byCall[c.id];
+    if (kind === "orders" && !o) return false;
+    if (kind === "noorder" && o) return false;
+    if (kind === "flagged" && !callFlagged(c)) return false;
+    return hit(c);
+  });
+
+  // ---- the archive, on demand ----
+  const loadMonth = (m) => {
+    fetch(CALLS_URL + "?month=" + encodeURIComponent(m), { headers: { "cache-control": "no-cache" } }).then((r) => r.json()).then((j) => {
+      setArchive((a) => Object.assign({}, a, { loaded: Object.assign({}, a.loaded, { [m]: (j && j.calls) || [] }) }));
+    }).catch(() => {});
+  };
+  const loadMonths = () => {
+    setArchive((a) => Object.assign({}, a, { busy: true, error: "" }));
+    fetch(CALLS_URL, { headers: { "cache-control": "no-cache" } }).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then((j) => {
+      const months = (j && j.months) || [];
+      setArchive((a) => Object.assign({}, a, { months, busy: false }));
+      months.slice(0, 2).forEach((m) => loadMonth(m.month));
+    }).catch((e) => setArchive((a) => Object.assign({}, a, { months: [], busy: false, error: "Couldn't reach the archive — " + (e && e.message ? e.message : "no answer") })));
+  };
+  useEffect(() => { if (range === 0 && archive.months === null && !archive.busy) loadMonths(); }, [range]);
+  const earlier = (archive.months || []).filter((m) => !(m.month in archive.loaded));
+  const showAll = () => { setRange(0); };
+  const history = (num) => { setNumFilter(num); setRange(0); setOpen(""); };
+
+  // ---- one recording at a time, in place ----
+  const play = (c) => {
+    const a = audioRef.current;
+    if (!a || !c.recordingUrl) return;
+    if (playing && playing.id === c.id) { if (a.paused) a.play().catch(() => {}); else a.pause(); return; }
+    a.src = c.recordingUrl;
+    setPlaying({ id: c.id, t: 0, d: 0, paused: false });
+    a.play().catch(() => setPlaying(null));
+  };
   const patchOrder = (id, patch) => persist && persist((d) => { const c = JSON.parse(JSON.stringify(d)); c.phoneOrders = (c.phoneOrders || []).map((o) => o.id === id ? Object.assign(o, patch) : o); return c; });
   const orderLine = (o) => {
     const posOk = o.posResult && o.posResult.ok;
@@ -5476,33 +5556,72 @@ function CallLog({ data, persist, isAdmin }) {
       (!o.keyedIntoPos && !(o.posResult && o.posResult.ok)) ? React.createElement(TicketButton, { onClick: () => patchOrder(o.id, { keyedIntoPos: true }) }, "Keyed in") : null,
       o.status !== "done" ? React.createElement(TicketButton, { onClick: () => patchOrder(o.id, { status: "done" }), color: COLORS.card, style: { border: "1px solid " + COLORS.line } }, o.type === "delivery" ? "Out the door" : "Picked up") : null));
   const card = { background: COLORS.card, borderRadius: 18, boxShadow: "0 1px 2px rgba(23,25,27,0.05), 0 6px 18px rgba(23,25,27,0.05)" };
+  const chip = (on, txt, onClick, key) => React.createElement("button", { key: key || txt, onClick, className: "text-xs px-2.5 py-1.5 rounded-full",
+    style: { fontFamily: "Inter", fontWeight: 600, border: "1px solid " + (on ? COLORS.crust : COLORS.line), background: on ? COLORS.crust : "transparent", color: on ? COLORS.cream : COLORS.crust, whiteSpace: "nowrap" } }, txt);
+  const action = { fontFamily: "Inter", fontSize: 13, fontWeight: 600, color: COLORS.crust, background: "#F2F2EF", border: "none", borderRadius: 999, padding: "8px 14px", textDecoration: "none", display: "inline-block" };
+  const muted = { fontFamily: "Inter", fontSize: 12.5, color: COLORS.steel };
+  const today = new Date().toLocaleDateString("en-CA");
   return React.createElement("div", { className: "px-4 py-4 mb-3", style: card },
-    React.createElement("div", { className: "flex items-baseline justify-between mb-2" },
+    React.createElement("audio", { ref: audioRef, preload: "none", style: { display: "none" },
+      onTimeUpdate: (e) => { const el = e.target; setPlaying((p) => p ? Object.assign({}, p, { t: el.currentTime || 0, d: el.duration || 0 }) : p); },
+      onPlay: () => setPlaying((p) => p ? Object.assign({}, p, { paused: false }) : p),
+      onPause: () => setPlaying((p) => p ? Object.assign({}, p, { paused: true }) : p),
+      onEnded: () => setPlaying(null), onError: () => setPlaying(null) }),
+    React.createElement("div", { className: "flex items-center justify-between gap-2 mb-2" },
       React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase" } }, "Calls"),
-      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 12.5, color: COLORS.steel } }, calls.length ? calls.length + " on file" : "")),
-    React.createElement("input", { placeholder: "Search a number, a name, or something they said…", value: q, onChange: (e) => setQ(e.target.value), className: "w-full px-3 outline-none opp-field mb-2" }),
-    !needle ? React.createElement("div", { className: "flex gap-1.5 mb-2" },
-      [[1, "Today"], [2, "2 days"], [7, "Week"], [30, "Month"]].map(([n, l]) => React.createElement("button", { key: n, onClick: () => setDays(n), className: "text-xs px-2.5 py-1.5 rounded-full",
-        style: { fontFamily: "Inter", fontWeight: 600, border: "1px solid " + (days === n ? COLORS.crust : COLORS.line), background: days === n ? COLORS.crust : "transparent", color: days === n ? COLORS.cream : COLORS.crust } }, l))) : null,
+      React.createElement("div", { className: "flex items-center gap-2" },
+        React.createElement("span", { style: muted }, calls.length ? calls.length + " on file" : ""),
+        React.createElement("button", { onClick: () => { setShowSearch(!showSearch); if (showSearch) setQ(""); }, "aria-label": "Search calls", title: "Search",
+          style: { width: 34, height: 34, borderRadius: 999, border: "1px solid " + (showSearch || needle ? COLORS.crust : COLORS.line), background: showSearch || needle ? COLORS.crust : "transparent", color: showSearch || needle ? COLORS.cream : COLORS.crust, fontSize: 15 } }, "\u{1F50D}"))),
+    (showSearch || needle) ? React.createElement("input", { placeholder: "Search a number, a name, or something they said…", value: q, autoFocus: true, onChange: (e) => setQ(e.target.value), className: "w-full px-3 outline-none opp-field mb-2" }) : null,
+    React.createElement("div", { className: "flex gap-1.5 mb-2 flex-wrap" },
+      [["all", "All"], ["orders", "Orders"], ["noorder", "No order"], ["flagged", "Flagged"]].map(([k, l]) => chip(kind === k, l, () => setKind(k), "k" + k))),
+    !needle ? React.createElement("div", { className: "flex gap-1.5 mb-2 flex-wrap" },
+      [[1, "Today"], [2, "2 days"], [7, "Week"], [30, "Month"], [0, "All"]].map(([n, l]) => chip(range === n, l, () => (n === 0 ? showAll() : setRange(n)), "r" + n))) : null,
+    numFilter ? React.createElement("div", { className: "flex items-center gap-2 mb-2 px-3 py-2 rounded", style: { background: "#F7F7F5", border: "1px solid " + COLORS.line } },
+      React.createElement("span", { style: { fontFamily: "Inter", fontSize: 13, color: COLORS.crust, flex: 1 } }, "Calls from " + fmtPhone(numFilter)),
+      React.createElement("button", { onClick: () => setNumFilter(""), style: { background: "transparent", border: "none", fontFamily: "Inter", fontSize: 13, fontWeight: 600, color: COLORS.ink } }, "Show all ×")) : null,
+    range === 0 && archive.busy ? React.createElement("div", { style: Object.assign({ padding: "4px 0 8px" }, muted) }, "Looking further back…") : null,
+    range === 0 && archive.error ? React.createElement("div", { style: Object.assign({ padding: "4px 0 8px", color: COLORS.alertDark }, muted) }, archive.error) : null,
     !calls.length ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: INK3, padding: "8px 0" } }, "No calls yet. Once the phone assistant is live, every call lands here with a summary, the transcript, and the order it made.") : null,
-    calls.length && !shown.length ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: INK3, padding: "8px 0" } }, needle ? "Nothing matches." : "No calls in this window.") : null,
+    calls.length && !shown.length ? React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: INK3, padding: "8px 0" } }, needle ? "Nothing matches." : numFilter ? "No other calls from this number." : kind !== "all" ? "Nothing like that in this window." : "No calls in this window.") : null,
     shown.map((c) => {
       const o = byCall[c.id];
       const isOpen = open === c.id;
-      return React.createElement("div", { key: c.id, style: { borderTop: "1px solid " + COLORS.line, padding: "10px 0" } },
-        React.createElement("button", { onClick: () => setOpen(isOpen ? "" : c.id), className: "w-full text-left", style: { background: "transparent", border: "none", padding: 0 } },
-          React.createElement("div", { className: "flex items-baseline justify-between gap-2" },
-            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 16, fontWeight: 700, color: COLORS.crust } },
-              (o && o.caller && o.caller.name) ? o.caller.name : fmtPhone(c.from) || "Unknown number",
-              (o && o.caller && o.caller.name) ? React.createElement("span", { style: { fontWeight: 400, fontSize: 13, color: COLORS.steel, marginLeft: 8 } }, fmtPhone(c.from)) : null),
-            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12.5, color: COLORS.steel, flex: "0 0 auto" } }, (callDay(c.at) === new Date().toLocaleDateString("en-CA") ? "" : new Date(c.at).toLocaleDateString([], { month: "short", day: "numeric" }) + " ") + t(c.at) + (c.durationSec != null ? " · " + dur(c.durationSec) : ""))),
-          React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: COLORS.crust, marginTop: 2, display: "-webkit-box", WebkitLineClamp: isOpen ? "unset" : 2, WebkitBoxOrient: "vertical", overflow: "hidden" } }, c.summary || (c.endedReason ? "No summary · " + c.endedReason : "No summary")),
-          o ? orderLine(o) : null),
+      const isPlaying = !!(playing && playing.id === c.id);
+      const rep = repeats[c.id];
+      const name = (o && o.caller && o.caller.name) ? o.caller.name : fmtPhone(c.from) || "Unknown number";
+      return React.createElement("div", { key: c.id, "data-call": c.id, style: { borderTop: "1px solid " + COLORS.line, padding: "10px 0", position: "relative" } },
+        React.createElement("div", { className: "flex items-start gap-2.5" },
+          c.recordingUrl ? React.createElement("button", { onClick: () => play(c), className: "opp-play", "aria-label": isPlaying && !playing.paused ? "Pause" : "Play",
+            style: { width: 36, height: 36, borderRadius: 999, border: "1px solid " + (isPlaying ? COLORS.crust : COLORS.line), background: isPlaying ? COLORS.crust : COLORS.card, color: isPlaying ? COLORS.cream : COLORS.crust, flex: "0 0 auto", fontSize: 13, lineHeight: 1, marginTop: 1 } },
+            isPlaying && !playing.paused ? "❚❚" : "▶") : null,
+          React.createElement("button", { onClick: () => setOpen(isOpen ? "" : c.id), className: "text-left", style: { flex: 1, minWidth: 0, background: "transparent", border: "none", padding: 0 } },
+            React.createElement("div", { className: "flex items-baseline justify-between gap-2" },
+              React.createElement("div", { style: { fontFamily: "Inter", fontSize: 16, fontWeight: 700, color: COLORS.crust, minWidth: 0 } },
+                name,
+                (o && o.caller && o.caller.name) ? React.createElement("span", { style: { fontWeight: 400, fontSize: 13, color: COLORS.steel, marginLeft: 8 } }, fmtPhone(c.from)) : null,
+                callUpset(c) ? React.createElement("span", { title: "Sounded " + c.mood, "data-mood": c.mood, style: { marginLeft: 6, fontSize: 15 } }, "\u{1F620}") : null),
+              React.createElement("div", { style: Object.assign({ flex: "0 0 auto" }, muted) }, (callDay(c.at) === today ? "" : new Date(c.at).toLocaleDateString([], { month: "short", day: "numeric" }) + " ") + t(c.at) + (c.durationSec != null ? " · " + dur(c.durationSec) : ""))),
+            React.createElement("div", { style: { fontFamily: "Inter", fontSize: 14, color: COLORS.crust, marginTop: 2, display: "-webkit-box", WebkitLineClamp: isOpen ? "unset" : 2, WebkitBoxOrient: "vertical", overflow: "hidden" } }, c.summary || (c.endedReason ? "No summary · " + c.endedReason : "No summary")),
+            o ? orderLine(o) : null)),
+        rep ? React.createElement("button", { onClick: () => history(c.from), "data-repeat": rep.nth, style: Object.assign({ background: "transparent", border: "none", padding: "2px 0 0", marginLeft: c.recordingUrl ? 46 : 0 }, muted) }, ordinal(rep.nth) + " call in " + rep.mins + " min") : null,
         isOpen ? React.createElement("div", null,
+          c.recordingUrl ? React.createElement("audio", { controls: true, preload: "none", src: c.recordingUrl, className: "w-full mt-2", style: { height: 36 },
+            onPlay: () => { const a = audioRef.current; if (a && !a.paused) a.pause(); } }) : null,
           o ? orderDetail(o) : null,
-          c.transcript ? React.createElement("pre", { className: "text-xs whitespace-pre-wrap p-2.5 rounded mt-2", style: { background: "#FAFAF8", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono", color: COLORS.crust, maxHeight: 320, overflowY: "auto" } }, c.transcript) : React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: INK3, marginTop: 6 } }, "No transcript came back for this call."),
-          c.recordingUrl ? React.createElement("a", { href: c.recordingUrl, target: "_blank", rel: "noopener", style: { display: "inline-block", marginTop: 8, fontFamily: "Inter", fontSize: 13, fontWeight: 600, color: COLORS.ink } }, "Listen to the recording ›") : null) : null);
+          c.transcript ? React.createElement("pre", { className: "text-xs whitespace-pre-wrap p-2.5 rounded mt-2", style: { background: "#FAFAF8", border: "1px solid " + COLORS.line, fontFamily: "JetBrains Mono", color: COLORS.crust, maxHeight: 320, overflowY: "auto" } }, c.transcript) : React.createElement("div", { style: { fontFamily: "Inter", fontSize: 13, color: INK3, marginTop: 6 } }, "No transcript for this call."),
+          React.createElement("div", { className: "flex gap-2 mt-2.5 flex-wrap", "data-actions": "1" },
+            canPlaceCall() && c.from ? React.createElement("a", { href: "tel:" + c.from, style: action }, "Call back") : null,
+            c.from ? React.createElement("button", { onClick: () => history(c.from), style: action }, "History") : null)) : null,
+        isPlaying && playing.d > 0 ? React.createElement("div", { "data-progress": "1", style: { position: "absolute", left: 0, right: 0, bottom: 0, height: 2, background: COLORS.line } },
+          React.createElement("div", { style: { width: Math.min(100, 100 * playing.t / playing.d) + "%", height: "100%", background: COLORS.lamp } })) : null);
     }),
+    range === 0 && earlier.length ? React.createElement("div", { className: "flex flex-col gap-1.5", style: { paddingTop: 8 } },
+      earlier.map((m) => React.createElement("button", { key: m.month, onClick: () => loadMonth(m.month), className: "text-sm px-3 py-2 rounded-full",
+        style: { fontFamily: "Inter", fontWeight: 600, border: "1px solid " + COLORS.line, background: "transparent", color: COLORS.crust } },
+        "Show earlier — " + monthLabel(m.month) + (m.n != null ? " (" + m.n + (m.n === 1 ? " call)" : " calls)") : "")))) : null,
+    range === 0 && archive.months && !archive.months.length && !archive.error ? React.createElement("div", { style: Object.assign({ padding: "8px 0 0" }, muted) }, "That's as far back as it goes.") : null,
     orphanOrders.length ? React.createElement("div", { style: { borderTop: "1px solid " + COLORS.line, paddingTop: 10, marginTop: 4 } },
       React.createElement("div", { style: { fontFamily: "Inter", fontSize: 12, fontWeight: 700, letterSpacing: "0.09em", color: INK2, textTransform: "uppercase", marginBottom: 4 } }, "Orders without a call record"),
       orphanOrders.slice(-10).reverse().map((o) => React.createElement("div", { key: o.id, style: { padding: "6px 0" } }, orderLine(o), open === o.id ? orderDetail(o) : React.createElement("button", { onClick: () => setOpen(o.id), style: { background: "transparent", border: "none", padding: 0, fontFamily: "Inter", fontSize: 12.5, color: COLORS.ink, marginTop: 2 } }, "Details ›")))) : null);
